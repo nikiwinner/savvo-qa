@@ -1,0 +1,172 @@
+import { APIRequestContext, APIResponse } from '@playwright/test'
+
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8000'
+
+export interface UserRecord {
+  email: string
+  password: string
+  name: string
+}
+
+export interface HouseholdRecord {
+  id: number
+  name: string
+}
+
+export interface ExpenseRecord {
+  id: number
+  description: string
+  amount: string
+}
+
+export interface CreateExpenseData {
+  household: number
+  description: string
+  amount: number
+  category: string
+  expense_date: string
+}
+
+/** Unique email to avoid conflicts between parallel tests */
+export function uniqueUser(prefix = 'user'): UserRecord {
+  const ts = Date.now()
+  const rand = Math.random().toString(36).slice(2, 6)
+  return {
+    email: `${prefix}-${ts}-${rand}@test.local`,
+    password: 'TestPass123!',
+    name: `Test ${prefix} ${ts}`,
+  }
+}
+
+/**
+ * Wraps a single APIRequestContext as one authenticated actor.
+ * Auth endpoints are @csrf_exempt so they need no CSRF header.
+ * All other mutating endpoints require X-CSRFToken from the cookie jar.
+ */
+export class ApiHelper {
+  constructor(
+    private readonly ctx: APIRequestContext,
+    private readonly baseUrl = BACKEND_URL,
+  ) {}
+
+  // ── Auth ───────────────────────────────────────────────────────────────────
+
+  async signup(user: UserRecord): Promise<void> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/auth/signup/`, {
+      data: {
+        username: user.email,
+        email: user.email,
+        password: user.password,
+        password_confirm: user.password,
+        name: user.name,
+      },
+    })
+    if (!res.ok()) {
+      throw new Error(`signup failed (${res.status()}): ${await res.text()}`)
+    }
+  }
+
+  async login(email: string, password: string): Promise<void> {
+    // If a session already exists (e.g. after signup), DRF's SessionAuthentication
+    // will enforce CSRF on the login request. Send the token when we have it.
+    const csrf = await this.csrfToken()
+    const res = await this.ctx.post(`${this.baseUrl}/api/auth/login/`, {
+      data: { username: email, password },
+      headers: csrf ? { 'X-CSRFToken': csrf } : {},
+    })
+    if (!res.ok()) {
+      throw new Error(`login failed (${res.status()}): ${await res.text()}`)
+    }
+    // Session + CSRF cookies are now stored in ctx's cookie jar automatically
+  }
+
+  /** Returns all cookies currently held by this context. */
+  async cookies() {
+    const state = await this.ctx.storageState()
+    return state.cookies
+  }
+
+  // ── Households ─────────────────────────────────────────────────────────────
+
+  async createHousehold(name: string, description = ''): Promise<HouseholdRecord> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/households/`, {
+      data: { name, description },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`createHousehold failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async listHouseholds(): Promise<HouseholdRecord[]> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/households/`)
+    if (!res.ok()) {
+      throw new Error(`listHouseholds failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** Returns the HTTP status code when fetching a specific household. */
+  async getHouseholdStatus(householdId: number): Promise<number> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/households/${householdId}/`)
+    return res.status()
+  }
+
+  async assignUser(householdId: number, userId: number): Promise<void> {
+    const res = await this.ctx.put(`${this.baseUrl}/api/households/${householdId}/assign_user/`, {
+      data: { user_id: userId },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`assignUser failed (${res.status()}): ${await res.text()}`)
+    }
+  }
+
+  async unassignUser(householdId: number, userId: number): Promise<APIResponse> {
+    return this.ctx.put(`${this.baseUrl}/api/households/${householdId}/unassign_user/`, {
+      data: { user_id: userId },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async me(): Promise<{ id: number; email: string; name: string } | null> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/auth/me/`)
+    const data = await res.json()
+    return data.user ?? null
+  }
+
+  // ── Expenses ───────────────────────────────────────────────────────────────
+
+  async createExpense(data: CreateExpenseData): Promise<ExpenseRecord> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/expenses/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`createExpense failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async listExpenses(): Promise<ExpenseRecord[]> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/expenses/`)
+    if (!res.ok()) {
+      throw new Error(`listExpenses failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** Returns the HTTP status code when fetching a specific expense. */
+  async getExpenseStatus(expenseId: number): Promise<number> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/expenses/${expenseId}/`)
+    return res.status()
+  }
+
+  // ── Internal ───────────────────────────────────────────────────────────────
+
+  private async csrfToken(): Promise<string> {
+    const state = await this.ctx.storageState()
+    return state.cookies.find((c) => c.name === 'csrftoken')?.value ?? ''
+  }
+}

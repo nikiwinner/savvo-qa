@@ -1,0 +1,24 @@
+{
+  "name": "ledgerapp-qa",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "description": "Playwright E2E test suite for HomeLedger",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:auth": "playwright test tests/auth/",
+    "test:households": "playwright test tests/households/",
+    "test:expenses": "playwright test tests/expenses/",
+    "test:dashboard": "playwright test tests/dashboard/",
+    "test:mobile": "playwright test --project=mobile-safari",
+    "test:tablet": "playwright test --project=tablet",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^6.0.0"
+  }
+}
