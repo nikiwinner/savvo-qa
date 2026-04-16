@@ -18,7 +18,7 @@ export class ExpensesPage {
 
   constructor(private readonly page: Page) {
     this.heading = page.locator('h1', { hasText: 'Expenses' })
-    this.newExpenseButton = page.locator('button', { hasText: '+ New Expense' })
+    this.newExpenseButton = page.locator('button', { hasText: '+ New Transaction' })
     this.createForm = page.locator('.form-card')
     this.emptyState = page.locator('.empty-state')
     this.noHouseholdMessage = page.locator('.info-message')
@@ -41,7 +41,7 @@ export class ExpensesPage {
     await this.createForm.locator('#description').fill(data.description)
     await this.createForm.locator('#amount').fill(data.amount)
     await this.createForm.locator('#expense_date').fill(data.date)
-    await this.createForm.locator('button', { hasText: 'Add Expense' }).click()
+    await this.createForm.locator('button', { hasText: 'Add Transaction' }).click()
   }
 
   async createExpense(data: CreateExpenseForm): Promise<void> {

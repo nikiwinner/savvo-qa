@@ -26,7 +26,6 @@ test.describe('Expense data scoping', () => {
       household: hhA.id,
       description: 'Alice Secret Expense',
       amount: 999,
-      category: 'Other',
       expense_date: TODAY,
     })
 
@@ -61,14 +60,12 @@ test.describe('Expense data scoping', () => {
       household: hhA.id,
       description: 'Alice Expense',
       amount: 200,
-      category: 'Rent',
       expense_date: TODAY,
     })
     const expB = await apiB.createExpense({
       household: hhB.id,
       description: 'Bob Expense',
       amount: 100,
-      category: 'Groceries',
       expense_date: TODAY,
     })
 
@@ -94,7 +91,6 @@ test.describe('Expense data scoping', () => {
         household: hhA.id,
         description: 'Intrusion Attempt',
         amount: 1,
-        category: 'Other',
         expense_date: TODAY,
       })
       // Should not reach here
@@ -112,7 +108,6 @@ test.describe('Expense data scoping', () => {
       household: hhA.id,
       description: 'Private Expense',
       amount: 500,
-      category: 'Other',
       expense_date: TODAY,
     })
 

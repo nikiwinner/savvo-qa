@@ -1,8 +1,8 @@
 import { test as base } from '@playwright/test'
-import { ApiHelper, UserRecord, HouseholdRecord, uniqueUser } from '../helpers/api'
+import { ApiHelper, UserRecord, HouseholdRecord, CategoryRecord, uniqueUser } from '../helpers/api'
 
 export { expect } from '@playwright/test'
-export type { UserRecord, HouseholdRecord }
+export type { UserRecord, HouseholdRecord, CategoryRecord }
 
 type AppFixtures = {
   /** A browser page with a freshly-created user already logged in. */

@@ -19,11 +19,19 @@ export interface ExpenseRecord {
   amount: string
 }
 
+export interface CategoryRecord {
+  id: number
+  name: string
+  icon: string
+  is_default: boolean
+}
+
 export interface CreateExpenseData {
   household: number
   description: string
   amount: number
-  category: string
+  category?: number | null
+  type?: 'expense' | 'income'
   expense_date: string
 }
 
@@ -155,6 +163,32 @@ export class ApiHelper {
       throw new Error(`listExpenses failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
+  }
+
+  // ── Categories ─────────────────────────────────────────────────────────────
+
+  async createCategory(name: string, icon = ''): Promise<CategoryRecord> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/categories/`, {
+      data: { name, icon },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`createCategory failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async listCategories(): Promise<CategoryRecord[]> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/categories/`)
+    if (!res.ok()) {
+      throw new Error(`listCategories failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async getCategoryByName(name: string): Promise<CategoryRecord | null> {
+    const cats = await this.listCategories()
+    return cats.find((c) => c.name === name) ?? null
   }
 
   /** Returns the HTTP status code when fetching a specific expense. */

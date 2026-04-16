@@ -32,7 +32,7 @@ test.describe('Expenses CRUD', () => {
     await expenses.goto()
 
     await expect(expenses.emptyState).toBeVisible()
-    await expect(expenses.emptyState).toContainText('No expenses yet')
+    await expect(expenses.emptyState).toContainText('No transactions yet')
   })
 
   test('creates an expense — it appears in the table', async ({ page, loggedInPage }) => {
@@ -81,7 +81,6 @@ test.describe('Expenses CRUD', () => {
       household: household.id,
       description: 'Original Description',
       amount: 50,
-      category: 'Other',
       expense_date: TODAY,
     })
 
@@ -101,7 +100,6 @@ test.describe('Expenses CRUD', () => {
       household: household.id,
       description: 'Rent Payment',
       amount: 1000,
-      category: 'Rent',
       expense_date: TODAY,
     })
 
@@ -120,7 +118,6 @@ test.describe('Expenses CRUD', () => {
       household: household.id,
       description: 'Cancel Test',
       amount: 75,
-      category: 'Other',
       expense_date: TODAY,
     })
 
@@ -143,7 +140,6 @@ test.describe('Expenses CRUD', () => {
       household: household.id,
       description: 'To Be Deleted',
       amount: 20,
-      category: 'Other',
       expense_date: TODAY,
     })
 
@@ -158,14 +154,14 @@ test.describe('Expenses CRUD', () => {
   test('summary shows the correct total amount', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const household = await api.createHousehold('Summary Home')
-    await api.createExpense({ household: household.id, description: 'Exp A', amount: 100, category: 'Other', expense_date: TODAY })
-    await api.createExpense({ household: household.id, description: 'Exp B', amount: 50.50, category: 'Other', expense_date: TODAY })
+    await api.createExpense({ household: household.id, description: 'Exp A', amount: 100, expense_date: TODAY })
+    await api.createExpense({ household: household.id, description: 'Exp B', amount: 50.50, expense_date: TODAY })
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    // 100 + 50.50 = $150.50
-    await expect(expenses.summaryValue).toContainText('$150.50')
+    // 100 + 50.50 = $150.50 (in the expense summary card specifically)
+    await expect(page.locator('.expense-summary .summary-value')).toContainText('$150.50')
   })
 
   test('link to households page is shown when no households exist', async ({

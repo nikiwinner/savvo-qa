@@ -1,7 +1,15 @@
 import { Page, Locator } from '@playwright/test'
 
 export class DashboardPage {
-  /** stat-value elements in DOM order: Households, Expenses, Total $, This Month $ */
+  /** stat-value elements in DOM order (after Story 1.9):
+   * 0: Total Households
+   * 1: Total Transactions
+   * 2: Total Income ($)
+   * 3: Total Expenses ($)
+   * 4: Net Balance ($)
+   * 5: This Month Income ($)
+   * 6: This Month Expenses ($)
+   */
   readonly statValues: Locator
   readonly statCards: Locator
   readonly logoutButton: Locator
@@ -20,6 +28,7 @@ export class DashboardPage {
 
   async goto(): Promise<void> {
     await this.page.goto('/dashboard')
+    await this.page.waitForLoadState('networkidle')
   }
 
   async logout(): Promise<void> {
@@ -32,15 +41,42 @@ export class DashboardPage {
     return this.statValues.nth(0)
   }
 
+  totalTransactions(): Locator {
+    return this.statValues.nth(1)
+  }
+
+  /** @deprecated use totalTransactions() — label changed to "Total Transactions" */
   totalExpenses(): Locator {
     return this.statValues.nth(1)
   }
 
+  totalIncome(): Locator {
+    return this.statValues.nth(2)
+  }
+
+  totalExpenseAmount(): Locator {
+    return this.statValues.nth(3)
+  }
+
+  netBalance(): Locator {
+    return this.statValues.nth(4)
+  }
+
+  monthlyIncomeAmount(): Locator {
+    return this.statValues.nth(5)
+  }
+
+  monthlyExpenseAmount(): Locator {
+    return this.statValues.nth(6)
+  }
+
+  /** @deprecated use totalIncome() or totalExpenseAmount() instead */
   totalAmount(): Locator {
     return this.statValues.nth(2)
   }
 
+  /** @deprecated use monthlyExpenseAmount() instead */
   monthlyAmount(): Locator {
-    return this.statValues.nth(3)
+    return this.statValues.nth(6)
   }
 }

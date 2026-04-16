@@ -1,0 +1,131 @@
+/**
+ * Expenses — Transaction Type (Phase 01, Story 1.9)
+ *
+ * Verifies income/expense type toggle: creation, visual distinction,
+ * edit form pre-selection, and dashboard stat differentiation.
+ */
+import { test, expect } from '../../fixtures/index'
+import { ExpensesPage } from '../../pages/ExpensesPage'
+import { DashboardPage } from '../../pages/DashboardPage'
+
+const TODAY = new Date().toISOString().split('T')[0]
+
+test.describe('Transaction type (income vs expense)', () => {
+  test('type defaults to expense when opening the create form', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    await api.createHousehold('Type Default Home')
+
+    const expenses = new ExpensesPage(page)
+    await expenses.goto()
+    await expenses.openCreateForm()
+
+    // The "Expense" radio should be checked by default
+    const expenseRadio = page.locator('.form-card input[type="radio"][value="expense"]')
+    await expect(expenseRadio).toBeChecked()
+    const incomeRadio = page.locator('.form-card input[type="radio"][value="income"]')
+    await expect(incomeRadio).not.toBeChecked()
+  })
+
+  test('can create an expense transaction', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    await api.createHousehold('Expense Type Home')
+
+    const expenses = new ExpensesPage(page)
+    await expenses.goto()
+    await expenses.openCreateForm()
+
+    // Select "Expense" type (it's the default, but be explicit)
+    await page.locator('.form-card label', { hasText: 'Expense' }).click()
+    await page.locator('.form-card #description').fill('Monthly Rent')
+    await page.locator('.form-card #amount').fill('1000')
+    await page.locator('.form-card #expense_date').fill(TODAY)
+    await page.locator('.form-card button[type="submit"]').click()
+
+    await expect(page.locator('tbody tr', { hasText: 'Monthly Rent' })).toBeVisible()
+    // Should have an "Expense" type badge
+    await expect(
+      page.locator('tbody tr', { hasText: 'Monthly Rent' }).locator('.type-expense'),
+    ).toBeVisible()
+  })
+
+  test('can create an income transaction', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    await api.createHousehold('Income Type Home')
+
+    const expenses = new ExpensesPage(page)
+    await expenses.goto()
+    await expenses.openCreateForm()
+
+    // Select "Income" type
+    await page.locator('.form-card label', { hasText: 'Income' }).click()
+    await page.locator('.form-card #description').fill('Freelance Payment')
+    await page.locator('.form-card #amount').fill('500')
+    await page.locator('.form-card #expense_date').fill(TODAY)
+    await page.locator('.form-card button[type="submit"]').click()
+
+    await expect(page.locator('tbody tr', { hasText: 'Freelance Payment' })).toBeVisible()
+    // Should have an "Income" type badge
+    await expect(
+      page.locator('tbody tr', { hasText: 'Freelance Payment' }).locator('.type-income'),
+    ).toBeVisible()
+  })
+
+  test('income and expense are visually distinguished in the table', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const hh = await api.createHousehold('Visual Distinction Home')
+    await api.createExpense({ household: hh.id, description: 'Salary', amount: 3000, type: 'income', expense_date: TODAY })
+    await api.createExpense({ household: hh.id, description: 'Electricity', amount: 120, type: 'expense', expense_date: TODAY })
+
+    const expenses = new ExpensesPage(page)
+    await expenses.goto()
+
+    // Income row has income-row class and type-income badge
+    const salaryRow = page.locator('tbody tr', { hasText: 'Salary' })
+    await expect(salaryRow).toBeVisible()
+    await expect(salaryRow.locator('.type-income')).toBeVisible()
+    await expect(salaryRow.locator('.amount-income')).toBeVisible()
+
+    // Expense row has type-expense badge
+    const elecRow = page.locator('tbody tr', { hasText: 'Electricity' })
+    await expect(elecRow).toBeVisible()
+    await expect(elecRow.locator('.type-expense')).toBeVisible()
+    await expect(elecRow.locator('.amount-expense')).toBeVisible()
+  })
+
+  test('editing a transaction preserves its type', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    const hh = await api.createHousehold('Edit Type Home')
+    await api.createExpense({ household: hh.id, description: 'Side Gig', amount: 200, type: 'income', expense_date: TODAY })
+
+    const expenses = new ExpensesPage(page)
+    await expenses.goto()
+
+    // Open edit form
+    await page.locator('tbody tr', { hasText: 'Side Gig' }).locator('.btn-icon[title="Edit"]').click()
+    const editRow = page.locator('tr.edit-row')
+    await expect(editRow).toBeVisible()
+
+    // The type select in edit form should show "income"
+    const typeSelect = editRow.locator('select[name="type"]')
+    await expect(typeSelect).toHaveValue('income')
+  })
+
+  test('dashboard stats differentiate income and expense', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    const hh = await api.createHousehold('Stats Split Home')
+    await api.createExpense({ household: hh.id, description: 'Paycheck', amount: 2000, type: 'income', expense_date: TODAY })
+    await api.createExpense({ household: hh.id, description: 'Groceries', amount: 150, type: 'expense', expense_date: TODAY })
+
+    const dashboard = new DashboardPage(page)
+    await dashboard.goto()
+
+    // Income stat shows 2000, expense stat shows 150
+    await expect(dashboard.totalIncome()).toContainText('2000')
+    await expect(dashboard.totalExpenseAmount()).toContainText('150')
+    // Net = 2000 - 150 = 1850
+    await expect(dashboard.netBalance()).toContainText('1850')
+  })
+})

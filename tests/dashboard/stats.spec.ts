@@ -1,8 +1,8 @@
 /**
- * Dashboard — Stats (Phase 00 + Phase 01, Story 1.7)
+ * Dashboard — Stats (Phase 00 + Phase 01, Stories 1.7 + 1.9)
  *
  * Verifies that the dashboard stat cards display real data loaded via djangoFetch.
- * Before Story 1.7, expenses were hardcoded to []; stats showed zeroes regardless.
+ * After Story 1.9, stats are split by income vs expense type.
  */
 import { test, expect } from '../../fixtures/index'
 import { DashboardPage } from '../../pages/DashboardPage'
@@ -16,9 +16,9 @@ test.describe('Dashboard stats', () => {
     await dashboard.goto()
 
     await expect(dashboard.totalHouseholds()).toHaveText('0')
-    await expect(dashboard.totalExpenses()).toHaveText('0')
-    await expect(dashboard.totalAmount()).toContainText('0')
-    await expect(dashboard.monthlyAmount()).toContainText('0')
+    await expect(dashboard.totalTransactions()).toHaveText('0')
+    await expect(dashboard.totalIncome()).toContainText('0')
+    await expect(dashboard.totalExpenseAmount()).toContainText('0')
   })
 
   test('total households count reflects created households', async ({ page, loggedInPage }) => {
@@ -33,32 +33,32 @@ test.describe('Dashboard stats', () => {
     await expect(dashboard.totalHouseholds()).toHaveText('2')
   })
 
-  test('total expenses count reflects created expenses', async ({ page, loggedInPage }) => {
+  test('total transactions count reflects created expenses', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createHousehold('Stats Home')
 
-    await api.createExpense({ household: hh.id, description: 'Exp 1', amount: 10, category: 'Other', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Exp 2', amount: 20, category: 'Other', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Exp 3', amount: 30, category: 'Other', expense_date: TODAY })
+    await api.createExpense({ household: hh.id, description: 'Exp 1', amount: 10, expense_date: TODAY })
+    await api.createExpense({ household: hh.id, description: 'Exp 2', amount: 20, expense_date: TODAY })
+    await api.createExpense({ household: hh.id, description: 'Exp 3', amount: 30, expense_date: TODAY })
 
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    await expect(dashboard.totalExpenses()).toHaveText('3')
+    await expect(dashboard.totalTransactions()).toHaveText('3')
   })
 
-  test('total amount is the sum of all expense amounts', async ({ page, loggedInPage }) => {
+  test('total expense amount is the sum of all expense transactions', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createHousehold('Amount Stats Home')
 
-    await api.createExpense({ household: hh.id, description: 'A', amount: 100, category: 'Rent', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'B', amount: 55.50, category: 'Groceries', expense_date: TODAY })
+    await api.createExpense({ household: hh.id, description: 'A', amount: 100, expense_date: TODAY })
+    await api.createExpense({ household: hh.id, description: 'B', amount: 55.50, expense_date: TODAY })
 
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    // total = 155.50
-    await expect(dashboard.totalAmount()).toContainText('155.50')
+    // total expenses = 155.50
+    await expect(dashboard.totalExpenseAmount()).toContainText('155.50')
   })
 
   test('monthly amount counts only expenses from the current month', async ({
@@ -77,24 +77,22 @@ test.describe('Dashboard stats', () => {
       household: hh.id,
       description: 'This Month',
       amount: 300,
-      category: 'Rent',
       expense_date: TODAY,
     })
     await api.createExpense({
       household: hh.id,
       description: 'Last Month',
       amount: 500,
-      category: 'Rent',
       expense_date: lastMonthStr,
     })
 
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    // Monthly amount should be 300, not 800
-    await expect(dashboard.monthlyAmount()).toContainText('300')
-    // But total should include both
-    await expect(dashboard.totalAmount()).toContainText('800')
+    // Monthly expenses amount should include only this month's expense
+    await expect(dashboard.monthlyExpenseAmount()).toContainText('300')
+    // Total expenses includes both
+    await expect(dashboard.totalExpenseAmount()).toContainText('800')
   })
 
   test('stats only reflect data from the current user (scoping)', async ({
@@ -106,7 +104,7 @@ test.describe('Dashboard stats', () => {
     // User A creates some data
     const { api: apiA } = loggedInPage
     const hhA = await apiA.createHousehold('A Home')
-    await apiA.createExpense({ household: hhA.id, description: 'A Expense', amount: 999, category: 'Other', expense_date: TODAY })
+    await apiA.createExpense({ household: hhA.id, description: 'A Expense', amount: 999, expense_date: TODAY })
 
     // Switch to user B (no data)
     const ctxB = await playwright.request.newContext()
@@ -124,7 +122,7 @@ test.describe('Dashboard stats', () => {
 
     // User B sees 0 everywhere — not user A's data
     await expect(dashboard.totalHouseholds()).toHaveText('0')
-    await expect(dashboard.totalExpenses()).toHaveText('0')
+    await expect(dashboard.totalTransactions()).toHaveText('0')
 
     await ctxB.dispose()
   })
