@@ -29,7 +29,8 @@ test.describe('Expenses CRUD', () => {
     await api.createHousehold('Test Home')
 
     const expenses = new ExpensesPage(page)
-    await expenses.goto()
+    await page.goto('/dashboard/expenses?month=all')
+    await page.waitForLoadState('networkidle')
 
     await expect(expenses.emptyState).toBeVisible()
     await expect(expenses.emptyState).toContainText('No transactions yet')
