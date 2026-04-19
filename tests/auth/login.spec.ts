@@ -87,7 +87,7 @@ test.describe('Login', () => {
     await login.goto()
 
     await expect(login.submitButton).toBeEnabled()
-    await expect(login.submitButton).toHaveText('Login')
+    await expect(login.submitButton).toContainText('Sign in')
   })
 
   test('has a link to the signup page', async ({ page }) => {

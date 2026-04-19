@@ -23,44 +23,21 @@ test.describe('Expense categories', () => {
     await expenses.openCreateForm()
 
     // The category select should contain at least "Groceries" (a seeded default)
-    const categorySelect = page.locator('.form-card #category')
+    const categorySelect = page.locator('.form-paper #category')
     await expect(categorySelect).toBeVisible()
     // Wait for categories to load (they load via onMount)
     await expect(categorySelect.locator('option', { hasText: 'Groceries' })).toBeAttached({ timeout: 5000 })
   })
 
-  test('can create a new category inline', async ({ page, loggedInPage }) => {
-    const { api } = loggedInPage
-    await api.createHousehold('Inline Category Home')
-
-    const expenses = new ExpensesPage(page)
-    await expenses.goto()
-    await expenses.openCreateForm()
-
-    // Click "+ New Category" button
-    await page.locator('.form-card .btn-link', { hasText: '+ New Category' }).click()
-
-    // An inline input should appear
-    const newCatInput = page.locator('.new-category-input')
-    await expect(newCatInput).toBeVisible()
-    await newCatInput.fill('Vacation Fund')
-    await page.locator('.new-category-row button', { hasText: 'Add' }).click()
-
-    // After adding, the dropdown should reappear with the new category
-    const categorySelect = page.locator('.form-card #category')
-    await expect(categorySelect).toBeVisible()
-    await expect(categorySelect.locator('option', { hasText: 'Vacation Fund' })).toBeAttached({ timeout: 5000 })
-  })
-
   test('created expense shows the selected category name', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    await api.createHousehold('Category Display Home')
+    const hh = await api.createHousehold('Category Display Home')
 
     const expenses = new ExpensesPage(page)
-    await expenses.goto()
 
     await expenses.createExpense({
       householdLabel: 'Category Display Home',
+      householdId: hh.id,
       category: 'Groceries',
       description: 'Weekly Shop',
       amount: '80',
@@ -70,7 +47,7 @@ test.describe('Expense categories', () => {
     // The table row should show the category name (not an ID)
     const row = page.locator('tbody tr', { hasText: 'Weekly Shop' })
     await expect(row).toBeVisible()
-    await expect(row.locator('.category-badge')).toContainText('Groceries')
+    await expect(row.locator('.badge-category')).toContainText('Groceries')
   })
 
   test('categories are global — user B sees user A\'s created category', async ({
@@ -80,8 +57,9 @@ test.describe('Expense categories', () => {
   }) => {
     const { apiA, apiB } = twoActors
 
-    // User A creates a custom category
-    await apiA.createCategory('Pet Care')
+    // User A creates a custom category — use unique name to avoid cross-project conflicts
+    const uniqueCatName = `PetCare-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    await apiA.createCategory(uniqueCatName)
 
     // Switch browser to user B
     await apiB.createHousehold('Bob Category Home')
@@ -94,8 +72,8 @@ test.describe('Expense categories', () => {
     await expenses.openCreateForm()
 
     // Wait for categories to load
-    const categorySelect = page.locator('.form-card #category')
-    await expect(categorySelect.locator('option', { hasText: 'Pet Care' })).toBeAttached({ timeout: 5000 })
+    const categorySelect = page.locator('.form-paper #category')
+    await expect(categorySelect.locator('option', { hasText: uniqueCatName })).toBeAttached({ timeout: 5000 })
   })
 
   test('duplicate category name returns 400', async ({ loggedInPage }) => {

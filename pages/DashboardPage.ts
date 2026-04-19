@@ -20,7 +20,7 @@ export class DashboardPage {
   constructor(private readonly page: Page) {
     this.statValues = page.locator('.stat-value')
     this.statCards = page.locator('.stat-card')
-    this.logoutButton = page.locator('.logout-btn')
+    this.logoutButton = page.locator('.logout-topbar-btn')
     this.userName = page.locator('.user-name')
     this.householdsLink = page.locator('a[href="/dashboard/households"]')
     this.expensesLink = page.locator('a[href="/dashboard/expenses"]')

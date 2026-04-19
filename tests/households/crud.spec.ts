@@ -58,7 +58,7 @@ test.describe('Households CRUD', () => {
     await households.createHousehold('Pre-fill Test')
 
     // Open edit form
-    await households.card('Pre-fill Test').locator('.btn-icon[title="Edit"]').click()
+    await households.card('Pre-fill Test').locator('.action-btn[title="Edit"]').click()
 
     const nameInput = households.card('Pre-fill Test').locator('input[name="name"]')
     await expect(nameInput).toHaveValue('Pre-fill Test')
@@ -71,7 +71,7 @@ test.describe('Households CRUD', () => {
 
     // Open edit, type a new name, then cancel
     const card = households.card('Original Name')
-    await card.locator('.btn-icon[title="Edit"]').click()
+    await card.locator('.action-btn[title="Edit"]').click()
     await card.locator('input[name="name"]').fill('Changed Name')
     await card.locator('button', { hasText: 'Cancel' }).click()
 

@@ -45,6 +45,6 @@ appTest.describe('Authenticated route access', () => {
   appTest('sidebar shows the logged-in user name', async ({ page, loggedInPage }) => {
     await page.goto('/dashboard')
     const { user } = loggedInPage
-    await expect(page.locator('.top-bar-user')).toContainText(user.name)
+    await expect(page.locator('.user-name')).toContainText(user.name)
   })
 })

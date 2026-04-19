@@ -1,8 +1,12 @@
 /**
  * Expenses — Month Filter (Phase 01, Story 1.9)
  *
- * Verifies that the month selector filters the transaction list,
- * "All time" shows everything, and the filter state is URL-driven.
+ * Verifies that the month filter chips filter the transaction list,
+ * the "All" button shows everything, and the filter state is URL-driven.
+ *
+ * The filter UI uses checkbox chips in a sidebar panel (.filter-panel).
+ * Each chip corresponds to one month. The "All" and "Current" buttons
+ * appear in the filter section header.
  */
 import { test, expect } from '../../fixtures/index'
 import { ExpensesPage } from '../../pages/ExpensesPage'
@@ -28,8 +32,10 @@ test.describe('Month filter', () => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    const monthInput = page.locator('#month-filter')
-    await expect(monthInput).toBeVisible()
+    // The filter panel with month chips is always visible on the expenses page
+    await expect(page.locator('.filter-panel')).toBeVisible()
+    // The Months filter section exists
+    await expect(page.locator('.filter-panel .filter-section-title', { hasText: 'Months' })).toBeVisible()
   })
 
   test('changing the month filter updates the displayed transactions', async ({
@@ -43,12 +49,9 @@ test.describe('Month filter', () => {
     await api.createExpense({ household: hh.id, description: 'This Month Expense', amount: 100, expense_date: TODAY })
     await api.createExpense({ household: hh.id, description: 'Last Month Expense', amount: 200, expense_date: lastMonthStr() })
 
+    // Navigate with current month filter applied
     const expenses = new ExpensesPage(page)
-    await expenses.goto()
-
-    // Set filter to current month
-    await page.locator('#month-filter').fill(currentMonthParam())
-    await page.locator('#month-filter').dispatchEvent('change')
+    await page.goto(`/dashboard/expenses?household=${hh.id}&month=${currentMonthParam()}`)
     await page.waitForLoadState('networkidle')
 
     // Should see this month's expense but not last month's
@@ -56,24 +59,22 @@ test.describe('Month filter', () => {
     await expect(page.locator('tbody tr', { hasText: 'Last Month Expense' })).not.toBeVisible()
   })
 
-  test('"All time" option shows all transactions', async ({ page, loggedInPage }) => {
+  test('"All" filter shows all transactions', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createHousehold('All Time Home')
 
     await api.createExpense({ household: hh.id, description: 'This Month', amount: 100, expense_date: TODAY })
     await api.createExpense({ household: hh.id, description: 'Last Month', amount: 200, expense_date: lastMonthStr() })
 
-    const expenses = new ExpensesPage(page)
-    // Navigate with month filter set first
-    await page.goto(`/dashboard/expenses?month=${currentMonthParam()}`)
+    // Navigate with current month filter set first — only this month shows
+    await page.goto(`/dashboard/expenses?household=${hh.id}&month=${currentMonthParam()}`)
     await page.waitForLoadState('networkidle')
 
-    // Should only see this month
     await expect(page.locator('tbody tr', { hasText: 'This Month' })).toBeVisible()
     await expect(page.locator('tbody tr', { hasText: 'Last Month' })).not.toBeVisible()
 
-    // Click "All time" button
-    await page.locator('button', { hasText: 'All time' }).click()
+    // Click the "All" button in the filter panel to show all transactions
+    await page.locator('.filter-panel .btn-filter-action', { hasText: 'All' }).click()
     await page.waitForLoadState('networkidle')
 
     // Now both should be visible
@@ -93,9 +94,14 @@ test.describe('Month filter', () => {
     // The URL should still contain the month param after navigation
     expect(page.url()).toContain(`month=${monthParam}`)
 
-    // The month input should reflect the current month filter
-    const monthInput = page.locator('#month-filter')
-    await expect(monthInput).toHaveValue(monthParam)
+    // The corresponding month chip should be checked in the Months filter section
+    const monthsSection = page.locator('.filter-panel .filter-section').filter({
+      has: page.locator('.filter-section-title', { hasText: 'Months' }),
+    })
+    const chipLabel = monthsSection.locator('.filter-chip').filter({
+      has: page.locator('input[type="checkbox"]:checked'),
+    })
+    await expect(chipLabel.first()).toBeVisible()
   })
 
   test('empty state shown when no transactions exist for selected month', async ({
@@ -109,7 +115,7 @@ test.describe('Month filter', () => {
     await api.createExpense({ household: hh.id, description: 'Old Expense', amount: 50, expense_date: lastMonthStr() })
 
     const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?month=${currentMonthParam()}`)
+    await page.goto(`/dashboard/expenses?household=${hh.id}&month=${currentMonthParam()}`)
     await page.waitForLoadState('networkidle')
 
     await expect(expenses.emptyState).toBeVisible()

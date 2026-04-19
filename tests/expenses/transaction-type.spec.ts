@@ -20,53 +20,53 @@ test.describe('Transaction type (income vs expense)', () => {
     await expenses.openCreateForm()
 
     // The "Expense" radio should be checked by default
-    const expenseRadio = page.locator('.form-card input[type="radio"][value="expense"]')
+    const expenseRadio = page.locator('.form-paper input[type="radio"][value="expense"]')
     await expect(expenseRadio).toBeChecked()
-    const incomeRadio = page.locator('.form-card input[type="radio"][value="income"]')
+    const incomeRadio = page.locator('.form-paper input[type="radio"][value="income"]')
     await expect(incomeRadio).not.toBeChecked()
   })
 
   test('can create an expense transaction', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    await api.createHousehold('Expense Type Home')
+    const hh = await api.createHousehold('Expense Type Home')
 
     const expenses = new ExpensesPage(page)
-    await expenses.goto()
-    await expenses.openCreateForm()
-
-    // Select "Expense" type (it's the default, but be explicit)
-    await page.locator('.form-card label', { hasText: 'Expense' }).click()
-    await page.locator('.form-card #description').fill('Monthly Rent')
-    await page.locator('.form-card #amount').fill('1000')
-    await page.locator('.form-card #expense_date').fill(TODAY)
-    await page.locator('.form-card button[type="submit"]').click()
+    await expenses.createExpense({
+      householdLabel: 'Expense Type Home',
+      householdId: hh.id,
+      type: 'expense',
+      category: 'No category',
+      description: 'Monthly Rent',
+      amount: '1000',
+      date: TODAY,
+    })
 
     await expect(page.locator('tbody tr', { hasText: 'Monthly Rent' })).toBeVisible()
     // Should have an "Expense" type badge
     await expect(
-      page.locator('tbody tr', { hasText: 'Monthly Rent' }).locator('.type-expense'),
+      page.locator('tbody tr', { hasText: 'Monthly Rent' }).locator('.badge-expense'),
     ).toBeVisible()
   })
 
   test('can create an income transaction', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    await api.createHousehold('Income Type Home')
+    const hh = await api.createHousehold('Income Type Home')
 
     const expenses = new ExpensesPage(page)
-    await expenses.goto()
-    await expenses.openCreateForm()
-
-    // Select "Income" type
-    await page.locator('.form-card label', { hasText: 'Income' }).click()
-    await page.locator('.form-card #description').fill('Freelance Payment')
-    await page.locator('.form-card #amount').fill('500')
-    await page.locator('.form-card #expense_date').fill(TODAY)
-    await page.locator('.form-card button[type="submit"]').click()
+    await expenses.createExpense({
+      householdLabel: 'Income Type Home',
+      householdId: hh.id,
+      type: 'income',
+      category: 'No category',
+      description: 'Freelance Payment',
+      amount: '500',
+      date: TODAY,
+    })
 
     await expect(page.locator('tbody tr', { hasText: 'Freelance Payment' })).toBeVisible()
     // Should have an "Income" type badge
     await expect(
-      page.locator('tbody tr', { hasText: 'Freelance Payment' }).locator('.type-income'),
+      page.locator('tbody tr', { hasText: 'Freelance Payment' }).locator('.badge-income'),
     ).toBeVisible()
   })
 
@@ -85,13 +85,13 @@ test.describe('Transaction type (income vs expense)', () => {
     // Income row has income-row class and type-income badge
     const salaryRow = page.locator('tbody tr', { hasText: 'Salary' })
     await expect(salaryRow).toBeVisible()
-    await expect(salaryRow.locator('.type-income')).toBeVisible()
+    await expect(salaryRow.locator('.badge-income')).toBeVisible()
     await expect(salaryRow.locator('.amount-income')).toBeVisible()
 
     // Expense row has type-expense badge
     const elecRow = page.locator('tbody tr', { hasText: 'Electricity' })
     await expect(elecRow).toBeVisible()
-    await expect(elecRow.locator('.type-expense')).toBeVisible()
+    await expect(elecRow.locator('.badge-expense')).toBeVisible()
     await expect(elecRow.locator('.amount-expense')).toBeVisible()
   })
 
@@ -104,7 +104,7 @@ test.describe('Transaction type (income vs expense)', () => {
     await expenses.goto()
 
     // Open edit form
-    await page.locator('tbody tr', { hasText: 'Side Gig' }).locator('.btn-icon[title="Edit"]').click()
+    await page.locator('tbody tr', { hasText: 'Side Gig' }).locator('.action-btn[title="Edit"]').click()
     const editRow = page.locator('tr.edit-row')
     await expect(editRow).toBeVisible()
 

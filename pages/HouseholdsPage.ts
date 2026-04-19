@@ -9,8 +9,8 @@ export class HouseholdsPage {
 
   constructor(private readonly page: Page) {
     this.heading = page.locator('h1', { hasText: 'Households' })
-    this.newHouseholdButton = page.locator('button', { hasText: '+ New Household' })
-    this.createForm = page.locator('.form-card')
+    this.newHouseholdButton = page.locator('button.btn-create', { hasText: 'New Household' })
+    this.createForm = page.locator('.form-paper')
     this.emptyState = page.locator('.empty-state')
     this.householdsGrid = page.locator('.households-grid')
   }
@@ -52,7 +52,7 @@ export class HouseholdsPage {
 
   async editHousehold(currentName: string, newName: string): Promise<void> {
     const c = this.card(currentName)
-    await c.locator('.btn-icon[title="Edit"]').click()
+    await c.locator('.action-btn[title="Edit"]').click()
     // The card switches to edit form — re-query by hidden id
     const editName = c.locator('input[name="name"]')
     await editName.fill(newName)
@@ -61,13 +61,13 @@ export class HouseholdsPage {
 
   async cancelEdit(name: string): Promise<void> {
     const c = this.card(name)
-    await c.locator('.btn-icon[title="Edit"]').click()
+    await c.locator('.action-btn[title="Edit"]').click()
     await c.locator('button', { hasText: 'Cancel' }).click()
   }
 
   async deleteHousehold(name: string): Promise<void> {
     const c = this.card(name)
     this.page.once('dialog', (d) => d.accept())
-    await c.locator('.btn-delete').click()
+    await c.locator('.action-btn.action-btn-danger').click()
   }
 }

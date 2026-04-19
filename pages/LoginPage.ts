@@ -11,7 +11,7 @@ export class LoginPage {
     this.emailInput = page.locator('#email')
     this.passwordInput = page.locator('#password')
     this.submitButton = page.locator('button[type="submit"]')
-    this.errorMessage = page.locator('.error-message')
+    this.errorMessage = page.locator('.alert.alert-error')
     this.signupLink = page.locator('a[href="/signup"]')
   }
 

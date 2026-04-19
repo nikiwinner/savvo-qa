@@ -29,7 +29,7 @@ test.describe('Expenses CRUD', () => {
     await api.createHousehold('Test Home')
 
     const expenses = new ExpensesPage(page)
-    await page.goto('/dashboard/expenses?month=all')
+    await page.goto('/dashboard/expenses')
     await page.waitForLoadState('networkidle')
 
     await expect(expenses.emptyState).toBeVisible()
@@ -38,13 +38,13 @@ test.describe('Expenses CRUD', () => {
 
   test('creates an expense — it appears in the table', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    await api.createHousehold('My Home')
+    const household = await api.createHousehold('My Home')
 
     const expenses = new ExpensesPage(page)
-    await expenses.goto()
 
     await expenses.createExpense({
       householdLabel: 'My Home',
+      householdId: household.id,
       category: 'Groceries',
       description: 'Weekly groceries',
       amount: '150.00',
@@ -57,10 +57,10 @@ test.describe('Expenses CRUD', () => {
 
   test('create form closes after successful submission', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    await api.createHousehold('Form Close Test')
+    const household = await api.createHousehold('Form Close Test')
 
     const expenses = new ExpensesPage(page)
-    await expenses.goto()
+    await expenses.gotoWithHousehold(household.id)
     await expenses.openCreateForm()
     await expect(expenses.createForm).toBeVisible()
 
@@ -125,7 +125,7 @@ test.describe('Expenses CRUD', () => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    await expenses.row('Cancel Test').locator('.btn-icon[title="Edit"]').click()
+    await expenses.row('Cancel Test').locator('.action-btn[title="Edit"]').click()
     const editRow = page.locator('tr.edit-row')
     await editRow.locator('input[name="description"]').fill('Cancelled Change')
     await expenses.cancelEdit()
@@ -161,8 +161,8 @@ test.describe('Expenses CRUD', () => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    // 100 + 50.50 = $150.50 (in the expense summary card specifically)
-    await expect(page.locator('.expense-summary .summary-value')).toContainText('$150.50')
+    // 100 + 50.50 = $150.50 (in the Expenses card of the summary strip)
+    await expect(page.locator('.summary-strip .stat-expense .stat-value')).toContainText('$150.50')
   })
 
   test('link to households page is shown when no households exist', async ({
@@ -172,7 +172,7 @@ test.describe('Expenses CRUD', () => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    const link = page.locator('.info-message a', { hasText: 'Go to Households' })
+    const link = page.locator('.alert.alert-info a', { hasText: 'Go to Households' })
     await expect(link).toBeVisible()
 
     await link.click()

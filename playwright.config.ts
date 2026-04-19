@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 import path from 'path'
+import dotenv from 'dotenv'
+
+dotenv.config({ path: path.resolve(__dirname, '.env') })
+
+const TEST_DB_NAME = process.env.POSTGRES_DB_NAME ?? 'ledgerapp_test'
 
 export default defineConfig({
   testDir: './tests',
@@ -35,7 +40,7 @@ export default defineConfig({
 
   webServer: [
     {
-      command: `cd ${path.resolve(__dirname, '../backend')} && uv run python manage.py runserver`,
+      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} uv run python manage.py runserver`,
       url: 'http://127.0.0.1:8000/api/auth/me/',
       reuseExistingServer: true,
       timeout: 30_000,
