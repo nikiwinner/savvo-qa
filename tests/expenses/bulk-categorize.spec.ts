@@ -1,0 +1,167 @@
+/**
+ * Bulk Categorization (Phase 3)
+ *
+ * Tests the checkbox-based bulk selection and the floating action bar that
+ * allows assigning a category to multiple transactions at once.
+ */
+import { test, expect } from '../../fixtures/index'
+
+const TODAY = new Date().toISOString().split('T')[0]
+
+test.describe('Bulk categorization', () => {
+  test('checkboxes appear on bank transaction rows', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    const household = await api.createHousehold('Checkbox Home')
+
+    await api.createBankTransaction({
+      description: 'CHECKBOX TXN ONE',
+      amount: '10.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      household_id: household.id,
+    })
+
+    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.waitForLoadState('networkidle')
+
+    // Bank rows with a household should have a checkbox in the cell-checkbox td
+    const bankRow = page.locator('tbody tr.row-bank', { hasText: 'CHECKBOX TXN ONE' })
+    await expect(bankRow).toBeVisible()
+    await expect(bankRow.locator('.cell-checkbox input[type="checkbox"]')).toBeVisible()
+  })
+
+  test('select all selects visible bank transactions', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    const household = await api.createHousehold('Select All Home')
+
+    // Seed 2 bank txns
+    await api.createBankTransaction({
+      description: 'SELECT ALL TXN A',
+      amount: '10.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      household_id: household.id,
+    })
+    await api.createBankTransaction({
+      description: 'SELECT ALL TXN B',
+      amount: '20.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      household_id: household.id,
+    })
+
+    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.waitForLoadState('networkidle')
+
+    // Click the header checkbox (select all)
+    const headerCheckbox = page.locator('thead .th-checkbox input[type="checkbox"]')
+    await expect(headerCheckbox).toBeVisible()
+    await headerCheckbox.click()
+
+    // Both rows should have their checkboxes checked
+    const rowA = page.locator('tbody tr.row-bank', { hasText: 'SELECT ALL TXN A' })
+    const rowB = page.locator('tbody tr.row-bank', { hasText: 'SELECT ALL TXN B' })
+    await expect(rowA.locator('.cell-checkbox input[type="checkbox"]')).toBeChecked()
+    await expect(rowB.locator('.cell-checkbox input[type="checkbox"]')).toBeChecked()
+
+    // Both rows should have the row-selected class
+    await expect(rowA).toHaveClass(/row-selected/)
+    await expect(rowB).toHaveClass(/row-selected/)
+  })
+
+  test('bulk categorize assigns category to multiple transactions', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const household = await api.createHousehold('Bulk Cat Home')
+
+    // Seed 3 bank txns
+    await api.createBankTransaction({
+      description: 'BULK TXN 1',
+      amount: '10.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      household_id: household.id,
+    })
+    await api.createBankTransaction({
+      description: 'BULK TXN 2',
+      amount: '20.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      household_id: household.id,
+    })
+    await api.createBankTransaction({
+      description: 'BULK TXN 3',
+      amount: '30.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      household_id: household.id,
+    })
+
+    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.waitForLoadState('networkidle')
+
+    // Select all via header checkbox
+    await page.locator('thead .th-checkbox input[type="checkbox"]').click()
+
+    // Wait for floating action bar to appear
+    await expect(page.locator('.bulk-action-bar')).toBeVisible()
+
+    // Select category in the bulk action bar
+    const bulkCatSelect = page.locator('.bulk-action-bar .bulk-cat-select')
+    await expect(bulkCatSelect).toBeVisible()
+    const groceriesOpt = bulkCatSelect.locator('option', { hasText: 'Groceries' }).first()
+    const groceriesVal = await groceriesOpt.getAttribute('value')
+    await bulkCatSelect.selectOption(groceriesVal ?? '')
+
+    // Click Apply
+    await page.locator('.bulk-action-bar button', { hasText: 'Apply' }).click()
+
+    // Wait for success message
+    await expect(page.locator('.bulk-success-bar')).toBeVisible({ timeout: 8000 })
+    await expect(page.locator('.bulk-success-bar')).toContainText('3 transactions categorized')
+
+    // All 3 rows should now show the category badge
+    const rows = ['BULK TXN 1', 'BULK TXN 2', 'BULK TXN 3']
+    for (const desc of rows) {
+      await expect(
+        page.locator('tbody tr.row-bank', { hasText: desc }).locator('.badge-category')
+      ).toBeVisible({ timeout: 5000 })
+    }
+  })
+
+  test('floating action bar appears when transactions are selected', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const household = await api.createHousehold('Action Bar Home')
+
+    await api.createBankTransaction({
+      description: 'ACTION BAR TXN',
+      amount: '55.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      household_id: household.id,
+    })
+
+    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.waitForLoadState('networkidle')
+
+    // Action bar should not be visible initially
+    await expect(page.locator('.bulk-action-bar')).not.toBeVisible()
+
+    // Select a row
+    const bankRow = page.locator('tbody tr.row-bank', { hasText: 'ACTION BAR TXN' })
+    await bankRow.locator('.cell-checkbox input[type="checkbox"]').click()
+
+    // Action bar should now be visible
+    await expect(page.locator('.bulk-action-bar')).toBeVisible()
+    await expect(page.locator('.bulk-action-bar .bulk-count')).toContainText('1 selected')
+
+    // Cancel should hide the bar
+    await page.locator('.bulk-action-bar button', { hasText: 'Cancel' }).click({ force: true })
+    await expect(page.locator('.bulk-action-bar')).not.toBeVisible({ timeout: 5000 })
+  })
+})

@@ -26,6 +26,56 @@ export interface CategoryRecord {
   is_default: boolean
 }
 
+export interface BankTransactionRecord {
+  id: number
+  account_id: number
+  connection_id: number
+  description: string
+  amount: string
+  type: string
+  transaction_date: string
+  household: number | null
+  category: number | null
+  merchant_display_name: string
+}
+
+export interface CategoryRuleRecord {
+  id: number
+  name: string
+  priority: number
+  merchant_contains: string
+  merchant_exact: string
+  is_auto: boolean
+  set_category: number | null
+  rename_merchant: string
+  household: number
+}
+
+export interface CreateBankTransactionData {
+  description: string
+  amount: string
+  type?: 'expense' | 'income'
+  transaction_date: string
+  household_id?: number | null
+  category_id?: number | null
+  merchant_display_name?: string
+  provider_category_code?: string
+}
+
+export interface CreateCategoryRuleData {
+  household: number
+  name: string
+  priority?: number
+  merchant_contains?: string
+  merchant_exact?: string
+  amount_min?: string | null
+  amount_max?: string | null
+  bank_account?: number | null
+  set_category?: number | null
+  rename_merchant?: string
+  is_auto?: boolean
+}
+
 export interface CreateExpenseData {
   household: number
   description: string
@@ -195,6 +245,43 @@ export class ApiHelper {
   async getExpenseStatus(expenseId: number): Promise<number> {
     const res = await this.ctx.get(`${this.baseUrl}/api/expenses/${expenseId}/`)
     return res.status()
+  }
+
+  // ── Bank Transactions (debug seeding) ─────────────────────────────────────
+
+  async createBankTransaction(data: CreateBankTransactionData): Promise<BankTransactionRecord> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/bank-transaction/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`createBankTransaction failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Category Rules ─────────────────────────────────────────────────────────
+
+  async createCategoryRule(data: CreateCategoryRuleData): Promise<CategoryRuleRecord> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/category-rules/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`createCategoryRule failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async listCategoryRules(householdId?: number): Promise<CategoryRuleRecord[]> {
+    const url = householdId
+      ? `${this.baseUrl}/api/category-rules/?household=${householdId}`
+      : `${this.baseUrl}/api/category-rules/`
+    const res = await this.ctx.get(url)
+    if (!res.ok()) {
+      throw new Error(`listCategoryRules failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
