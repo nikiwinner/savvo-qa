@@ -122,9 +122,11 @@ test.describe('Categories settings page', () => {
     const catRow = page.locator('tbody tr.clickable-row', { hasText: catName })
     await expect(catRow).toBeVisible()
 
-    // Accept the confirm dialog and click delete
-    page.once('dialog', (d) => d.accept())
+    // Click delete and confirm via the custom ConfirmDialog
     await catRow.locator('button.btn-icon-danger').click()
+    const dialog = page.locator('[role="dialog"]')
+    await expect(dialog).toBeVisible()
+    await dialog.locator('button.btn-confirm-danger').click()
 
     // Success message
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 5000 })
@@ -155,17 +157,18 @@ test.describe('Categories settings page', () => {
     const catRow = page.locator('tbody tr.clickable-row', { hasText: catName })
     await expect(catRow).toBeVisible()
 
-    // Intercept the confirm dialog to verify it contains the usage warning
-    let dialogMessage = ''
-    page.once('dialog', async (d) => {
-      dialogMessage = d.message()
-      await d.dismiss() // Dismiss — we don't actually want to delete
-    })
-
+    // Trigger the delete — app shows a custom ConfirmDialog, not the native one
     await catRow.locator('button.btn-icon-danger').click()
 
-    // The dialog should have appeared — message should contain usage warning
+    const dialog = page.locator('[role="dialog"]')
+    await expect(dialog).toBeVisible()
+
+    // Dialog message must explain which data is linked before asking to confirm
+    const dialogMessage = (await dialog.locator('.dialog-message').textContent()) ?? ''
     expect(dialogMessage).toContain('used by')
     expect(dialogMessage).toContain('expense')
+
+    // Dismiss — we don't want to actually delete the category
+    await dialog.locator('button.btn-ghost').click()
   })
 })

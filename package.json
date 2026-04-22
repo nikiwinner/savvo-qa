@@ -12,6 +12,7 @@
     "test:households": "playwright test tests/households/",
     "test:expenses": "playwright test tests/expenses/",
     "test:dashboard": "playwright test tests/dashboard/",
+    "test:marketing": "playwright test tests/marketing/ --project=chromium --workers=1",
     "test:mobile": "playwright test --project=mobile-safari",
     "test:tablet": "playwright test --project=tablet",
     "report": "playwright show-report"

@@ -40,7 +40,7 @@ export default defineConfig({
 
   webServer: [
     {
-      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} uv run python manage.py runserver`,
+      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True uv run python manage.py runserver`,
       url: 'http://127.0.0.1:8000/api/auth/me/',
       reuseExistingServer: true,
       timeout: 30_000,

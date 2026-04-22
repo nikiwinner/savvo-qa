@@ -102,8 +102,15 @@ test.describe('Bulk categorization', () => {
     await page.goto(`/dashboard/expenses?household=${household.id}`)
     await page.waitForLoadState('networkidle')
 
-    // Select all via header checkbox
-    await page.locator('thead .th-checkbox input[type="checkbox"]').click()
+    // Select only our three seeded rows directly (not "select all" — the seed endpoint
+    // currently returns transactions from all users sharing the debug BankConnection,
+    // so relying on the visible set makes this test fragile under parallel execution).
+    const descriptions = ['BULK TXN 1', 'BULK TXN 2', 'BULK TXN 3']
+    for (const desc of descriptions) {
+      const row = page.locator('tbody tr.row-bank', { hasText: desc })
+      await expect(row).toBeVisible()
+      await row.locator('.cell-checkbox input[type="checkbox"]').check()
+    }
 
     // Wait for floating action bar to appear
     await expect(page.locator('.bulk-action-bar')).toBeVisible()
@@ -123,8 +130,7 @@ test.describe('Bulk categorization', () => {
     await expect(page.locator('.bulk-success-bar')).toContainText('3 transactions categorized')
 
     // All 3 rows should now show the category badge
-    const rows = ['BULK TXN 1', 'BULK TXN 2', 'BULK TXN 3']
-    for (const desc of rows) {
+    for (const desc of descriptions) {
       await expect(
         page.locator('tbody tr.row-bank', { hasText: desc }).locator('.badge-category')
       ).toBeVisible({ timeout: 5000 })

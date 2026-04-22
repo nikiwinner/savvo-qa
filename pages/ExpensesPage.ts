@@ -114,7 +114,11 @@ export class ExpensesPage {
       },
     )
 
-    await this.createForm.locator('button', { hasText: 'Add Transaction' }).click()
+    // Scroll the submit button into view first — under some viewport/layout races the
+    // fixed footer covers the button and Playwright's click retries time out.
+    const submitBtn = this.createForm.locator('button', { hasText: 'Add Transaction' })
+    await submitBtn.scrollIntoViewIfNeeded()
+    await submitBtn.click()
   }
 
   async createExpense(data: CreateExpenseForm): Promise<void> {
@@ -157,7 +161,11 @@ export class ExpensesPage {
   }
 
   async deleteExpense(description: string): Promise<void> {
-    this.page.once('dialog', (d) => d.accept())
     await this.row(description).locator('.action-btn.action-btn-danger').click()
+    // The app uses a custom ConfirmDialog (not the native confirm()).
+    const dialog = this.page.locator('[role="dialog"]')
+    await dialog.waitFor({ state: 'visible' })
+    await dialog.locator('button.btn-confirm-danger').click()
+    await dialog.waitFor({ state: 'hidden' })
   }
 }

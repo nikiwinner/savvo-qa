@@ -67,7 +67,11 @@ export class HouseholdsPage {
 
   async deleteHousehold(name: string): Promise<void> {
     const c = this.card(name)
-    this.page.once('dialog', (d) => d.accept())
     await c.locator('.action-btn.action-btn-danger').click()
+    // The app uses a custom ConfirmDialog (not the native confirm()).
+    const dialog = this.page.locator('[role="dialog"]')
+    await dialog.waitFor({ state: 'visible' })
+    await dialog.locator('button.btn-confirm-danger').click()
+    await dialog.waitFor({ state: 'hidden' })
   }
 }

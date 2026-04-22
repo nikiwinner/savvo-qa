@@ -92,8 +92,9 @@ test.describe('Category Rules settings page', () => {
     // Edit form should appear
     await expect(page.locator('tr.edit-row')).toBeVisible()
 
-    // Find the name input in edit row and change it
-    const editNameInput = page.locator('tr.edit-row input[id^="edit-name-"]')
+    // Find the name input in edit row and change it.
+    // RuleForm id pattern: `${idPrefix}-name` where idPrefix is `edit-{ruleId}`.
+    const editNameInput = page.locator('tr.edit-row input[id^="edit-"][id$="-name"]')
     await editNameInput.fill('Updated Rule Name')
 
     // Save
@@ -128,9 +129,11 @@ test.describe('Category Rules settings page', () => {
     const ruleRow = page.locator('tbody tr.clickable-row', { hasText: 'Rule To Delete' })
     await expect(ruleRow).toBeVisible()
 
-    // Accept the confirm dialog and click delete
-    page.once('dialog', (d) => d.accept())
+    // Click delete and confirm via the custom ConfirmDialog
     await ruleRow.locator('button.btn-icon-danger').click()
+    const dialog = page.locator('[role="dialog"]')
+    await expect(dialog).toBeVisible()
+    await dialog.locator('button.btn-confirm-danger').click()
 
     // Success message
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 5000 })
