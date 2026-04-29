@@ -10,9 +10,9 @@ import { uniqueUser } from '../../helpers/api'
 
 test.describe('Signup', () => {
   test('signs up with valid credentials and lands on dashboard', async ({ page }) => {
-    const signup = new SignupPage(page)
     const user = uniqueUser()
 
+    const signup = new SignupPage(page)
     await signup.goto()
     await signup.signup(user.name, user.email, user.password, user.password)
 

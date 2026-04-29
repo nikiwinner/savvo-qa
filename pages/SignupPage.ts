@@ -13,14 +13,14 @@ export class SignupPage {
     this.nameInput = page.locator('#name')
     this.emailInput = page.locator('#email')
     this.passwordInput = page.locator('#password')
-    this.confirmPasswordInput = page.locator('#confirmPassword')
+    this.confirmPasswordInput = page.locator('#password_confirm')
     this.submitButton = page.locator('button[type="submit"]')
     this.errorMessage = page.locator('.alert.alert-error')
     this.loginLink = page.locator('a[href="/login"]')
   }
 
-  async goto(): Promise<void> {
-    await this.page.goto('/signup')
+  async goto(url = '/signup'): Promise<void> {
+    await this.page.goto(url)
     // Wait for SvelteKit to hydrate — without this, on:submit|preventDefault isn't attached yet
     // and the browser falls back to native GET form submission
     await this.page.waitForLoadState('networkidle')

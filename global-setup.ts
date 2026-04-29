@@ -66,20 +66,4 @@ export default async function globalSetup(): Promise<void> {
     console.error('\n❌ Database flush failed.')
     throw err
   }
-
-  // 4. Seed the marketing quiz fixture (Phase 04). Flush wipes it; re-seed so
-  //    the marketing API specs have an active QuizDefinition to hit.
-  console.log('🌱 Seeding quiz fixture (marketing app)...')
-  try {
-    execSync('uv run python manage.py seed_quiz', {
-      cwd: backendDir,
-      env: { ...process.env, ...testDbEnv },
-      stdio: 'inherit',
-      timeout: 30_000,
-    })
-    console.log('✅ Quiz fixture seeded.\n')
-  } catch (err) {
-    console.error('\n❌ Quiz seed failed.')
-    throw err
-  }
 }

@@ -6,7 +6,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { LoginPage } from '../../pages/LoginPage'
-import { uniqueUser } from '../../helpers/api'
+import { uniqueUser, ApiHelper } from '../../helpers/api'
 
 test.describe('Login', () => {
   test.beforeEach(async ({ playwright }) => {
@@ -17,15 +17,8 @@ test.describe('Login', () => {
   test('logs in with valid credentials and lands on dashboard', async ({ page, playwright }) => {
     const user = uniqueUser()
     const reqCtx = await playwright.request.newContext()
-    await reqCtx.post('http://localhost:8000/api/auth/signup/', {
-      data: {
-        username: user.email,
-        email: user.email,
-        password: user.password,
-        password_confirm: user.password,
-        name: user.name,
-      },
-    })
+    const api = new ApiHelper(reqCtx)
+    await api.signup(user)
     await reqCtx.dispose()
 
     const login = new LoginPage(page)

@@ -110,15 +110,14 @@ export class ApiHelper {
   // ── Auth ───────────────────────────────────────────────────────────────────
 
   async signup(user: UserRecord): Promise<void> {
-    const res = await this.ctx.post(`${this.baseUrl}/api/auth/signup/`, {
-      data: {
-        username: user.email,
-        email: user.email,
-        password: user.password,
-        password_confirm: user.password,
-        name: user.name,
-      },
-    })
+    const data: Record<string, string> = {
+      username: user.email,
+      email: user.email,
+      password: user.password,
+      password_confirm: user.password,
+      name: user.name,
+    }
+    const res = await this.ctx.post(`${this.baseUrl}/api/auth/signup/`, { data })
     if (!res.ok()) {
       throw new Error(`signup failed (${res.status()}): ${await res.text()}`)
     }
