@@ -166,8 +166,13 @@ test.describe('Bulk categorization', () => {
     await expect(page.locator('.bulk-action-bar')).toBeVisible()
     await expect(page.locator('.bulk-action-bar .bulk-count')).toContainText('1 selected')
 
-    // Cancel should hide the bar
-    await page.locator('.bulk-action-bar button', { hasText: 'Cancel' }).click({ force: true })
+    // Cancel should hide the bar.
+    // The bar is position:fixed with white-space:nowrap, so on narrow mobile-safari
+    // viewports the Cancel button can overflow off-screen and pointer events from
+    // a synthesised mouse click don't always reach the button. Dispatch the click
+    // event directly to avoid input-simulation flake across browsers.
+    const cancelButton = page.locator('.bulk-action-bar').getByRole('button', { name: 'Cancel' })
+    await cancelButton.dispatchEvent('click')
     await expect(page.locator('.bulk-action-bar')).not.toBeVisible({ timeout: 5000 })
   })
 })

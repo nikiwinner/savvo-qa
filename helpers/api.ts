@@ -109,7 +109,7 @@ export class ApiHelper {
 
   // ── Auth ───────────────────────────────────────────────────────────────────
 
-  async signup(user: UserRecord): Promise<void> {
+  async signup(user: UserRecord, currency?: string): Promise<void> {
     const data: Record<string, string> = {
       username: user.email,
       email: user.email,
@@ -117,9 +117,22 @@ export class ApiHelper {
       password_confirm: user.password,
       name: user.name,
     }
+    if (currency !== undefined) {
+      data['currency'] = currency
+    }
     const res = await this.ctx.post(`${this.baseUrl}/api/auth/signup/`, { data })
     if (!res.ok()) {
       throw new Error(`signup failed (${res.status()}): ${await res.text()}`)
+    }
+  }
+
+  async setUserCurrency(code: string): Promise<void> {
+    const res = await this.ctx.patch(`${this.baseUrl}/api/auth/profile/`, {
+      data: { currency: code },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`setUserCurrency failed (${res.status()}): ${await res.text()}`)
     }
   }
 
@@ -187,7 +200,7 @@ export class ApiHelper {
     })
   }
 
-  async me(): Promise<{ id: number; email: string; name: string } | null> {
+  async me(): Promise<{ id: number; email: string; name: string; currency?: string } | null> {
     const res = await this.ctx.get(`${this.baseUrl}/api/auth/me/`)
     const data = await res.json()
     return data.user ?? null
@@ -255,6 +268,51 @@ export class ApiHelper {
     })
     if (!res.ok()) {
       throw new Error(`createBankTransaction failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Budgets ────────────────────────────────────────────────────────────────
+
+  async createBudget(data: {
+    household: number
+    category: number
+    amount: string
+    year: number
+    month: number
+  }): Promise<{ id: number; household: number; category: number; amount: string; year: number; month: number; spent: string; pace_status: string; pace_ratio: number; daily_safe_spend: string; remaining: string }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/budgets/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`createBudget failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async listBudgets(params: { household?: number; year?: number; month?: number } = {}): Promise<Array<{ id: number; household: number; category: number; amount: string; spent: string; pace_status: string; pace_ratio: number; daily_safe_spend: string }>> {
+    const qs = new URLSearchParams()
+    if (params.household !== undefined) qs.set('household', String(params.household))
+    if (params.year !== undefined) qs.set('year', String(params.year))
+    if (params.month !== undefined) qs.set('month', String(params.month))
+    const url = `${this.baseUrl}/api/budgets/${qs.toString() ? '?' + qs.toString() : ''}`
+    const res = await this.ctx.get(url)
+    if (!res.ok()) {
+      throw new Error(`listBudgets failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async listUnbudgeted(params: { household: number; year: number; month: number }): Promise<Array<{ category: { id: number; name: string; icon: string }; spent: string }>> {
+    const qs = new URLSearchParams({
+      household: String(params.household),
+      year: String(params.year),
+      month: String(params.month),
+    })
+    const res = await this.ctx.get(`${this.baseUrl}/api/budgets/unbudgeted/?${qs.toString()}`)
+    if (!res.ok()) {
+      throw new Error(`listUnbudgeted failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
