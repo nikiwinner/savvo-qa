@@ -150,8 +150,9 @@ test.describe('Reconciliation UI', () => {
     await page.goto(`/dashboard/reconciliation?household=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    await expect(
-      page.locator('text=All caught up — nothing to reconcile right now.'),
-    ).toBeVisible()
+    // Assert against stable structural selectors, not exact copy — copy can be refined
+    // (e.g. "No suggestions right now" + criteria list + actionable links) without breaking tests.
+    await expect(page.locator('.empty-state-title')).toHaveText('No suggestions right now')
+    await expect(page.locator('.empty-state-criteria li').first()).toBeVisible()
   })
 })
