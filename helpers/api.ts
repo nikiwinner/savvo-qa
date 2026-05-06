@@ -292,6 +292,49 @@ export class ApiHelper {
     return res.json()
   }
 
+  // ── Bank Transactions: bulk_set_household ─────────────────────────────────
+
+  /**
+   * POST /api/bank-transactions/bulk_set_household/ — raw, returns APIResponse so
+   * negative tests can inspect the status code without throwing.
+   * `householdId === null` unmaps; pass `undefined` to omit the key entirely.
+   */
+  async bulkSetHouseholdRaw(
+    transactionIds: number[],
+    householdId: number | null | undefined,
+  ): Promise<APIResponse> {
+    const body: Record<string, unknown> = { transaction_ids: transactionIds }
+    if (householdId !== undefined) {
+      body['household_id'] = householdId
+    }
+    return this.ctx.post(`${this.baseUrl}/api/bank-transactions/bulk_set_household/`, {
+      data: body,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  /** Throws on non-OK; returns the JSON response (`{ updated: number }`). */
+  async bulkSetHousehold(
+    transactionIds: number[],
+    householdId: number | null,
+  ): Promise<{ updated: number }> {
+    const res = await this.bulkSetHouseholdRaw(transactionIds, householdId)
+    if (!res.ok()) {
+      throw new Error(`bulkSetHousehold failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** Fetch a single bank transaction's record via the list endpoint. */
+  async getBankTransaction(id: number): Promise<BankTransactionRecord | null> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/bank-transactions/${id}/`)
+    if (res.status() === 404) return null
+    if (!res.ok()) {
+      throw new Error(`getBankTransaction failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
   // ── Budgets ────────────────────────────────────────────────────────────────
 
   async createBudget(data: {
