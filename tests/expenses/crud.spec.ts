@@ -109,7 +109,9 @@ test.describe('Expenses CRUD', () => {
 
     await expenses.editExpense('Rent Payment', { amount: '1200' })
 
-    await expect(expenses.row('Rent Payment')).toContainText('$1,200.00')
+    // Default user.currency is EUR (backend default); per-row rendering uses
+    // expense.currency (snapshotted at create-time) — Story 8.7.
+    await expect(expenses.row('Rent Payment')).toContainText('€1,200.00')
   })
 
   test('cancel edit reverts without saving', async ({ page, loggedInPage }) => {
@@ -161,8 +163,9 @@ test.describe('Expenses CRUD', () => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    // 100 + 50.50 = $150.50 (in the Expenses card of the summary strip)
-    await expect(page.locator('.summary-strip .stat-expense .stat-value')).toContainText('$150.50')
+    // 100 + 50.50 = €150.50 (in the Expenses card of the summary strip).
+    // Summary uses the viewer's user.currency, which defaults to EUR.
+    await expect(page.locator('.summary-strip .stat-expense .stat-value')).toContainText('€150.50')
   })
 
   test('link to households page is shown when no households exist', async ({
