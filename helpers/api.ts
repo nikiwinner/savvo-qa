@@ -17,6 +17,8 @@ export interface ExpenseRecord {
   id: number
   description: string
   amount: string
+  category: number | null
+  category_detail: { id: number; name: string; icon: string } | null
 }
 
 export interface CategoryRecord {

@@ -67,8 +67,31 @@ export class ExpensesPage {
       await this.createForm.locator('label', { hasText: labelText }).click()
     }
 
-    // Select category via Playwright (no on:change handler, safe)
-    await this.createForm.locator('#category').selectOption({ label: data.category })
+    // Select category via the chip-grid picker. The picker is rendered async
+    // (server load derives recents), so wait for it to be visible — failing
+    // here is faster and clearer than timing out on a missing chip.
+    //
+    // The legacy <select> exposed a "No category" placeholder option; the chip
+    // picker has no such chip — leaving every chip unclicked is what "no
+    // category" looks like now. So when callers pass `category: 'No category'`
+    // we just don't click anything (the hidden <input name="category"> stays
+    // empty and the backend stores null).
+    const picker = this.createForm.locator('[role="radiogroup"][data-chip-picker-id="category"]')
+    await picker.waitFor({ state: 'visible' })
+
+    let categoryId: string | null = null
+    if (data.category && data.category !== 'No category') {
+      const categoryChip = picker.locator('[role="radio"]', { hasText: data.category }).first()
+      await categoryChip.scrollIntoViewIfNeeded()
+      await categoryChip.click()
+
+      // Resolve the category id from the chip's data attribute. We use this id
+      // below to force the hidden <input name="category"> value right before
+      // submit, the same defensive pattern used in
+      // tests/expenses/category-chip-picker.spec.ts and
+      // tests/expenses/categories.spec.ts.
+      categoryId = await categoryChip.getAttribute('data-chip-cat-id')
+    }
 
     // Fill description and amount via Playwright
     await this.createForm.locator('#description').fill(data.description)
@@ -84,7 +107,17 @@ export class ExpensesPage {
     // Set ALL form field values in one synchronous evaluate call, immediately before submit,
     // to prevent any pending Svelte re-renders from resetting them.
     await this.page.evaluate(
-      ({ householdLabel, description, amount, category }: { householdLabel: string; description: string; amount: string; category: string }) => {
+      ({
+        householdLabel,
+        description,
+        amount,
+        categoryId,
+      }: {
+        householdLabel: string
+        description: string
+        amount: string
+        categoryId: string | null
+      }) => {
         const form = document.querySelector('.form-paper form') as HTMLFormElement | null
         if (!form) return
 
@@ -100,17 +133,16 @@ export class ExpensesPage {
         const amountInput = form.querySelector('#amount') as HTMLInputElement | null
         if (amountInput) amountInput.value = amount
 
-        const catSelect = form.querySelector('#category') as HTMLSelectElement | null
-        if (catSelect) {
-          const catOpt = Array.from(catSelect.options).find((o) => o.text === category)
-          if (catOpt) catSelect.value = catOpt.value
-        }
+        const hiddenCat = form.querySelector(
+          'input[type="hidden"][name="category"]',
+        ) as HTMLInputElement | null
+        if (hiddenCat) hiddenCat.value = categoryId ?? ''
       },
       {
         householdLabel: data.householdLabel,
         description: data.description,
         amount: data.amount,
-        category: data.category,
+        categoryId,
       },
     )
 

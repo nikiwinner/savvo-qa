@@ -7,8 +7,6 @@
 import { test, expect } from '../../fixtures/index'
 import { ExpensesPage } from '../../pages/ExpensesPage'
 
-const TODAY = new Date().toISOString().split('T')[0]
-
 test.describe('Expense categories', () => {
   test('category dropdown is populated from the API (not hardcoded)', async ({
     page,
@@ -22,30 +20,88 @@ test.describe('Expense categories', () => {
     await expenses.goto()
     await expenses.openCreateForm()
 
-    // The category select should contain at least "Groceries" (a seeded default)
-    const categorySelect = page.locator('.form-paper #category')
-    await expect(categorySelect).toBeVisible()
+    // The category chip picker should contain a chip for at least "Groceries"
+    // (a seeded default). The picker lives inside the create form paper.
+    const picker = expenses.createForm.locator(
+      '[role="radiogroup"][data-chip-picker-id="category"]',
+    )
+    await expect(picker).toBeVisible()
     // Wait for categories to load (they load via onMount)
-    await expect(categorySelect.locator('option', { hasText: 'Groceries' })).toBeAttached({ timeout: 5000 })
+    await expect(
+      picker.locator('[role="radio"]', { hasText: 'Groceries' }),
+    ).toHaveCount(1, { timeout: 5000 })
   })
 
   test('created expense shows the selected category name', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createHousehold('Category Display Home')
+    const groceries = await api.getCategoryByName('Groceries')
+    expect(groceries, 'Groceries default category should exist').not.toBeNull()
 
     const expenses = new ExpensesPage(page)
+    await expenses.gotoWithHousehold(hh.id)
+    await expenses.openCreateForm()
 
-    await expenses.createExpense({
-      householdLabel: 'Category Display Home',
-      householdId: hh.id,
-      category: 'Groceries',
-      description: 'Weekly Shop',
-      amount: '80',
-      date: TODAY,
-    })
+    // Pick the Groceries chip in the new chip-grid picker.
+    const picker = expenses.createForm.locator(
+      '[role="radiogroup"][data-chip-picker-id="category"]',
+    )
+    await expect(picker).toBeVisible()
+    const groceriesChip = picker.locator(
+      `[role="radio"][data-chip-cat-id="${groceries!.id}"]`,
+    )
+    await groceriesChip.scrollIntoViewIfNeeded()
+    await groceriesChip.click()
+    await expect(groceriesChip).toHaveAttribute('aria-checked', 'true')
 
-    // The table row should show the category name (not an ID)
-    const row = page.locator('tbody tr', { hasText: 'Weekly Shop' })
+    // The hidden form input the form actually submits should hold the category id.
+    const hiddenCategoryInput = expenses.createForm.locator(
+      'input[type="hidden"][name="category"]',
+    )
+    await expect(hiddenCategoryInput).toHaveValue(String(groceries!.id))
+
+    // Fill the rest of the form. Force values right before submit to defend
+    // against any pending Svelte re-renders (mirrors the chip-picker spec).
+    const description = 'Weekly Shop'
+    const amount = '80'
+
+    await expenses.createForm.locator('#description').fill(description)
+    await expenses.createForm.locator('#amount').fill(amount)
+
+    await page.evaluate(
+      ({
+        hhId,
+        desc,
+        amt,
+        catId,
+      }: {
+        hhId: number
+        desc: string
+        amt: string
+        catId: number
+      }) => {
+        const form = document.querySelector('.form-paper form') as HTMLFormElement | null
+        if (!form) return
+        const householdSelect = form.querySelector('#household_id') as HTMLSelectElement | null
+        if (householdSelect) householdSelect.value = String(hhId)
+        const descInput = form.querySelector('#description') as HTMLInputElement | null
+        if (descInput) descInput.value = desc
+        const amountInput = form.querySelector('#amount') as HTMLInputElement | null
+        if (amountInput) amountInput.value = amt
+        const hiddenCat = form.querySelector(
+          'input[type="hidden"][name="category"]',
+        ) as HTMLInputElement | null
+        if (hiddenCat) hiddenCat.value = String(catId)
+      },
+      { hhId: hh.id, desc: description, amt: amount, catId: groceries!.id },
+    )
+
+    const submitBtn = expenses.createForm.locator('button', { hasText: 'Add Transaction' })
+    await submitBtn.scrollIntoViewIfNeeded()
+    await submitBtn.click()
+
+    // The table row should show the category name (not an ID).
+    const row = page.locator('tbody tr', { hasText: description })
     await expect(row).toBeVisible()
     await expect(row.locator('.badge-category')).toContainText('Groceries')
   })
@@ -71,9 +127,15 @@ test.describe('Expense categories', () => {
     await expenses.goto()
     await expenses.openCreateForm()
 
-    // Wait for categories to load
-    const categorySelect = page.locator('.form-paper #category')
-    await expect(categorySelect.locator('option', { hasText: uniqueCatName })).toBeAttached({ timeout: 5000 })
+    // Wait for categories to load — the user A-created category must appear as
+    // a chip in user B's picker (categories are global per Gotcha #9).
+    const picker = expenses.createForm.locator(
+      '[role="radiogroup"][data-chip-picker-id="category"]',
+    )
+    await expect(picker).toBeVisible()
+    await expect(
+      picker.locator('[role="radio"]', { hasText: uniqueCatName }),
+    ).toHaveCount(1, { timeout: 5000 })
   })
 
   test('duplicate category name returns 400', async ({ loggedInPage }) => {
