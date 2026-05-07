@@ -1,6 +1,6 @@
 import { APIRequestContext, APIResponse } from '@playwright/test'
 
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8000'
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8001'
 
 export interface UserRecord {
   email: string

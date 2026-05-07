@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test'
 import { ApiHelper, uniqueUser } from '../../helpers/api'
 import { SignupPage } from '../../pages/SignupPage'
 
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8000'
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8001'
 
 test.describe('Signup — currency preference', () => {
   test('signup with default currency stores EUR on the user', async ({ page }) => {

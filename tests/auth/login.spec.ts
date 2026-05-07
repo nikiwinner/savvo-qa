@@ -8,6 +8,8 @@ import { test, expect } from '@playwright/test'
 import { LoginPage } from '../../pages/LoginPage'
 import { uniqueUser, ApiHelper } from '../../helpers/api'
 
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8001'
+
 test.describe('Login', () => {
   test.beforeEach(async ({ playwright }) => {
     // Pre-create a shared user so tests below can log in
@@ -31,7 +33,7 @@ test.describe('Login', () => {
   test('shows error with wrong password', async ({ page, playwright }) => {
     const user = uniqueUser()
     const reqCtx = await playwright.request.newContext()
-    await reqCtx.post('http://localhost:8000/api/auth/signup/', {
+    await reqCtx.post(`${BACKEND_URL}/api/auth/signup/`, {
       data: {
         username: user.email,
         email: user.email,
@@ -65,7 +67,7 @@ test.describe('Login', () => {
     // it's easiest to just check the button is NOT disabled initially
     const user = uniqueUser()
     const reqCtx = await playwright.request.newContext()
-    await reqCtx.post('http://localhost:8000/api/auth/signup/', {
+    await reqCtx.post(`${BACKEND_URL}/api/auth/signup/`, {
       data: {
         username: user.email,
         email: user.email,

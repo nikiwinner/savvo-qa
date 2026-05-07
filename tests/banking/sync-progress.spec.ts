@@ -23,7 +23,7 @@
  */
 import { test, expect } from '../../fixtures/index'
 
-// Frontend (`http://localhost:5173`) calls backend (`http://localhost:8000`)
+// Frontend (QA: `http://localhost:5174`) calls backend (QA: `http://localhost:8001`)
 // from the browser via `apiFetch`. Because that's a cross-origin request with
 // `credentials: 'include'` and `content-type: application/json`, the browser
 // sends an OPTIONS preflight first. When we use page.route to fulfill the
@@ -31,8 +31,12 @@ import { test, expect } from '../../fixtures/index'
 // the browser rejects the response, apiFetch throws synchronously, and the
 // SyncProgress component unmounts immediately (via fireComplete in its
 // `finally`) before we ever see the spinner.
+//
+// `Access-Control-Allow-Origin` MUST echo whatever origin the browser used to
+// load the page (FRONTEND_URL). Hardcoding :5173 here would break QA after we
+// moved to dedicated ports.
 const CORS_HEADERS: Record<string, string> = {
-  'Access-Control-Allow-Origin': 'http://localhost:5173',
+  'Access-Control-Allow-Origin': process.env.FRONTEND_URL ?? 'http://localhost:5174',
   'Access-Control-Allow-Credentials': 'true',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'content-type, x-csrftoken, X-CSRFToken',

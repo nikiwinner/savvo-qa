@@ -40,15 +40,20 @@ export default defineConfig({
 
   webServer: [
     {
-      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True uv run python manage.py runserver`,
-      url: 'http://127.0.0.1:8000/api/auth/me/',
-      reuseExistingServer: true,
+      // QA-only backend on :8001 against ledgerapp_test. Never reuses the dev
+      // backend on :8000 — that would contaminate the dev DB.
+      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True uv run python manage.py runserver 127.0.0.1:8001`,
+      url: 'http://127.0.0.1:8001/api/auth/me/',
+      reuseExistingServer: false,
       timeout: 30_000,
     },
     {
-      command: `cd ${path.resolve(__dirname, '../frontend')} && npm run dev`,
-      url: 'http://localhost:5173',
-      reuseExistingServer: true,
+      // QA-only frontend on :5174, pointed at the QA backend on :8001.
+      // --strictPort makes Vite fail loudly if :5174 is taken instead of
+      // silently falling back to a random port (which would break baseURL).
+      command: `cd ${path.resolve(__dirname, '../frontend')} && PUBLIC_API_BASE_URL=http://localhost:8001 npm run dev -- --port 5174 --strictPort`,
+      url: 'http://localhost:5174',
+      reuseExistingServer: false,
       timeout: 60_000,
     },
   ],

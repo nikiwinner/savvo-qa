@@ -8,6 +8,8 @@ import { test, expect } from '@playwright/test'
 import { SignupPage } from '../../pages/SignupPage'
 import { uniqueUser } from '../../helpers/api'
 
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8001'
+
 test.describe('Signup', () => {
   test('signs up with valid credentials and lands on dashboard', async ({ page }) => {
     const user = uniqueUser()
@@ -54,7 +56,7 @@ test.describe('Signup', () => {
     // Create the user first via API
     const reqCtx = await playwright.request.newContext()
     const user = uniqueUser()
-    await reqCtx.post('http://localhost:8000/api/auth/signup/', {
+    await reqCtx.post(`${BACKEND_URL}/api/auth/signup/`, {
       data: {
         username: user.email,
         email: user.email,
