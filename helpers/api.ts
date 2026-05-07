@@ -292,6 +292,39 @@ export class ApiHelper {
     return res.json()
   }
 
+  /**
+   * POST /api/seed/bank-connection-status/ — DEBUG-only endpoint that forces
+   * a BankConnection.status (and optionally error_message) for E2E tests.
+   * Used to exercise the SyncProgress passive-mode and 30s-hint flows where
+   * we need to pin status='syncing' server-side without racing a real /sync/.
+   */
+  async setBankConnectionStatus(
+    connectionId: number,
+    statusValue:
+      | 'awaiting_auth'
+      | 'connected'
+      | 'syncing'
+      | 'error'
+      | 'disconnected',
+    errorMessage?: string,
+  ): Promise<{ id: number; status: string; error_message: string }> {
+    const body: Record<string, unknown> = {
+      connection_id: connectionId,
+      status: statusValue,
+    }
+    if (errorMessage !== undefined) {
+      body['error_message'] = errorMessage
+    }
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/bank-connection-status/`, {
+      data: body,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`setBankConnectionStatus failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
   // ── Bank Transactions: bulk_set_household ─────────────────────────────────
 
   /**
