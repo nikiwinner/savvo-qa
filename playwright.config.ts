@@ -42,7 +42,11 @@ export default defineConfig({
     {
       // QA-only backend on :8001 against ledgerapp_test. Never reuses the dev
       // backend on :8000 — that would contaminate the dev DB.
-      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True uv run python manage.py runserver 127.0.0.1:8001`,
+      // OAUTH_TEST_MODE=True enables stub Google auth-code resolution for
+      // Story 9.10 E2E tests (see authzone/oauth.py:_TEST_CODES).
+      // FRONTEND_URL points the OAuth success/failure redirects at the QA
+      // frontend on :5174, not the dev frontend on :5173.
+      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True OAUTH_TEST_MODE=True FRONTEND_URL=http://localhost:5174 uv run python manage.py runserver 127.0.0.1:8001`,
       url: 'http://127.0.0.1:8001/api/auth/me/',
       reuseExistingServer: false,
       timeout: 30_000,
