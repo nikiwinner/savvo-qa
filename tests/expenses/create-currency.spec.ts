@@ -96,12 +96,17 @@ test.describe('Currency selector on the expense create form', () => {
       .toBe('USD')
 
     // Reload and verify the row renders with the USD symbol — not EUR.
+    // Phase 10 (Story 10.7) adds a hybrid `(≈ €X.YY)` secondary line for
+    // off-currency rows, so scope the symbol assertions to the canonical
+    // line only.
     await page.reload()
     await page.waitForLoadState('networkidle')
     const row = expenses.row(description)
     await expect(row).toBeVisible({ timeout: 5000 })
-    const amountText = await row.locator('td.cell-amount').innerText()
-    expect(amountText).toContain('$')
-    expect(amountText).not.toContain('€')
+    const canonical = row.locator('td.cell-amount .canonical')
+    await expect(canonical).toBeVisible()
+    const canonicalText = await canonical.innerText()
+    expect(canonicalText).toContain('$')
+    expect(canonicalText).not.toContain('€')
   })
 })

@@ -67,14 +67,17 @@ test.describe('Per-row currency rendering on /dashboard/expenses', () => {
     const amountCell = bobRow.locator('td.cell-amount')
     await expect(amountCell).toBeVisible()
 
-    // Intl.NumberFormat('en-US', { currency: 'USD' }).format(10) -> "$10.00".
-    // We assert the dollar sign appears and the euro sign does not — this
-    // tolerates any locale-specific spacing/grouping while still pinning the
-    // critical per-row currency behaviour.
-    const amountText = await amountCell.innerText()
-    expect(amountText).toContain('$')
-    expect(amountText).not.toContain('€')
-    expect(amountText).toMatch(/10\.00/)
+    // Phase 10 (Story 10.7) introduces the inline-converted hybrid display:
+    // off-currency rows now render a small `(≈ €Y.YY)` secondary line below
+    // the canonical `$X.XX`. To keep the original per-row currency invariant
+    // tight, scope the symbol assertions to the canonical line only — the
+    // FX hint legitimately contains the viewer's currency symbol.
+    const canonical = amountCell.locator('.canonical')
+    await expect(canonical).toBeVisible()
+    const canonicalText = await canonical.innerText()
+    expect(canonicalText).toContain('$')
+    expect(canonicalText).not.toContain('€')
+    expect(canonicalText).toMatch(/10\.00/)
 
     await ctxAlice.dispose()
     await ctxBob.dispose()

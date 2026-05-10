@@ -124,16 +124,17 @@ test.describe('Budget overview page', () => {
     await expect(unbudgetedSection).toContainText('42.00')
   })
 
-  test('currency symbol matches user preference', async ({ page, loggedInPage }) => {
+  test('currency symbol matches household primary currency', async ({ page, loggedInPage }) => {
+    // Phase 10 (Story 10.7): the budget card now renders the household's
+    // primary_currency, NOT the viewer's User.currency. We set the household
+    // primary to GBP via PATCH and assert the card shows £.
     const { api } = loggedInPage
     const hh = await api.createHousehold('Currency Symbol Home')
     const categories = await api.listCategories()
     const cat = categories[0]
 
-    // Set user currency to GBP
-    await api.setUserCurrency('GBP')
+    await api.setHouseholdPrimaryCurrency(hh.id, 'GBP')
 
-    // Create a budget
     await api.createBudget({
       household: hh.id,
       category: cat.id,
@@ -142,11 +143,9 @@ test.describe('Budget overview page', () => {
       month: MONTH,
     })
 
-    // Need to reload browser session after currency change (page already has cookies)
     await page.goto(`/dashboard/budgets?household=${hh.id}&year=${YEAR}&month=${MONTH}`)
     await page.waitForLoadState('networkidle')
 
-    // GBP symbol (£) should appear in the budget card amounts
     const budgetCard = page.locator('.budget-card').first()
     await expect(budgetCard).toContainText('£')
   })
