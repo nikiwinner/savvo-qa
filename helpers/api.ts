@@ -105,6 +105,8 @@ export interface CreateExpenseData {
   category?: number | null
   type?: 'expense' | 'income'
   expense_date: string
+  /** ISO 4217 currency code from the 8-code whitelist. Default: viewer's User.currency. */
+  currency?: string
 }
 
 /** Unique email to avoid conflicts between parallel tests */
@@ -541,6 +543,35 @@ export class ApiHelper {
       },
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
+  }
+
+  // ── FX (DEBUG-only seed) ───────────────────────────────────────────────────
+
+  /**
+   * POST /api/seed/exchange-rate/ — DEBUG-only endpoint that pre-fills the
+   * ExchangeRate cache so tests are deterministic without hitting the live
+   * Frankfurter provider. The QA backend points FX_PROVIDER_BASE_URL at an
+   * unreachable host (see playwright.config.ts), so any rate not seeded will
+   * raise FXRateUnavailableError and surface fx_stale=true.
+   */
+  async seedExchangeRate(
+    base_currency: string,
+    quote_currency: string,
+    rate: string,
+    on_date?: string,
+  ): Promise<{ id: number; date: string; base_currency: string; quote_currency: string; rate: string }> {
+    const body: Record<string, string> = { base_currency, quote_currency, rate }
+    if (on_date !== undefined) {
+      body['date'] = on_date
+    }
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/exchange-rate/`, {
+      data: body,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`seedExchangeRate failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
