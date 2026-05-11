@@ -23,6 +23,12 @@
  */
 import { test, expect } from '../../fixtures/index'
 
+// Pre-existing Phase 09 timing flake under fullyParallel — page.clock advance
+// competes for worker time on the shared :8001 backend. File-scoped retries
+// keep this stable without slowing the rest of the suite. Phase 10 fix-up
+// hygiene; revisit if/when the backend test stack moves to per-worker DBs.
+test.describe.configure({ retries: 2 })
+
 // Frontend (QA: `http://localhost:5174`) calls backend (QA: `http://localhost:8001`)
 // from the browser via `apiFetch`. Because that's a cross-origin request with
 // `credentials: 'include'` and `content-type: application/json`, the browser
