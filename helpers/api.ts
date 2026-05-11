@@ -558,6 +558,42 @@ export class ApiHelper {
     })
   }
 
+  // ── Bank Accounts (DEBUG-only seed) ────────────────────────────────────────
+
+  /**
+   * POST /api/seed/bank-account/ — DEBUG-only endpoint (Phase 11 Story 11.7)
+   * that creates a BankConnection + BankAccount with explicit balance fields,
+   * optionally also seeding one BankTransaction mapped to a household so the
+   * analytics `balance-summary` scoping filter includes the account.
+   *
+   * Pass `balance_amount: null` to seed a "never synced" account.
+   */
+  async seedBankAccount(data: {
+    account_name: string
+    bank_name?: string
+    balance_amount: string | null
+    balance_currency?: string
+    balance_updated_at?: string | null
+    household_id?: number | null
+  }): Promise<{
+    account_id: number
+    connection_id: number
+    account_name: string
+    bank_name: string
+    balance_amount: string | null
+    balance_currency: string
+    balance_updated_at: string | null
+  }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/bank-account/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`seedBankAccount failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
   // ── FX (DEBUG-only seed) ───────────────────────────────────────────────────
 
   /**

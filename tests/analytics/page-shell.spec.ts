@@ -71,9 +71,13 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     expect(page.url()).toContain('months=12')
     expect(page.url()).toContain(`household=${hh.id}`)
 
-    // Section stubs still render — no crash on rerender.
-    const stubs = page.getByTestId('analytics-section-stub')
-    expect(await stubs.count()).toBeGreaterThan(0)
+    // Sections still render — no crash on rerender. (Story 11.5/11.6/11.7
+    // replaced the original "Coming in next story" stubs with real components.)
+    await expect(page.getByTestId('analytics-section-spending')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-monthly-trend')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-income-expenses')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-balance')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-insights')).toBeVisible()
   })
 
   test('empty household renders empty states without crashing', async ({ page, loggedInPage }) => {
