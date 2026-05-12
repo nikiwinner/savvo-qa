@@ -71,13 +71,14 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     expect(page.url()).toContain('months=12')
     expect(page.url()).toContain(`household=${hh.id}`)
 
-    // Sections still render — no crash on rerender. (Story 11.5/11.6/11.7
-    // replaced the original "Coming in next story" stubs with real components.)
+    // Sections still render — no crash on rerender. The redesign consolidated
+    // the former monthly-trend + income-vs-expenses cards into one cashflow
+    // combo chart and added a top-categories card.
     await expect(page.getByTestId('analytics-section-spending')).toBeVisible()
-    await expect(page.getByTestId('analytics-section-monthly-trend')).toBeVisible()
-    await expect(page.getByTestId('analytics-section-income-expenses')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-cashflow')).toBeVisible()
     await expect(page.getByTestId('analytics-section-balance')).toBeVisible()
     await expect(page.getByTestId('analytics-section-insights')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-top-categories')).toBeVisible()
   })
 
   test('empty household renders empty states without crashing', async ({ page, loggedInPage }) => {
@@ -91,12 +92,12 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
-    // All five section cards render (spending, monthly-trend, income-vs-expenses, balance, insights).
+    // All five section cards render (spending, cashflow, top-categories, insights, balance).
     await expect(page.getByTestId('analytics-section-spending')).toBeVisible()
-    await expect(page.getByTestId('analytics-section-monthly-trend')).toBeVisible()
-    await expect(page.getByTestId('analytics-section-income-expenses')).toBeVisible()
-    await expect(page.getByTestId('analytics-section-balance')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-cashflow')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-top-categories')).toBeVisible()
     await expect(page.getByTestId('analytics-section-insights')).toBeVisible()
+    await expect(page.getByTestId('analytics-section-balance')).toBeVisible()
 
     expect(errors).toEqual([])
   })
