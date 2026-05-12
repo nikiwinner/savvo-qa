@@ -56,13 +56,16 @@ test.describe('Category chip picker', () => {
     // is shared across runs and may carry custom user-created categories from
     // sibling specs — categories are global per Gotcha #9. Asserting presence
     // of every default and the picker being functional is what matters here.)
+    // We use exact-word regex matching so parallel-test categories like
+    // "Groceries-IM" or "Other-D1" don't satisfy a substring `hasText` match.
     for (const name of DEFAULT_CATEGORY_NAMES) {
-      const chip = picker.locator('[role="radio"]', { hasText: name })
+      const exactWord = new RegExp(`(?:^|\\s)${name}(?:\\s|$)`)
+      const chip = picker.locator('[role="radio"]', { hasText: exactWord })
       await expect(chip, `chip for category "${name}" should be present`).toHaveCount(1)
     }
 
     // Functional sanity: at least one default chip is clickable + flips aria-checked.
-    const groceriesChip = picker.locator('[role="radio"]', { hasText: 'Groceries' })
+    const groceriesChip = picker.locator('[role="radio"]', { hasText: /(?:^|\s)Groceries(?:\s|$)/ })
     await groceriesChip.scrollIntoViewIfNeeded()
     await groceriesChip.click()
     await expect(groceriesChip).toHaveAttribute('aria-checked', 'true')

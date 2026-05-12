@@ -26,9 +26,12 @@ test.describe('Expense categories', () => {
       '[role="radiogroup"][data-chip-picker-id="category"]',
     )
     await expect(picker).toBeVisible()
-    // Wait for categories to load (they load via onMount)
+    // Wait for categories to load (they load via onMount).
+    // Use exact-word regex to avoid matching parallel-test categories like
+    // "Groceries-IM" or "Groceries-D1" which can pollute the global list
+    // (categories are global per Gotcha #9).
     await expect(
-      picker.locator('[role="radio"]', { hasText: 'Groceries' }),
+      picker.locator('[role="radio"]', { hasText: /(?:^|\s)Groceries(?:\s|$)/ }),
     ).toHaveCount(1, { timeout: 5000 })
   })
 

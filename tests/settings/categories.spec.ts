@@ -39,12 +39,15 @@ test.describe('Categories settings page', () => {
 
     // Table should be visible with rows
     await expect(page.locator('table')).toBeVisible()
-    // At least one row for Groceries
-    await expect(page.locator('tbody tr', { hasText: 'Groceries' })).toBeVisible()
+    // At least one row for Groceries. Use exact-word regex so parallel-test
+    // categories like "Groceries-IM"/"Groceries-D1" (categories are global
+    // per Gotcha #9) don't trigger a strict-mode multiple-match violation.
+    const groceriesRowExact = /(?:^|\s)Groceries(?:\s|$)/
+    await expect(page.locator('tbody tr', { hasText: groceriesRowExact })).toBeVisible()
 
     // If we added an expense with Groceries, the usage column should be non-empty
     if (groceries) {
-      const groceriesRow = page.locator('tbody tr', { hasText: 'Groceries' })
+      const groceriesRow = page.locator('tbody tr', { hasText: groceriesRowExact })
       const usageText = await groceriesRow.locator('.usage-text').textContent()
       // Should contain "1 expense" or "1 transaction" — just check it's not "—"
       expect(usageText).not.toBe('—')
