@@ -277,6 +277,37 @@ export class ApiHelper {
     return res.json()
   }
 
+  /**
+   * Idempotent variant of {@link createCategory}. Returns the existing row
+   * by name when POST returns 400 "already exists".
+   *
+   * Categories are global (CLAUDE.md Gotcha #9) — the QA test DB persists
+   * across project runs (chromium → mobile-safari → tablet) and across
+   * separate `pnpm test` invocations. Use this helper from any test that
+   * seeds shared category names; reserve {@link createCategory} for tests
+   * that explicitly assert on the strict 400 duplicate behaviour.
+   */
+  async findOrCreateCategory(name: string, icon = ''): Promise<CategoryRecord> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/categories/`, {
+      data: { name, icon },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (res.ok()) {
+      return res.json()
+    }
+    if (res.status() === 400) {
+      const body = await res.text()
+      if (body.includes('already exists')) {
+        const existing = await this.getCategoryByName(name)
+        if (existing) {
+          return existing
+        }
+      }
+      throw new Error(`findOrCreateCategory failed (${res.status()}): ${body}`)
+    }
+    throw new Error(`findOrCreateCategory failed (${res.status()}): ${await res.text()}`)
+  }
+
   async listCategories(): Promise<CategoryRecord[]> {
     const res = await this.ctx.get(`${this.baseUrl}/api/categories/`)
     if (!res.ok()) {

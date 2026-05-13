@@ -33,9 +33,9 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
     const hh = await api.createHousehold('Donut Home')
 
     // Seed three categories' worth of expenses, all >3% of total.
-    const groceries = await api.createCategory('Groceries-D1', 'shopping-cart')
-    const transport = await api.createCategory('Transport-D1', 'car')
-    const dining = await api.createCategory('Dining-D1', 'utensils')
+    const groceries = await api.findOrCreateCategory('Groceries-D1', 'shopping-cart')
+    const transport = await api.findOrCreateCategory('Transport-D1', 'car')
+    const dining = await api.findOrCreateCategory('Dining-D1', 'utensils')
 
     await api.createExpense({
       household: hh.id,
@@ -79,11 +79,11 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
 
     // 3 large categories + 2 tiny ones. Two tiny entries forces the rebucket
     // (single-tail passthrough rule: 1 tiny stays as-is).
-    const big1 = await api.createCategory('Big-A', 'box')
-    const big2 = await api.createCategory('Big-B', 'box')
-    const big3 = await api.createCategory('Big-C', 'box')
-    const tiny1 = await api.createCategory('Tiny-A', 'box')
-    const tiny2 = await api.createCategory('Tiny-B', 'box')
+    const big1 = await api.findOrCreateCategory('Big-A', 'box')
+    const big2 = await api.findOrCreateCategory('Big-B', 'box')
+    const big3 = await api.findOrCreateCategory('Big-C', 'box')
+    const tiny1 = await api.findOrCreateCategory('Tiny-A', 'box')
+    const tiny2 = await api.findOrCreateCategory('Tiny-B', 'box')
 
     // Totals: 500 + 500 + 500 + 0.5 + 0.5 = 1501. Tiny share ≈ 0.033% each.
     await api.createExpense({ household: hh.id, description: 'big a', amount: 500, category: big1.id, expense_date: TODAY_ISO })
@@ -110,7 +110,7 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
     const hh = await api.createHousehold('Tooltip Home')
 
     // Single category — its share is 100.0% so we can assert exact text.
-    const onlyCat = await api.createCategory('Solo-Tip', 'star')
+    const onlyCat = await api.findOrCreateCategory('Solo-Tip', 'star')
     await api.createExpense({
       household: hh.id,
       description: 'solo',

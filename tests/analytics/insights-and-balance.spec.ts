@@ -47,7 +47,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
 
     // Trigger uncategorized_alert: >20% of THIS month's rows are uncategorised.
     // Seed 5 uncategorised + 2 categorised = 5/7 ≈ 71% uncategorised.
-    const groceries = await api.createCategory('Groceries-IM', 'shopping-cart')
+    const groceries = await api.findOrCreateCategory('Groceries-IM', 'shopping-cart')
     for (let i = 0; i < 5; i++) {
       await api.createExpense({
         household: hh.id,
