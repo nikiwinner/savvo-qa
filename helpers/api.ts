@@ -68,22 +68,6 @@ export interface CreateBankTransactionData {
   pending?: boolean
 }
 
-export interface ReconciliationLinkRecord {
-  id: number
-  expense_id: number
-  bank_transaction_id: number
-  source: 'suggestion' | 'manual'
-  confidence: string | null
-  canonical_source: 'manual' | 'bank'
-}
-
-export interface SuggestionRecord {
-  expense: { id: number; description: string; amount: string; currency: string }
-  bank_transaction: { id: number; description: string; amount: string; currency: string }
-  confidence: string
-  date_delta_days: number
-}
-
 export interface CreateCategoryRuleData {
   household: number
   name: string
@@ -438,110 +422,6 @@ export class ApiHelper {
       throw new Error(`listCategoryRules failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
-  }
-
-  // ── Reconciliation ─────────────────────────────────────────────────────────
-
-  /**
-   * POST /api/reconciliation/links/ — create (confirm) a reconciliation link.
-   * Default from_suggestion=false. Use from_suggestion=true for suggestion-page confirms.
-   */
-  async createReconciliationLink(
-    expense_id: number,
-    bank_transaction_id: number,
-    opts?: { from_suggestion?: boolean },
-  ): Promise<ReconciliationLinkRecord> {
-    const res = await this.ctx.post(`${this.baseUrl}/api/reconciliation/links/`, {
-      data: {
-        expense_id,
-        bank_transaction_id,
-        from_suggestion: opts?.from_suggestion ?? false,
-      },
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
-    if (!res.ok()) {
-      throw new Error(`createReconciliationLink failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  /**
-   * POST /api/reconciliation/rejections/ — record a suggestion rejection (idempotent).
-   */
-  async rejectSuggestion(
-    expense_id: number,
-    bank_transaction_id: number,
-  ): Promise<{ rejected: boolean; expense_id: number; bank_transaction_id: number }> {
-    const res = await this.ctx.post(`${this.baseUrl}/api/reconciliation/rejections/`, {
-      data: { expense_id, bank_transaction_id },
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
-    if (!res.ok()) {
-      throw new Error(`rejectSuggestion failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  /**
-   * DELETE /api/reconciliation/links/<id>/ — remove a reconciliation link.
-   */
-  async deleteReconciliationLink(link_id: number): Promise<void> {
-    const res = await this.ctx.delete(
-      `${this.baseUrl}/api/reconciliation/links/${link_id}/`,
-      { headers: { 'X-CSRFToken': await this.csrfToken() } },
-    )
-    if (!res.ok()) {
-      throw new Error(`deleteReconciliationLink failed (${res.status()}): ${await res.text()}`)
-    }
-  }
-
-  /**
-   * GET /api/reconciliation/links/?household=<id> — list links for a household.
-   */
-  async listReconciliationLinks(
-    householdId: number,
-  ): Promise<{ count: number; results: ReconciliationLinkRecord[] }> {
-    const res = await this.ctx.get(
-      `${this.baseUrl}/api/reconciliation/links/?household=${householdId}`,
-    )
-    if (!res.ok()) {
-      throw new Error(`listReconciliationLinks failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  /**
-   * GET /api/reconciliation/suggestions/?household=<id> — list outstanding suggestions.
-   */
-  async listSuggestions(
-    householdId: number,
-  ): Promise<{ count: number; results: SuggestionRecord[] }> {
-    const res = await this.ctx.get(
-      `${this.baseUrl}/api/reconciliation/suggestions/?household=${householdId}`,
-    )
-    if (!res.ok()) {
-      throw new Error(`listSuggestions failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  /**
-   * POST /api/reconciliation/links/ — raw post, returns the raw APIResponse so
-   * callers can inspect the status code without throwing.
-   */
-  async createReconciliationLinkRaw(
-    expense_id: number,
-    bank_transaction_id: number,
-    opts?: { from_suggestion?: boolean },
-  ) {
-    return this.ctx.post(`${this.baseUrl}/api/reconciliation/links/`, {
-      data: {
-        expense_id,
-        bank_transaction_id,
-        from_suggestion: opts?.from_suggestion ?? false,
-      },
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
   }
 
   // ── Bank Accounts (DEBUG-only seed) ────────────────────────────────────────

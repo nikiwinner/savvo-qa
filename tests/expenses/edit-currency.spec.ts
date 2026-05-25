@@ -1,14 +1,10 @@
 /**
- * Expenses — editable currency on unlinked manual expenses (Phase 10, Story 10.5)
+ * Expenses — editable currency on manual expenses (Phase 10, Story 10.5)
  *
  * Verifies:
- *   1. Persist path — saving a currency change on an unlinked manual expense
- *                    submits immediately (no confirmation dialog) and the new
- *                    currency lands server-side.
- *   2. Disabled state — the currency control is disabled and exposes the
- *                    documented tooltip when the expense is linked to a
- *                    bank transaction (the reconciliation currency-equality
- *                    invariant must not be broken via the UI).
+ *   1. Persist path — saving a currency change on a manual expense submits
+ *                    immediately (no confirmation dialog) and the new currency
+ *                    lands server-side.
  */
 import { test, expect } from '../../fixtures/index'
 import { ExpensesPage } from '../../pages/ExpensesPage'
@@ -16,7 +12,7 @@ import { ExpensesPage } from '../../pages/ExpensesPage'
 const TARGET_DATE = '2026-05-15' // matches the seed pattern from per-row tests
 
 test.describe('Editable currency on /dashboard/expenses (Story 10.5)', () => {
-  test('currency change on an unlinked expense submits immediately and persists', async ({
+  test('currency change on a manual expense submits immediately and persists', async ({
     page,
     loggedInPage,
   }) => {
@@ -72,50 +68,5 @@ test.describe('Editable currency on /dashboard/expenses (Story 10.5)', () => {
         { timeout: 5000 },
       )
       .toBe('USD')
-  })
-
-  test('disabled state — currency picker is disabled with documented tooltip on a linked expense', async ({
-    page,
-    loggedInPage,
-  }) => {
-    const { api } = loggedInPage
-    const household = await api.createHousehold('Linked Currency Home')
-    const categories = await api.listCategories()
-    const cat = categories[0]
-
-    const description = `linked-currency-${Date.now()}`
-    const expense = await api.createExpense({
-      household: household.id,
-      description,
-      amount: 42.5,
-      category: cat.id,
-      type: 'expense',
-      expense_date: '2026-04-12',
-    })
-    const bankTxn = await api.createBankTransaction({
-      description: `linked-currency-bank-${Date.now()}`,
-      merchant_display_name: 'BANK MERCHANT',
-      amount: '42.50',
-      type: 'expense',
-      transaction_date: '2026-04-12',
-      household_id: household.id,
-      category_id: cat.id,
-      currency: 'EUR',
-    })
-    await api.createReconciliationLink(Number(expense.id), bankTxn.id)
-
-    const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
-    await page.waitForLoadState('networkidle')
-
-    await expenses.row(description).locator('.action-btn[title="Edit"]').click()
-    const editRow = page.locator('tr.edit-row')
-    const currencySelect = editRow.locator('select[name="currency"]')
-    await expect(currencySelect).toBeVisible()
-    await expect(currencySelect).toBeDisabled()
-
-    // Documented tooltip text from Implementation Rule #3 / Story 10.5 fix #3.
-    const titleAttr = await currencySelect.getAttribute('title')
-    expect(titleAttr).toBe('Unlink first to change currency.')
   })
 })
