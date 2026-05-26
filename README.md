@@ -9,7 +9,7 @@ database:
 
 | Layer    | Dev (`npm run dev`)    | QA (`pnpm test`)         |
 |----------|------------------------|--------------------------|
-| Backend  | `:8000`, DB `ledgerapp`  | `:8001`, DB `ledgerapp_test` |
+| Backend  | `:8000`, DB `savvo`  | `:8001`, DB `savvo_test` |
 | Frontend | `:5173`                | `:5174` (`PUBLIC_API_BASE_URL=http://localhost:8001`) |
 
 Both `webServer` entries in `playwright.config.ts` set `reuseExistingServer:
@@ -31,7 +31,7 @@ pnpm test:auth          # run auth tests only
 pnpm test:headed        # run with browser visible
 ```
 
-`global-setup.ts` creates `ledgerapp_test` if it doesn't exist, runs
+`global-setup.ts` creates `savvo_test` if it doesn't exist, runs
 migrations, and `flush`es the database before every run.
 
 ## Configuration
@@ -42,7 +42,7 @@ migrations, and `flush`es the database before every run.
 |------------------|--------------------------|------------------------------------------|
 | `FRONTEND_URL`   | `http://localhost:5174`  | Playwright `baseURL` and the origin in CORS-mock headers |
 | `BACKEND_URL`    | `http://localhost:8001`  | Used by `ApiHelper` for direct API calls |
-| `POSTGRES_DB_NAME` | `ledgerapp_test`       | Test database name                       |
+| `POSTGRES_DB_NAME` | `savvo_test`       | Test database name                       |
 | `POSTGRES_USERNAME` | `postgres`            | Postgres user                            |
 | `POSTGRES_PASSWORD` | `password321`         | Postgres password                        |
 | `POSTGRES_HOST`  | `127.0.0.1`              | Postgres host                            |

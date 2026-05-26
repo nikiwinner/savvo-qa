@@ -6,7 +6,7 @@
  * are live from Stories 11.2 and 11.3. The frontend now renders both:
  *   • InsightsFeed.svelte: server-sorted Insight[] with per-card dismiss
  *     button. Dismissals persist via localStorage key
- *     `ledgerapp:dismissed_insights:v1`. Per-period scoping — dismissing
+ *     `savvo:dismissed_insights:v1`. Per-period scoping — dismissing
  *     in May does NOT silence June's same-type insight.
  *   • BalanceSummaryCard.svelte: per-account native balance + primary-currency
  *     total + Phase 10 fx_stale icon.

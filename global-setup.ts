@@ -4,7 +4,7 @@ import dotenv from 'dotenv'
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
-const TEST_DB_NAME = process.env.POSTGRES_DB_NAME ?? 'ledgerapp_test'
+const TEST_DB_NAME = process.env.POSTGRES_DB_NAME ?? 'savvo_test'
 const DB_USER = process.env.POSTGRES_USERNAME ?? 'postgres'
 const DB_PASSWORD = process.env.POSTGRES_PASSWORD ?? 'password321'
 const DB_HOST = process.env.POSTGRES_HOST ?? '127.0.0.1'

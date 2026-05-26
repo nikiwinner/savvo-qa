@@ -4,7 +4,7 @@ import dotenv from 'dotenv'
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
-const TEST_DB_NAME = process.env.POSTGRES_DB_NAME ?? 'ledgerapp_test'
+const TEST_DB_NAME = process.env.POSTGRES_DB_NAME ?? 'savvo_test'
 
 export default defineConfig({
   testDir: './tests',
@@ -40,7 +40,7 @@ export default defineConfig({
 
   webServer: [
     {
-      // QA-only backend on :8001 against ledgerapp_test. Never reuses the dev
+      // QA-only backend on :8001 against savvo_test. Never reuses the dev
       // backend on :8000 — that would contaminate the dev DB.
       // OAUTH_TEST_MODE=True enables stub Google auth-code resolution for
       // Story 9.10 E2E tests (see authzone/oauth.py:_TEST_CODES).
