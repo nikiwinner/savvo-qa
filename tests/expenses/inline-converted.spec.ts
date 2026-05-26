@@ -24,17 +24,17 @@ test.describe('Inline-converted display on /dashboard/expenses (Story 10.7)', ()
     // Seed a deterministic USD->EUR rate so the conversion is predictable.
     await api.seedExchangeRate('USD', 'EUR', '0.50', TODAY)
 
-    const hh = await api.createHousehold('Inline FX Home')
+    const hh = await api.createSpace('Inline FX Home')
     const description = `usd-row-${Date.now()}`
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description,
       amount: 200,
       expense_date: TODAY,
       currency: 'USD',
     })
 
-    await page.goto(`/dashboard/expenses?household=${hh.id}`)
+    await page.goto(`/dashboard/expenses?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr', { hasText: description })
@@ -61,17 +61,17 @@ test.describe('Inline-converted display on /dashboard/expenses (Story 10.7)', ()
     const { api } = loggedInPage
     await api.setUserCurrency('EUR')
 
-    const hh = await api.createHousehold('Same Currency Home')
+    const hh = await api.createSpace('Same Currency Home')
     const description = `eur-row-${Date.now()}`
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description,
       amount: 50,
       expense_date: TODAY,
       currency: 'EUR',
     })
 
-    await page.goto(`/dashboard/expenses?household=${hh.id}`)
+    await page.goto(`/dashboard/expenses?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr', { hasText: description })
@@ -91,17 +91,17 @@ test.describe('Inline-converted display on /dashboard/expenses (Story 10.7)', ()
     // nothing → the serializer returns converted_amount: null while
     // currency != userCurrency, which is the disambiguation rule for "FX
     // failed" (Implementation Rule #16, branch c).
-    const hh = await api.createHousehold('FX Failed Home')
+    const hh = await api.createSpace('FX Failed Home')
     const description = `nok-row-${Date.now()}`
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description,
       amount: 99,
       expense_date: TODAY,
       currency: 'NOK',
     })
 
-    await page.goto(`/dashboard/expenses?household=${hh.id}`)
+    await page.goto(`/dashboard/expenses?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr', { hasText: description })

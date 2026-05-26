@@ -8,7 +8,9 @@
  *   3. Expense chip excludes income rows; URL gets ?type=expense.
  *
  * Implementation hints from coder/reviewer:
- *   - Chip is a <label class="filter-chip"> with text "Income" / "Expense".
+ *   - The Type filter lives in a right-side <Drawer> opened via the "Filters"
+ *     button. Each chip is a <label class="filter-chip"> with text
+ *     "Income" / "Expense" inside the drawer's Type section.
  *   - Active chip carries the .filter-chip-active class.
  *   - Income rows on the manual-expense table get class "row-income".
  *   - Amount cell shows leading '+' for income, '-' for expense.
@@ -24,13 +26,13 @@ test.describe('Income vs expense split filter', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Income Split Home')
+    const hh = await api.createSpace('Income Split Home')
 
     // 2 expense rows + 2 income rows
-    await api.createExpense({ household: hh.id, description: 'Rent', amount: 1200, type: 'expense', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Groceries', amount: 80, type: 'expense', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Salary', amount: 3000, type: 'income', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Side Gig', amount: 500, type: 'income', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Rent', amount: 1200, type: 'expense', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Groceries', amount: 80, type: 'expense', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Salary', amount: 3000, type: 'income', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Side Gig', amount: 500, type: 'income', expense_date: TODAY })
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
@@ -38,8 +40,13 @@ test.describe('Income vs expense split filter', () => {
     // Pre-condition: all 4 manual rows are visible.
     await expect(page.locator('tbody tr:not(.edit-row):not(.row-bank)')).toHaveCount(4)
 
-    // Click the Income chip in the sidebar Type filter.
-    const incomeChip = page.locator('label.filter-chip', { hasText: 'Income' })
+    // Open the filters drawer and click the Income chip in the Type section.
+    await expenses.openFilters()
+    const typeSection = expenses
+      .filtersDrawer()
+      .locator('.filter-section')
+      .filter({ has: page.locator('.filter-section-title', { hasText: 'Type' }) })
+    const incomeChip = typeSection.locator('label.filter-chip', { hasText: 'Income' })
     await incomeChip.click()
 
     // URL gets ?type=income.
@@ -60,11 +67,11 @@ test.describe('Income vs expense split filter', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Income Accent Home')
+    const hh = await api.createSpace('Income Accent Home')
 
     const incomeDesc = 'income-accent-test'
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: incomeDesc,
       amount: 3000,
       type: 'income',
@@ -90,20 +97,26 @@ test.describe('Income vs expense split filter', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Expense Filter Home')
+    const hh = await api.createSpace('Expense Filter Home')
 
     // Same shape as test 1: 2 expense + 2 income rows.
-    await api.createExpense({ household: hh.id, description: 'Rent', amount: 1200, type: 'expense', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Groceries', amount: 80, type: 'expense', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Salary', amount: 3000, type: 'income', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Side Gig', amount: 500, type: 'income', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Rent', amount: 1200, type: 'expense', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Groceries', amount: 80, type: 'expense', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Salary', amount: 3000, type: 'income', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Side Gig', amount: 500, type: 'income', expense_date: TODAY })
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
     await expect(page.locator('tbody tr:not(.edit-row):not(.row-bank)')).toHaveCount(4)
 
-    const expenseChip = page.locator('label.filter-chip', { hasText: 'Expense' })
+    // Open the filters drawer and click the Expense chip in the Type section.
+    await expenses.openFilters()
+    const typeSection = expenses
+      .filtersDrawer()
+      .locator('.filter-section')
+      .filter({ has: page.locator('.filter-section-title', { hasText: 'Type' }) })
+    const expenseChip = typeSection.locator('label.filter-chip', { hasText: 'Expense' })
     await expenseChip.click()
 
     // URL gets ?type=expense.

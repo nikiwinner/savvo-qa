@@ -11,20 +11,20 @@ const TODAY = new Date().toISOString().split('T')[0]
 test.describe('Bulk categorization', () => {
   test('checkboxes appear on bank transaction rows', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Checkbox Home')
+    const space = await api.createSpace('Checkbox Home')
 
     await api.createBankTransaction({
       description: 'CHECKBOX TXN ONE',
       amount: '10.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
-    // Bank rows with a household should have a checkbox in the cell-checkbox td
+    // Bank rows with a space should have a checkbox in the cell-checkbox td
     const bankRow = page.locator('tbody tr.row-bank', { hasText: 'CHECKBOX TXN ONE' })
     await expect(bankRow).toBeVisible()
     await expect(bankRow.locator('.cell-checkbox input[type="checkbox"]')).toBeVisible()
@@ -32,7 +32,7 @@ test.describe('Bulk categorization', () => {
 
   test('select all selects visible bank transactions', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Select All Home')
+    const space = await api.createSpace('Select All Home')
 
     // Seed 2 bank txns
     await api.createBankTransaction({
@@ -40,17 +40,17 @@ test.describe('Bulk categorization', () => {
       amount: '10.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
     await api.createBankTransaction({
       description: 'SELECT ALL TXN B',
       amount: '20.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Click the header checkbox (select all)
@@ -74,7 +74,7 @@ test.describe('Bulk categorization', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Bulk Cat Home')
+    const space = await api.createSpace('Bulk Cat Home')
 
     // Seed 3 bank txns
     await api.createBankTransaction({
@@ -82,24 +82,24 @@ test.describe('Bulk categorization', () => {
       amount: '10.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
     await api.createBankTransaction({
       description: 'BULK TXN 2',
       amount: '20.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
     await api.createBankTransaction({
       description: 'BULK TXN 3',
       amount: '30.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Select only our three seeded rows directly (not "select all" — the seed endpoint
@@ -142,17 +142,17 @@ test.describe('Bulk categorization', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Action Bar Home')
+    const space = await api.createSpace('Action Bar Home')
 
     await api.createBankTransaction({
       description: 'ACTION BAR TXN',
       amount: '55.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Action bar should not be visible initially

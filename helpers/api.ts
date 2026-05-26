@@ -8,7 +8,7 @@ export interface UserRecord {
   name: string
 }
 
-export interface HouseholdRecord {
+export interface SpaceRecord {
   id: number
   name: string
 }
@@ -36,7 +36,7 @@ export interface BankTransactionRecord {
   amount: string
   type: string
   transaction_date: string
-  household: number | null
+  space: number | null
   category: number | null
   merchant_display_name: string
 }
@@ -50,7 +50,7 @@ export interface CategoryRuleRecord {
   is_auto: boolean
   set_category: number | null
   rename_merchant: string
-  household: number
+  space: number
 }
 
 export interface CreateBankTransactionData {
@@ -58,7 +58,7 @@ export interface CreateBankTransactionData {
   amount: string
   type?: 'expense' | 'income'
   transaction_date: string
-  household_id?: number | null
+  space_id?: number | null
   category_id?: number | null
   merchant_display_name?: string
   provider_category_code?: string
@@ -69,7 +69,7 @@ export interface CreateBankTransactionData {
 }
 
 export interface CreateCategoryRuleData {
-  household: number
+  space: number
   name: string
   priority?: number
   merchant_contains?: string
@@ -83,7 +83,7 @@ export interface CreateCategoryRuleData {
 }
 
 export interface CreateExpenseData {
-  household: number
+  space: number
   description: string
   amount: number
   category?: number | null
@@ -145,15 +145,15 @@ export class ApiHelper {
   }
 
   /**
-   * PATCH /api/households/<id>/ — set primary_currency (Story 10.1 / 10.7).
+   * PATCH /api/spaces/<id>/ — set primary_currency (Story 10.1 / 10.7).
    */
-  async setHouseholdPrimaryCurrency(householdId: number, code: string): Promise<void> {
-    const res = await this.ctx.patch(`${this.baseUrl}/api/households/${householdId}/`, {
+  async setSpacePrimaryCurrency(spaceId: number, code: string): Promise<void> {
+    const res = await this.ctx.patch(`${this.baseUrl}/api/spaces/${spaceId}/`, {
       data: { primary_currency: code },
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
     if (!res.ok()) {
-      throw new Error(`setHouseholdPrimaryCurrency failed (${res.status()}): ${await res.text()}`)
+      throw new Error(`setSpacePrimaryCurrency failed (${res.status()}): ${await res.text()}`)
     }
   }
 
@@ -177,35 +177,35 @@ export class ApiHelper {
     return state.cookies
   }
 
-  // ── Households ─────────────────────────────────────────────────────────────
+  // ── Spaces ─────────────────────────────────────────────────────────────
 
-  async createHousehold(name: string, description = ''): Promise<HouseholdRecord> {
-    const res = await this.ctx.post(`${this.baseUrl}/api/households/`, {
+  async createSpace(name: string, description = ''): Promise<SpaceRecord> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/spaces/`, {
       data: { name, description },
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
     if (!res.ok()) {
-      throw new Error(`createHousehold failed (${res.status()}): ${await res.text()}`)
+      throw new Error(`createSpace failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
 
-  async listHouseholds(): Promise<HouseholdRecord[]> {
-    const res = await this.ctx.get(`${this.baseUrl}/api/households/`)
+  async listSpaces(): Promise<SpaceRecord[]> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/spaces/`)
     if (!res.ok()) {
-      throw new Error(`listHouseholds failed (${res.status()}): ${await res.text()}`)
+      throw new Error(`listSpaces failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
 
-  /** Returns the HTTP status code when fetching a specific household. */
-  async getHouseholdStatus(householdId: number): Promise<number> {
-    const res = await this.ctx.get(`${this.baseUrl}/api/households/${householdId}/`)
+  /** Returns the HTTP status code when fetching a specific space. */
+  async getSpaceStatus(spaceId: number): Promise<number> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/spaces/${spaceId}/`)
     return res.status()
   }
 
-  async assignUser(householdId: number, userId: number): Promise<void> {
-    const res = await this.ctx.put(`${this.baseUrl}/api/households/${householdId}/assign_user/`, {
+  async assignUser(spaceId: number, userId: number): Promise<void> {
+    const res = await this.ctx.put(`${this.baseUrl}/api/spaces/${spaceId}/assign_user/`, {
       data: { user_id: userId },
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
@@ -214,8 +214,8 @@ export class ApiHelper {
     }
   }
 
-  async unassignUser(householdId: number, userId: number): Promise<APIResponse> {
-    return this.ctx.put(`${this.baseUrl}/api/households/${householdId}/unassign_user/`, {
+  async unassignUser(spaceId: number, userId: number): Promise<APIResponse> {
+    return this.ctx.put(`${this.baseUrl}/api/spaces/${spaceId}/unassign_user/`, {
       data: { user_id: userId },
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
@@ -357,35 +357,35 @@ export class ApiHelper {
     return res.json()
   }
 
-  // ── Bank Transactions: bulk_set_household ─────────────────────────────────
+  // ── Bank Transactions: bulk_set_space ─────────────────────────────────
 
   /**
-   * POST /api/bank-transactions/bulk_set_household/ — raw, returns APIResponse so
+   * POST /api/bank-transactions/bulk_set_space/ — raw, returns APIResponse so
    * negative tests can inspect the status code without throwing.
-   * `householdId === null` unmaps; pass `undefined` to omit the key entirely.
+   * `spaceId === null` unmaps; pass `undefined` to omit the key entirely.
    */
-  async bulkSetHouseholdRaw(
+  async bulkSetSpaceRaw(
     transactionIds: number[],
-    householdId: number | null | undefined,
+    spaceId: number | null | undefined,
   ): Promise<APIResponse> {
     const body: Record<string, unknown> = { transaction_ids: transactionIds }
-    if (householdId !== undefined) {
-      body['household_id'] = householdId
+    if (spaceId !== undefined) {
+      body['space_id'] = spaceId
     }
-    return this.ctx.post(`${this.baseUrl}/api/bank-transactions/bulk_set_household/`, {
+    return this.ctx.post(`${this.baseUrl}/api/bank-transactions/bulk_set_space/`, {
       data: body,
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
   }
 
   /** Throws on non-OK; returns the JSON response (`{ updated: number }`). */
-  async bulkSetHousehold(
+  async bulkSetSpace(
     transactionIds: number[],
-    householdId: number | null,
+    spaceId: number | null,
   ): Promise<{ updated: number }> {
-    const res = await this.bulkSetHouseholdRaw(transactionIds, householdId)
+    const res = await this.bulkSetSpaceRaw(transactionIds, spaceId)
     if (!res.ok()) {
-      throw new Error(`bulkSetHousehold failed (${res.status()}): ${await res.text()}`)
+      throw new Error(`bulkSetSpace failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
@@ -413,9 +413,9 @@ export class ApiHelper {
     return res.json()
   }
 
-  async listCategoryRules(householdId?: number): Promise<CategoryRuleRecord[]> {
-    const url = householdId
-      ? `${this.baseUrl}/api/category-rules/?household=${householdId}`
+  async listCategoryRules(spaceId?: number): Promise<CategoryRuleRecord[]> {
+    const url = spaceId
+      ? `${this.baseUrl}/api/category-rules/?space=${spaceId}`
       : `${this.baseUrl}/api/category-rules/`
     const res = await this.ctx.get(url)
     if (!res.ok()) {
@@ -429,7 +429,7 @@ export class ApiHelper {
   /**
    * POST /api/seed/bank-account/ — DEBUG-only endpoint (Phase 11 Story 11.7)
    * that creates a BankConnection + BankAccount with explicit balance fields,
-   * optionally also seeding one BankTransaction mapped to a household so the
+   * optionally also seeding one BankTransaction mapped to a space so the
    * analytics `balance-summary` scoping filter includes the account.
    *
    * Pass `balance_amount: null` to seed a "never synced" account.
@@ -440,7 +440,7 @@ export class ApiHelper {
     balance_amount: string | null
     balance_currency?: string
     balance_updated_at?: string | null
-    household_id?: number | null
+    space_id?: number | null
   }): Promise<{
     account_id: number
     connection_id: number

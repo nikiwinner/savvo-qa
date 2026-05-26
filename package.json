@@ -9,7 +9,7 @@
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
     "test:auth": "playwright test tests/auth/",
-    "test:households": "playwright test tests/households/",
+    "test:spaces": "playwright test tests/spaces/",
     "test:expenses": "playwright test tests/expenses/",
     "test:dashboard": "playwright test tests/dashboard/",
     "test:marketing": "playwright test tests/marketing/ --project=chromium --workers=1",

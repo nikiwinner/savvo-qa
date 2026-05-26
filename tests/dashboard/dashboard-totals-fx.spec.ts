@@ -22,10 +22,10 @@ test.describe('Dashboard totals FX', () => {
     // Seed a deterministic USD->EUR rate so the USD row converts cleanly.
     await api.seedExchangeRate('USD', 'EUR', '0.50', TODAY)
 
-    const hh = await api.createHousehold('FX Mixed Home')
+    const hh = await api.createSpace('FX Mixed Home')
     // 100 EUR expense passes through unchanged.
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'EUR groceries',
       amount: 100,
       expense_date: TODAY,
@@ -33,7 +33,7 @@ test.describe('Dashboard totals FX', () => {
     })
     // 200 USD * 0.50 = 100 EUR
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'USD coffee',
       amount: 200,
       expense_date: TODAY,
@@ -65,9 +65,9 @@ test.describe('Dashboard totals FX', () => {
     // unreachable, so the live fetch fails and the 14-day walk-back finds
     // nothing → FXRateUnavailableError → fx_stale=true. The failed-row raw
     // amount still folds in (best-effort).
-    const hh = await api.createHousehold('FX Stale Home')
+    const hh = await api.createSpace('FX Stale Home')
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'SEK untranslated',
       amount: 50,
       expense_date: TODAY,

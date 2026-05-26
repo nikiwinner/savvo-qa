@@ -35,8 +35,8 @@ const DEFAULT_CATEGORY_NAMES = [
 test.describe('Category chip picker', () => {
   test('chip picker renders all default seeded categories', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    // Creating a household seeds the 11 default categories.
-    await api.createHousehold('Chip Picker Home')
+    // Creating a space seeds the 11 default categories.
+    await api.createSpace('Chip Picker Home')
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
@@ -73,7 +73,7 @@ test.describe('Category chip picker', () => {
 
   test('recent categories surface first in correct order', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Recents Home')
+    const space = await api.createSpace('Recents Home')
 
     // Look up category ids for the three we'll seed.
     const groceries = await api.getCategoryByName('Groceries')
@@ -92,7 +92,7 @@ test.describe('Category chip picker', () => {
     //   2× Transportation
     //   3× Groceries (newest)
     await api.createExpense({
-      household: household.id,
+      space: space.id,
       description: 'U-1',
       amount: 10,
       expense_date: TODAY,
@@ -100,7 +100,7 @@ test.describe('Category chip picker', () => {
     })
     for (let i = 0; i < 2; i++) {
       await api.createExpense({
-        household: household.id,
+        space: space.id,
         description: `T-${i}`,
         amount: 11,
         expense_date: TODAY,
@@ -109,7 +109,7 @@ test.describe('Category chip picker', () => {
     }
     for (let i = 0; i < 3; i++) {
       await api.createExpense({
-        household: household.id,
+        space: space.id,
         description: `G-${i}`,
         amount: 12,
         expense_date: TODAY,
@@ -173,12 +173,12 @@ test.describe('Category chip picker', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Chip Submit Home')
+    const space = await api.createSpace('Chip Submit Home')
     const groceries = await api.getCategoryByName('Groceries')
     expect(groceries).not.toBeNull()
 
     const expenses = new ExpensesPage(page)
-    await expenses.gotoWithHousehold(household.id)
+    await expenses.gotoWithSpace(space.id)
     await expenses.openCreateForm()
 
     const picker = page.locator('[role="radiogroup"][data-chip-picker-id="category"]')
@@ -194,8 +194,8 @@ test.describe('Category chip picker', () => {
     const hiddenCategoryInput = expenses.createForm.locator('input[type="hidden"][name="category"]')
     await expect(hiddenCategoryInput).toHaveValue(String(groceries!.id))
 
-    // Fill the rest of the form (date defaults to today, household is preselected
-    // via ?household=<id>). Force the household + amount values right before submit
+    // Fill the rest of the form (date defaults to today, space is preselected
+    // via ?space=<id>). Force the space + amount values right before submit
     // to defend against any pending Svelte re-renders.
     const description = `Chip Created ${Date.now()}`
     const amount = '42.00'
@@ -207,8 +207,8 @@ test.describe('Category chip picker', () => {
       ({ hhId, desc, amt, catId }: { hhId: number; desc: string; amt: string; catId: number }) => {
         const form = document.querySelector('.form-paper form') as HTMLFormElement | null
         if (!form) return
-        const householdSelect = form.querySelector('#household_id') as HTMLSelectElement | null
-        if (householdSelect) householdSelect.value = String(hhId)
+        const spaceSelect = form.querySelector('#space_id') as HTMLSelectElement | null
+        if (spaceSelect) spaceSelect.value = String(hhId)
         const descInput = form.querySelector('#description') as HTMLInputElement | null
         if (descInput) descInput.value = desc
         const amountInput = form.querySelector('#amount') as HTMLInputElement | null
@@ -218,7 +218,7 @@ test.describe('Category chip picker', () => {
         ) as HTMLInputElement | null
         if (hiddenCat) hiddenCat.value = String(catId)
       },
-      { hhId: household.id, desc: description, amt: amount, catId: groceries!.id },
+      { hhId: space.id, desc: description, amt: amount, catId: groceries!.id },
     )
 
     const submitBtn = expenses.createForm.locator('button', { hasText: 'Add Transaction' })

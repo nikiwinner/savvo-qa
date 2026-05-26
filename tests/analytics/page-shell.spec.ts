@@ -7,8 +7,8 @@
  *   • Sidebar link → page reachable.
  *   • Page renders header + period selector + 5 section cards.
  *   • Period changes round-trip via URL params (no client-side state).
- *   • Empty-household path doesn't crash.
- *   • Non-member household renders error states cleanly, no JS errors.
+ *   • Empty-space path doesn't crash.
+ *   • Non-member space renders error states cleanly, no JS errors.
  */
 import { test, expect } from '../../fixtures/index'
 
@@ -19,9 +19,9 @@ function pad2(n: number): string {
 test.describe('Analytics page shell (Story 11.4)', () => {
   test('analytics link in sidebar navigates to the page', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Analytics Home')
+    const hh = await api.createSpace('Analytics Home')
 
-    await page.goto(`/dashboard?household=${hh.id}`)
+    await page.goto(`/dashboard?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const analyticsLink = page.locator('.nav-menu a', { hasText: 'Analytics' })
@@ -29,17 +29,17 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     await analyticsLink.click()
 
     await page.waitForURL(/\/dashboard\/analytics(\?|$)/)
-    // The redirect normalises ?household=<id> into the URL.
-    expect(page.url()).toContain(`household=${hh.id}`)
+    // The redirect normalises ?space=<id> into the URL.
+    expect(page.url()).toContain(`space=${hh.id}`)
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
     await expect(page.getByTestId('period-selector')).toBeVisible()
   })
 
   test('period selector month change updates URL and reloads data', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Period Home')
+    const hh = await api.createSpace('Period Home')
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     // Pick a clearly earlier month so the active value definitely changes.
@@ -51,7 +51,7 @@ test.describe('Analytics page shell (Story 11.4)', () => {
 
     await page.waitForURL(new RegExp(`period=${target}`))
     expect(page.url()).toContain(`period=${target}`)
-    expect(page.url()).toContain(`household=${hh.id}`)
+    expect(page.url()).toContain(`space=${hh.id}`)
 
     // Page heading still rendered — server data round-trip completed cleanly.
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
@@ -60,16 +60,16 @@ test.describe('Analytics page shell (Story 11.4)', () => {
 
   test('months dropdown change updates URL', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Months Home')
+    const hh = await api.createSpace('Months Home')
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     await page.getByTestId('period-months-select').selectOption('12')
 
     await page.waitForURL(/months=12/)
     expect(page.url()).toContain('months=12')
-    expect(page.url()).toContain(`household=${hh.id}`)
+    expect(page.url()).toContain(`space=${hh.id}`)
 
     // Sections still render — no crash on rerender. The redesign consolidated
     // the former monthly-trend + income-vs-expenses cards into one cashflow
@@ -81,14 +81,14 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     await expect(page.getByTestId('analytics-section-top-categories')).toBeVisible()
   })
 
-  test('empty household renders empty states without crashing', async ({ page, loggedInPage }) => {
+  test('empty space renders empty states without crashing', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Empty Home')
+    const hh = await api.createSpace('Empty Home')
 
     const errors: string[] = []
     page.on('pageerror', (err) => errors.push(err.message))
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
@@ -102,11 +102,11 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     expect(errors).toEqual([])
   })
 
-  test('non-member household renders cleanly without crashing', async ({ page, twoActors, context }) => {
+  test('non-member space renders cleanly without crashing', async ({ page, twoActors, context }) => {
     const { userA, apiA, apiB } = twoActors
 
-    // B owns a household that A is not a member of.
-    const hhB = await apiB.createHousehold('B Household')
+    // B owns a space that A is not a member of.
+    const hhB = await apiB.createSpace('B Space')
 
     // Log A into the browser context.
     const cookiesA = await apiA.cookies()
@@ -117,19 +117,19 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     const errors: string[] = []
     page.on('pageerror', (err) => errors.push(err.message))
 
-    // Force-feed B's household id while logged in as A. The backend should
+    // Force-feed B's space id while logged in as A. The backend should
     // 403 on every analytics endpoint, which the loader catches into
     // loadErrors — the page renders error states for each section. No crash.
-    await page.goto(`/dashboard/analytics?household=${hhB.id}`)
+    await page.goto(`/dashboard/analytics?space=${hhB.id}`)
     await page.waitForLoadState('networkidle')
 
     // Page heading still rendered.
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
 
     // Either each section shows the empty-error placeholder, OR (if the loader
-    // redirected A to her first household with `?household=<idA>`) the URL no
+    // redirected A to her first space with `?space=<idA>`) the URL no
     // longer carries hhB.id. Both are acceptable per the DoD.
-    const stillOnOther = page.url().includes(`household=${hhB.id}`)
+    const stillOnOther = page.url().includes(`space=${hhB.id}`)
     if (stillOnOther) {
       const errorPlaceholders = page.getByTestId('analytics-section-error')
       expect(await errorPlaceholders.count()).toBeGreaterThan(0)

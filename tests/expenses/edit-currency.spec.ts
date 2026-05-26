@@ -17,11 +17,11 @@ test.describe('Editable currency on /dashboard/expenses (Story 10.5)', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Currency Persist Home')
+    const space = await api.createSpace('Currency Persist Home')
 
     const description = `currency-persist-${Date.now()}`
     const created = await api.createExpense({
-      household: household.id,
+      space: space.id,
       description,
       amount: 12.5,
       type: 'expense',
@@ -30,12 +30,12 @@ test.describe('Editable currency on /dashboard/expenses (Story 10.5)', () => {
     const createdId = Number(created.id)
 
     const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
-    await expenses.row(description).locator('.action-btn[title="Edit"]').click()
-    const editRow = page.locator('tr.edit-row')
-    const currencySelect = editRow.locator('select[name="currency"]')
+    await expenses.openEditModal(description)
+    const editModal = expenses.editModal()
+    const currencySelect = editModal.locator('#edit-currency')
     await expect(currencySelect).toBeVisible()
     await expect(currencySelect).toBeEnabled()
 
@@ -51,7 +51,7 @@ test.describe('Editable currency on /dashboard/expenses (Story 10.5)', () => {
     const responsePromise = page.waitForResponse(
       (res) => res.request().method() === 'POST' && res.url().includes('?/update'),
     )
-    await editRow.locator('button', { hasText: 'Save' }).click()
+    await editModal.locator('.edit-modal-actions button', { hasText: 'Save' }).click()
     const submitRes = await responsePromise
     expect(submitRes.status()).toBe(200)
 

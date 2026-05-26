@@ -5,7 +5,7 @@
  * `currency` field — NOT the viewer's user.currency and NOT a hardcoded USD.
  *
  * Setup uses two users with different `User.currency` values in the same
- * household. Bob (USD) seeds the expense, so the expense's currency is
+ * space. Bob (USD) seeds the expense, so the expense's currency is
  * snapshotted as USD at create-time (per gotcha #23). Alice (EUR) views the
  * expenses page and must see the USD symbol on Bob's row.
  */
@@ -33,17 +33,17 @@ test.describe('Per-row currency rendering on /dashboard/expenses', () => {
     await apiBob.signup(bob, 'USD')
     await apiBob.login(bob.email, bob.password)
 
-    // Alice creates the household and assigns Bob.
-    const household = await apiAlice.createHousehold('Per-Row Currency Home')
+    // Alice creates the space and assigns Bob.
+    const space = await apiAlice.createSpace('Per-Row Currency Home')
     const bobInfo = await apiBob.me()
     expect(bobInfo).not.toBeNull()
-    await apiAlice.assignUser(household.id, bobInfo!.id)
+    await apiAlice.assignUser(space.id, bobInfo!.id)
 
     // Bob seeds an expense — backend snapshots Expense.currency from Bob's
     // user.currency (USD) at create-time per gotcha #23.
     const distinctiveDescription = `bob-usd-10-${Date.now()}`
     await apiBob.createExpense({
-      household: household.id,
+      space: space.id,
       description: distinctiveDescription,
       amount: 10.0,
       type: 'expense',
@@ -51,9 +51,9 @@ test.describe('Per-row currency rendering on /dashboard/expenses', () => {
     })
 
     // Push Alice's session cookies into the browser context, then visit the
-    // expenses page scoped to the shared household.
+    // expenses page scoped to the shared space.
     await context.addCookies(await apiAlice.cookies())
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Locate Bob's row by description and assert per-row symbol.

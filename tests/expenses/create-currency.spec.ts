@@ -16,11 +16,11 @@ test.describe('Currency selector on the expense create form', () => {
   }) => {
     const { api } = loggedInPage
     // Default user.currency is 'EUR'; we'll switch to 'USD' at create time.
-    const household = await api.createHousehold('Create Currency Home')
+    const space = await api.createSpace('Create Currency Home')
     const description = `create-currency-${Date.now()}`
 
     const expenses = new ExpensesPage(page)
-    await expenses.gotoWithHousehold(household.id)
+    await expenses.gotoWithSpace(space.id)
     await expenses.openCreateForm()
 
     // The default selection must be the viewer's currency (EUR).
@@ -43,19 +43,19 @@ test.describe('Currency selector on the expense create form', () => {
     await expenses.createForm.locator('#description').fill(description)
     await expenses.createForm.locator('#amount').fill('17.25')
 
-    // Re-assert household and currency immediately before submit, since
+    // Re-assert space and currency immediately before submit, since
     // any reactive Svelte re-render could reset native form values.
     await page.evaluate(
-      ({ householdId, descValue, amountValue, currencyValue }: {
-        householdId: number
+      ({ spaceId, descValue, amountValue, currencyValue }: {
+        spaceId: number
         descValue: string
         amountValue: string
         currencyValue: string
       }) => {
         const form = document.querySelector('.form-paper form') as HTMLFormElement | null
         if (!form) return
-        const hh = form.querySelector('#household_id') as HTMLSelectElement | null
-        if (hh) hh.value = String(householdId)
+        const hh = form.querySelector('#space_id') as HTMLSelectElement | null
+        if (hh) hh.value = String(spaceId)
         const desc = form.querySelector('#description') as HTMLInputElement | null
         if (desc) desc.value = descValue
         const amt = form.querySelector('#amount') as HTMLInputElement | null
@@ -64,7 +64,7 @@ test.describe('Currency selector on the expense create form', () => {
         if (cur) cur.value = currencyValue
       },
       {
-        householdId: household.id,
+        spaceId: space.id,
         descValue: description,
         amountValue: '17.25',
         currencyValue: 'USD',

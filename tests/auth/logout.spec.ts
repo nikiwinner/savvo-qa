@@ -36,7 +36,7 @@ test.describe('Logout', () => {
 
     await dashboard.logout()
 
-    await page.goto('/dashboard/households')
+    await page.goto('/dashboard/spaces')
     await expect(page).toHaveURL('/login')
 
     await page.goto('/dashboard/expenses')

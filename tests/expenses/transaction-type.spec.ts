@@ -13,7 +13,7 @@ const TODAY = new Date().toISOString().split('T')[0]
 test.describe('Transaction type (income vs expense)', () => {
   test('type defaults to expense when opening the create form', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    await api.createHousehold('Type Default Home')
+    await api.createSpace('Type Default Home')
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
@@ -28,12 +28,12 @@ test.describe('Transaction type (income vs expense)', () => {
 
   test('can create an expense transaction', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Expense Type Home')
+    const hh = await api.createSpace('Expense Type Home')
 
     const expenses = new ExpensesPage(page)
     await expenses.createExpense({
-      householdLabel: 'Expense Type Home',
-      householdId: hh.id,
+      spaceLabel: 'Expense Type Home',
+      spaceId: hh.id,
       type: 'expense',
       category: 'No category',
       description: 'Monthly Rent',
@@ -50,12 +50,12 @@ test.describe('Transaction type (income vs expense)', () => {
 
   test('can create an income transaction', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Income Type Home')
+    const hh = await api.createSpace('Income Type Home')
 
     const expenses = new ExpensesPage(page)
     await expenses.createExpense({
-      householdLabel: 'Income Type Home',
-      householdId: hh.id,
+      spaceLabel: 'Income Type Home',
+      spaceId: hh.id,
       type: 'income',
       category: 'No category',
       description: 'Freelance Payment',
@@ -75,9 +75,9 @@ test.describe('Transaction type (income vs expense)', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Visual Distinction Home')
-    await api.createExpense({ household: hh.id, description: 'Salary', amount: 3000, type: 'income', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Electricity', amount: 120, type: 'expense', expense_date: TODAY })
+    const hh = await api.createSpace('Visual Distinction Home')
+    await api.createExpense({ space: hh.id, description: 'Salary', amount: 3000, type: 'income', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Electricity', amount: 120, type: 'expense', expense_date: TODAY })
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
@@ -97,27 +97,26 @@ test.describe('Transaction type (income vs expense)', () => {
 
   test('editing a transaction preserves its type', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Edit Type Home')
-    await api.createExpense({ household: hh.id, description: 'Side Gig', amount: 200, type: 'income', expense_date: TODAY })
+    const hh = await api.createSpace('Edit Type Home')
+    await api.createExpense({ space: hh.id, description: 'Side Gig', amount: 200, type: 'income', expense_date: TODAY })
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    // Open edit form
-    await page.locator('tbody tr', { hasText: 'Side Gig' }).locator('.action-btn[title="Edit"]').click()
-    const editRow = page.locator('tr.edit-row')
-    await expect(editRow).toBeVisible()
+    // Open edit modal
+    await expenses.openEditModal('Side Gig')
+    const editModal = expenses.editModal()
 
-    // The type select in edit form should show "income"
-    const typeSelect = editRow.locator('select[name="type"]')
-    await expect(typeSelect).toHaveValue('income')
+    // Type is now a radio group — the "income" radio should be pre-selected.
+    await expect(editModal.locator('input[name="type"][value="income"]')).toBeChecked()
+    await expect(editModal.locator('input[name="type"][value="expense"]')).not.toBeChecked()
   })
 
   test('dashboard stats differentiate income and expense', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Stats Split Home')
-    await api.createExpense({ household: hh.id, description: 'Paycheck', amount: 2000, type: 'income', expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Groceries', amount: 150, type: 'expense', expense_date: TODAY })
+    const hh = await api.createSpace('Stats Split Home')
+    await api.createExpense({ space: hh.id, description: 'Paycheck', amount: 2000, type: 'income', expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Groceries', amount: 150, type: 'expense', expense_date: TODAY })
 
     const dashboard = new DashboardPage(page)
     await dashboard.goto()

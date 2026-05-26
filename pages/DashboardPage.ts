@@ -2,7 +2,7 @@ import { Page, Locator } from '@playwright/test'
 
 export class DashboardPage {
   /** stat-value elements in DOM order (after Story 1.9):
-   * 0: Total Households
+   * 0: Total Spaces
    * 1: Total Transactions
    * 2: Total Income ($)
    * 3: Total Expenses ($)
@@ -14,7 +14,7 @@ export class DashboardPage {
   readonly statCards: Locator
   readonly logoutButton: Locator
   readonly userName: Locator
-  readonly householdsLink: Locator
+  readonly spacesLink: Locator
   readonly expensesLink: Locator
 
   constructor(private readonly page: Page) {
@@ -22,7 +22,7 @@ export class DashboardPage {
     this.statCards = page.locator('.stat-card')
     this.logoutButton = page.locator('.logout-topbar-btn')
     this.userName = page.locator('.user-name')
-    this.householdsLink = page.locator('a[href="/dashboard/households"]')
+    this.spacesLink = page.locator('a[href="/dashboard/spaces"]')
     this.expensesLink = page.locator('a[href="/dashboard/expenses"]')
   }
 
@@ -37,7 +37,7 @@ export class DashboardPage {
     await this.page.waitForURL('/login')
   }
 
-  totalHouseholds(): Locator {
+  totalSpaces(): Locator {
     return this.statValues.nth(0)
   }
 

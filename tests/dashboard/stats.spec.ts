@@ -15,31 +15,31 @@ test.describe('Dashboard stats', () => {
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    await expect(dashboard.totalHouseholds()).toHaveText('0')
+    await expect(dashboard.totalSpaces()).toHaveText('0')
     await expect(dashboard.totalTransactions()).toHaveText('0')
     await expect(dashboard.totalIncome()).toContainText('0')
     await expect(dashboard.totalExpenseAmount()).toContainText('0')
   })
 
-  test('total households count reflects created households', async ({ page, loggedInPage }) => {
+  test('total spaces count reflects created spaces', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
 
-    await api.createHousehold('House 1')
-    await api.createHousehold('House 2')
+    await api.createSpace('House 1')
+    await api.createSpace('House 2')
 
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    await expect(dashboard.totalHouseholds()).toHaveText('2')
+    await expect(dashboard.totalSpaces()).toHaveText('2')
   })
 
   test('total transactions count reflects created expenses', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Stats Home')
+    const hh = await api.createSpace('Stats Home')
 
-    await api.createExpense({ household: hh.id, description: 'Exp 1', amount: 10, expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Exp 2', amount: 20, expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'Exp 3', amount: 30, expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Exp 1', amount: 10, expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Exp 2', amount: 20, expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'Exp 3', amount: 30, expense_date: TODAY })
 
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
@@ -49,10 +49,10 @@ test.describe('Dashboard stats', () => {
 
   test('total expense amount is the sum of all expense transactions', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Amount Stats Home')
+    const hh = await api.createSpace('Amount Stats Home')
 
-    await api.createExpense({ household: hh.id, description: 'A', amount: 100, expense_date: TODAY })
-    await api.createExpense({ household: hh.id, description: 'B', amount: 55.50, expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'A', amount: 100, expense_date: TODAY })
+    await api.createExpense({ space: hh.id, description: 'B', amount: 55.50, expense_date: TODAY })
 
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
@@ -66,7 +66,7 @@ test.describe('Dashboard stats', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Monthly Stats Home')
+    const hh = await api.createSpace('Monthly Stats Home')
 
     const lastMonth = new Date()
     lastMonth.setMonth(lastMonth.getMonth() - 1)
@@ -74,13 +74,13 @@ test.describe('Dashboard stats', () => {
 
     // One expense this month, one last month
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'This Month',
       amount: 300,
       expense_date: TODAY,
     })
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Last Month',
       amount: 500,
       expense_date: lastMonthStr,
@@ -103,8 +103,8 @@ test.describe('Dashboard stats', () => {
   }) => {
     // User A creates some data
     const { api: apiA } = loggedInPage
-    const hhA = await apiA.createHousehold('A Home')
-    await apiA.createExpense({ household: hhA.id, description: 'A Expense', amount: 999, expense_date: TODAY })
+    const hhA = await apiA.createSpace('A Home')
+    await apiA.createExpense({ space: hhA.id, description: 'A Expense', amount: 999, expense_date: TODAY })
 
     // Switch to user B (no data)
     const ctxB = await playwright.request.newContext()
@@ -121,20 +121,20 @@ test.describe('Dashboard stats', () => {
     await dashboard.goto()
 
     // User B sees 0 everywhere — not user A's data
-    await expect(dashboard.totalHouseholds()).toHaveText('0')
+    await expect(dashboard.totalSpaces()).toHaveText('0')
     await expect(dashboard.totalTransactions()).toHaveText('0')
 
     await ctxB.dispose()
   })
 
-  test('dashboard has quick action links to households and expenses', async ({
+  test('dashboard has quick action links to spaces and expenses', async ({
     page,
     loggedInPage: _,
   }) => {
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    await expect(dashboard.householdsLink.first()).toBeVisible()
+    await expect(dashboard.spacesLink.first()).toBeVisible()
     await expect(dashboard.expensesLink.first()).toBeVisible()
   })
 })

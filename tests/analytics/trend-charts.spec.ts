@@ -13,7 +13,7 @@
  *     hidden DOM — canvas can't be DOM-introspected by Playwright).
  *   • Income + Expenses + Net Balance datasets are all wired in.
  *   • `?months=12` reloads the chart to 12 entries.
- *   • Empty household surfaces the empty placeholder.
+ *   • Empty space surfaces the empty placeholder.
  */
 import { test, expect } from '../../fixtures/index'
 
@@ -27,18 +27,18 @@ function isoDaysAgo(daysBack: number): string {
 test.describe('Analytics cashflow trend chart', () => {
   test('renders 6 entries by default', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Trend Home')
+    const hh = await api.createSpace('Trend Home')
 
     for (let i = 0; i < 6; i++) {
       await api.createExpense({
-        household: hh.id,
+        space: hh.id,
         description: `M-${i}`,
         amount: 100 + i * 10,
         expense_date: isoDaysAgo(i),
       })
     }
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const trend = page.getByTestId('cashflow-trend')
@@ -51,39 +51,39 @@ test.describe('Analytics cashflow trend chart', () => {
 
   test('income + expenses + net-balance series all wired in', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('IvE Home')
+    const hh = await api.createSpace('IvE Home')
 
     // Seed both income and expense rows so all three series carry real values.
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Salary 1',
       amount: 2000,
       type: 'income',
       expense_date: isoDaysAgo(0),
     })
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Salary 2',
       amount: 2000,
       type: 'income',
       expense_date: isoDaysAgo(1),
     })
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Rent 1',
       amount: 800,
       type: 'expense',
       expense_date: isoDaysAgo(0),
     })
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Rent 2',
       amount: 800,
       type: 'expense',
       expense_date: isoDaysAgo(1),
     })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const chart = page.getByTestId('cashflow-trend')
@@ -113,18 +113,18 @@ test.describe('Analytics cashflow trend chart', () => {
 
   test('months=12 reloads the chart to 12 entries', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Months12 Home')
+    const hh = await api.createSpace('Months12 Home')
 
     for (let i = 0; i < 12; i++) {
       await api.createExpense({
-        household: hh.id,
+        space: hh.id,
         description: `M12-${i}`,
         amount: 50 + i,
         expense_date: isoDaysAgo(i),
       })
     }
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&months=12`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&months=12`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('cashflow-trend')).toBeVisible()
@@ -133,9 +133,9 @@ test.describe('Analytics cashflow trend chart', () => {
 
   test('empty data renders empty state', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Empty Trend Home')
+    const hh = await api.createSpace('Empty Trend Home')
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('cashflow-trend')).toBeVisible()

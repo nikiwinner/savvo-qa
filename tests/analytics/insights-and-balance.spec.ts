@@ -43,14 +43,14 @@ function periodOffset(offset: number): string {
 test.describe('Analytics insights + balance summary (Story 11.7)', () => {
   test('multi-rule scenario surfaces three insight cards', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Insights MultiRule Home')
+    const hh = await api.createSpace('Insights MultiRule Home')
 
     // Trigger uncategorized_alert: >20% of THIS month's rows are uncategorised.
     // Seed 5 uncategorised + 2 categorised = 5/7 ≈ 71% uncategorised.
     const groceries = await api.findOrCreateCategory('Groceries-IM', 'shopping-cart')
     for (let i = 0; i < 5; i++) {
       await api.createExpense({
-        household: hh.id,
+        space: hh.id,
         description: `Uncat ${i}`,
         amount: 20,
         expense_date: TODAY_ISO,
@@ -58,7 +58,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     }
     // Trigger top_merchant: highest-spend merchant this month.
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'ALDI Saturday',
       amount: 150,
       category: groceries.id,
@@ -66,14 +66,14 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     })
     // Trigger category_spike: groceries 50 last month → 150 this month (200% spike).
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Groceries small last month',
       amount: 50,
       category: groceries.id,
       expense_date: isoOffsetMonths(-1),
     })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     const feed = page.getByTestId('insights-feed')
@@ -95,11 +95,11 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     await expect(info).toHaveAttribute('data-severity', 'info')
   })
 
-  test('empty household renders insights placeholder', async ({ page, loggedInPage }) => {
+  test('empty space renders insights placeholder', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Empty Insights Home')
+    const hh = await api.createSpace('Empty Insights Home')
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insights-feed')).toBeVisible()
@@ -109,7 +109,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
 
   test('balance summary shows per-account native + primary total', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Balance Home')
+    const hh = await api.createSpace('Balance Home')
 
     // Seed FX rates so USD->EUR is known (deterministic; cache-only render path).
     await api.seedExchangeRate('USD', 'EUR', '0.90', TODAY_ISO)
@@ -120,7 +120,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       balance_amount: '1000.00',
       balance_currency: 'EUR',
       balance_updated_at: TODAY.toISOString(),
-      household_id: hh.id,
+      space_id: hh.id,
     })
     const usd = await api.seedBankAccount({
       account_name: 'USD Savings',
@@ -128,10 +128,10 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       balance_amount: '500.00',
       balance_currency: 'USD',
       balance_updated_at: TODAY.toISOString(),
-      household_id: hh.id,
+      space_id: hh.id,
     })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('balance-summary')).toBeVisible()
@@ -146,7 +146,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     const usdRow = page.getByTestId(`balance-account-${usd.account_id}`)
     await expect(usdRow).toContainText('$')
 
-    // Total is in the household primary (EUR). 1000 + 500*0.90 = 1450.00.
+    // Total is in the space primary (EUR). 1000 + 500*0.90 = 1450.00.
     const total = page.getByTestId('balance-total')
     await expect(total).toContainText('€')
     await expect(total).toContainText('1,450.00')
@@ -154,7 +154,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
 
   test('fx_stale icon appears on balance when rate missing', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('FX Stale Home')
+    const hh = await api.createSpace('FX Stale Home')
 
     // Deliberately do NOT seed any CHF->EUR rate. CHF is used here (not USD)
     // because earlier tests in the suite seed USD->EUR rates that persist in
@@ -167,10 +167,10 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       balance_amount: '500.00',
       balance_currency: 'CHF',
       balance_updated_at: TODAY.toISOString(),
-      household_id: hh.id,
+      space_id: hh.id,
     })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('balance-summary')).toBeVisible()
@@ -180,7 +180,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
 
   test('null-balance account is listed but excluded from total', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Null Balance Home')
+    const hh = await api.createSpace('Null Balance Home')
 
     const synced = await api.seedBankAccount({
       account_name: 'Synced Account',
@@ -188,7 +188,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       balance_amount: '300.00',
       balance_currency: 'EUR',
       balance_updated_at: TODAY.toISOString(),
-      household_id: hh.id,
+      space_id: hh.id,
     })
     const never = await api.seedBankAccount({
       account_name: 'Never Synced',
@@ -196,10 +196,10 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       balance_amount: null,
       balance_currency: 'EUR',
       balance_updated_at: null,
-      household_id: hh.id,
+      space_id: hh.id,
     })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId(`balance-account-${synced.account_id}`)).toBeVisible()
@@ -216,19 +216,19 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
 
   test('dismiss button hides a card and persists across reload', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Dismiss Home')
+    const hh = await api.createSpace('Dismiss Home')
 
     // Seed enough rows to definitely trigger uncategorized_alert (>20%).
     for (let i = 0; i < 5; i++) {
       await api.createExpense({
-        household: hh.id,
+        space: hh.id,
         description: `D ${i}`,
         amount: 25,
         expense_date: TODAY_ISO,
       })
     }
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     const card = page.getByTestId('insight-card-uncategorized_alert')
@@ -252,12 +252,12 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Period Scope Home')
+    const hh = await api.createSpace('Period Scope Home')
 
     // Trigger uncategorized_alert in CURRENT month.
     for (let i = 0; i < 5; i++) {
       await api.createExpense({
-        household: hh.id,
+        space: hh.id,
         description: `Cur ${i}`,
         amount: 25,
         expense_date: TODAY_ISO,
@@ -267,7 +267,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     // pile of rows so the rule fires for that period too.
     for (let i = 0; i < 5; i++) {
       await api.createExpense({
-        household: hh.id,
+        space: hh.id,
         description: `Prev ${i}`,
         amount: 25,
         expense_date: isoOffsetMonths(-1),
@@ -275,7 +275,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     }
 
     // Dismiss for the CURRENT period.
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()
     await page.getByTestId('insight-dismiss-uncategorized_alert').click()
@@ -284,7 +284,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     // Navigate to PREVIOUS month — the same-type insight has a different
     // period_yyyy_mm hash, so it must NOT be auto-dismissed.
     const prevPeriod = periodOffset(-1)
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${prevPeriod}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${prevPeriod}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()
@@ -292,18 +292,18 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
 
   test('"show all" link unfilters dismissed cards', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Show All Home')
+    const hh = await api.createSpace('Show All Home')
 
     for (let i = 0; i < 5; i++) {
       await api.createExpense({
-        household: hh.id,
+        space: hh.id,
         description: `S ${i}`,
         amount: 25,
         expense_date: TODAY_ISO,
       })
     }
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()

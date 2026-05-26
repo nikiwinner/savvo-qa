@@ -2,31 +2,31 @@
  * Expenses — CRUD (Phase 00 Story 0.4 + Phase 01)
  *
  * Create, edit, delete via the browser UI.
- * Expenses require an existing household — each test creates one via API.
+ * Expenses require an existing space — each test creates one via API.
  */
 import { test, expect } from '../../fixtures/index'
-import { HouseholdsPage } from '../../pages/HouseholdsPage'
+import { SpacesPage } from '../../pages/SpacesPage'
 import { ExpensesPage } from '../../pages/ExpensesPage'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
 test.describe('Expenses CRUD', () => {
-  test('shows info message when user has no households', async ({ page, loggedInPage: _ }) => {
+  test('shows info message when user has no spaces', async ({ page, loggedInPage: _ }) => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    await expect(expenses.noHouseholdMessage).toBeVisible()
-    await expect(expenses.noHouseholdMessage).toContainText('create a household first')
+    await expect(expenses.noSpaceMessage).toBeVisible()
+    await expect(expenses.noSpaceMessage).toContainText('create a space first')
     // Create button should be disabled
     await expect(expenses.newExpenseButton).toBeDisabled()
   })
 
-  test('shows empty state when user has a household but no expenses', async ({
+  test('shows empty state when user has a space but no expenses', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    await api.createHousehold('Test Home')
+    await api.createSpace('Test Home')
 
     const expenses = new ExpensesPage(page)
     await page.goto('/dashboard/expenses')
@@ -38,13 +38,13 @@ test.describe('Expenses CRUD', () => {
 
   test('creates an expense — it appears in the table', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('My Home')
+    const space = await api.createSpace('My Home')
 
     const expenses = new ExpensesPage(page)
 
     await expenses.createExpense({
-      householdLabel: 'My Home',
-      householdId: household.id,
+      spaceLabel: 'My Home',
+      spaceId: space.id,
       category: 'Groceries',
       description: 'Weekly groceries',
       amount: '150.00',
@@ -57,15 +57,15 @@ test.describe('Expenses CRUD', () => {
 
   test('create form closes after successful submission', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Form Close Test')
+    const space = await api.createSpace('Form Close Test')
 
     const expenses = new ExpensesPage(page)
-    await expenses.gotoWithHousehold(household.id)
+    await expenses.gotoWithSpace(space.id)
     await expenses.openCreateForm()
     await expect(expenses.createForm).toBeVisible()
 
     await expenses.submitCreateForm({
-      householdLabel: 'Form Close Test',
+      spaceLabel: 'Form Close Test',
       category: 'Utilities',
       description: 'Electric bill',
       amount: '80.00',
@@ -77,9 +77,9 @@ test.describe('Expenses CRUD', () => {
 
   test('edits an expense description', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Edit Test Home')
+    const space = await api.createSpace('Edit Test Home')
     await api.createExpense({
-      household: household.id,
+      space: space.id,
       description: 'Original Description',
       amount: 50,
       expense_date: TODAY,
@@ -96,9 +96,9 @@ test.describe('Expenses CRUD', () => {
 
   test('edits an expense amount', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Amount Edit Home')
+    const space = await api.createSpace('Amount Edit Home')
     await api.createExpense({
-      household: household.id,
+      space: space.id,
       description: 'Rent Payment',
       amount: 1000,
       expense_date: TODAY,
@@ -116,9 +116,9 @@ test.describe('Expenses CRUD', () => {
 
   test('cancel edit reverts without saving', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Cancel Edit Home')
+    const space = await api.createSpace('Cancel Edit Home')
     await api.createExpense({
-      household: household.id,
+      space: space.id,
       description: 'Cancel Test',
       amount: 75,
       expense_date: TODAY,
@@ -127,9 +127,8 @@ test.describe('Expenses CRUD', () => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    await expenses.row('Cancel Test').locator('.action-btn[title="Edit"]').click()
-    const editRow = page.locator('tr.edit-row')
-    await editRow.locator('input[name="description"]').fill('Cancelled Change')
+    await expenses.openEditModal('Cancel Test')
+    await expenses.editModal().locator('#edit-description').fill('Cancelled Change')
     await expenses.cancelEdit()
 
     await expect(expenses.row('Cancel Test')).toBeVisible()
@@ -138,9 +137,9 @@ test.describe('Expenses CRUD', () => {
 
   test('deletes an expense — it disappears from the table', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Delete Test Home')
+    const space = await api.createSpace('Delete Test Home')
     await api.createExpense({
-      household: household.id,
+      space: space.id,
       description: 'To Be Deleted',
       amount: 20,
       expense_date: TODAY,
@@ -156,9 +155,9 @@ test.describe('Expenses CRUD', () => {
 
   test('summary shows the correct total amount', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Summary Home')
-    await api.createExpense({ household: household.id, description: 'Exp A', amount: 100, expense_date: TODAY })
-    await api.createExpense({ household: household.id, description: 'Exp B', amount: 50.50, expense_date: TODAY })
+    const space = await api.createSpace('Summary Home')
+    await api.createExpense({ space: space.id, description: 'Exp A', amount: 100, expense_date: TODAY })
+    await api.createExpense({ space: space.id, description: 'Exp B', amount: 50.50, expense_date: TODAY })
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
@@ -168,17 +167,17 @@ test.describe('Expenses CRUD', () => {
     await expect(page.locator('.summary-strip .stat-expense .stat-value')).toContainText('€150.50')
   })
 
-  test('link to households page is shown when no households exist', async ({
+  test('link to spaces page is shown when no spaces exist', async ({
     page,
     loggedInPage: _,
   }) => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    const link = page.locator('.alert.alert-info a', { hasText: 'Go to Households' })
+    const link = page.locator('.alert.alert-info a', { hasText: 'Go to Spaces' })
     await expect(link).toBeVisible()
 
     await link.click()
-    await expect(page).toHaveURL('/dashboard/households')
+    await expect(page).toHaveURL('/dashboard/spaces')
   })
 })

@@ -12,9 +12,9 @@ test.describe('Expense categories', () => {
     page,
     loggedInPage,
   }) => {
-    // Create a household — this seeds default categories
+    // Create a space — this seeds default categories
     const { api } = loggedInPage
-    await api.createHousehold('Category Dropdown Home')
+    await api.createSpace('Category Dropdown Home')
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
@@ -37,12 +37,12 @@ test.describe('Expense categories', () => {
 
   test('created expense shows the selected category name', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Category Display Home')
+    const hh = await api.createSpace('Category Display Home')
     const groceries = await api.getCategoryByName('Groceries')
     expect(groceries, 'Groceries default category should exist').not.toBeNull()
 
     const expenses = new ExpensesPage(page)
-    await expenses.gotoWithHousehold(hh.id)
+    await expenses.gotoWithSpace(hh.id)
     await expenses.openCreateForm()
 
     // Pick the Groceries chip in the new chip-grid picker.
@@ -85,8 +85,8 @@ test.describe('Expense categories', () => {
       }) => {
         const form = document.querySelector('.form-paper form') as HTMLFormElement | null
         if (!form) return
-        const householdSelect = form.querySelector('#household_id') as HTMLSelectElement | null
-        if (householdSelect) householdSelect.value = String(hhId)
+        const spaceSelect = form.querySelector('#space_id') as HTMLSelectElement | null
+        if (spaceSelect) spaceSelect.value = String(hhId)
         const descInput = form.querySelector('#description') as HTMLInputElement | null
         if (descInput) descInput.value = desc
         const amountInput = form.querySelector('#amount') as HTMLInputElement | null
@@ -121,7 +121,7 @@ test.describe('Expense categories', () => {
     await apiA.createCategory(uniqueCatName)
 
     // Switch browser to user B
-    await apiB.createHousehold('Bob Category Home')
+    await apiB.createSpace('Bob Category Home')
     const cookiesB = await apiB.cookies()
     await context.clearCookies()
     await context.addCookies(cookiesB)

@@ -18,15 +18,15 @@ test.describe('Categories settings page', () => {
 
   test('lists all categories with usage counts', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    // Create a household to seed default categories
-    const household = await api.createHousehold('Usage Count Home')
+    // Create a space to seed default categories
+    const space = await api.createSpace('Usage Count Home')
 
     // Create an expense using Groceries category to bump usage count
     const categories = await api.listCategories()
     const groceries = categories.find((c) => c.name === 'Groceries')
     if (groceries) {
       await api.createExpense({
-        household: household.id,
+        space: space.id,
         description: 'Usage Test Expense',
         amount: 10,
         expense_date: TODAY,
@@ -141,13 +141,13 @@ test.describe('Categories settings page', () => {
 
   test('delete warning for category with linked data', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Delete Warning Home')
+    const space = await api.createSpace('Delete Warning Home')
     const catName = `In Use Cat ${Date.now()}`
 
     // Create a category and attach an expense to it
     const cat = await api.createCategory(catName)
     await api.createExpense({
-      household: household.id,
+      space: space.id,
       description: 'Expense using cat',
       amount: 15,
       expense_date: TODAY,

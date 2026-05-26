@@ -30,7 +30,7 @@ function slug(name: string): string {
 test.describe('Analytics spending donut (Story 11.5)', () => {
   test('donut renders with seeded category data', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Donut Home')
+    const hh = await api.createSpace('Donut Home')
 
     // Seed three categories' worth of expenses, all >3% of total.
     const groceries = await api.findOrCreateCategory('Groceries-D1', 'shopping-cart')
@@ -38,28 +38,28 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
     const dining = await api.findOrCreateCategory('Dining-D1', 'utensils')
 
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Weekly grocery run',
       amount: 200,
       category: groceries.id,
       expense_date: TODAY_ISO,
     })
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Train pass',
       amount: 80,
       category: transport.id,
       expense_date: TODAY_ISO,
     })
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'Sushi dinner',
       amount: 50,
       category: dining.id,
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     const donut = page.getByTestId('category-donut')
@@ -75,7 +75,7 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
 
   test('Other bucket appears when category total under 3%', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Other Home')
+    const hh = await api.createSpace('Other Home')
 
     // 3 large categories + 2 tiny ones. Two tiny entries forces the rebucket
     // (single-tail passthrough rule: 1 tiny stays as-is).
@@ -86,13 +86,13 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
     const tiny2 = await api.findOrCreateCategory('Tiny-B', 'box')
 
     // Totals: 500 + 500 + 500 + 0.5 + 0.5 = 1501. Tiny share ≈ 0.033% each.
-    await api.createExpense({ household: hh.id, description: 'big a', amount: 500, category: big1.id, expense_date: TODAY_ISO })
-    await api.createExpense({ household: hh.id, description: 'big b', amount: 500, category: big2.id, expense_date: TODAY_ISO })
-    await api.createExpense({ household: hh.id, description: 'big c', amount: 500, category: big3.id, expense_date: TODAY_ISO })
-    await api.createExpense({ household: hh.id, description: 'tiny a', amount: 0.5, category: tiny1.id, expense_date: TODAY_ISO })
-    await api.createExpense({ household: hh.id, description: 'tiny b', amount: 0.5, category: tiny2.id, expense_date: TODAY_ISO })
+    await api.createExpense({ space: hh.id, description: 'big a', amount: 500, category: big1.id, expense_date: TODAY_ISO })
+    await api.createExpense({ space: hh.id, description: 'big b', amount: 500, category: big2.id, expense_date: TODAY_ISO })
+    await api.createExpense({ space: hh.id, description: 'big c', amount: 500, category: big3.id, expense_date: TODAY_ISO })
+    await api.createExpense({ space: hh.id, description: 'tiny a', amount: 0.5, category: tiny1.id, expense_date: TODAY_ISO })
+    await api.createExpense({ space: hh.id, description: 'tiny b', amount: 0.5, category: tiny2.id, expense_date: TODAY_ISO })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     const donut = page.getByTestId('category-donut')
@@ -107,19 +107,19 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
 
   test('tooltip text shows category + amount + percentage', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Tooltip Home')
+    const hh = await api.createSpace('Tooltip Home')
 
     // Single category — its share is 100.0% so we can assert exact text.
     const onlyCat = await api.findOrCreateCategory('Solo-Tip', 'star')
     await api.createExpense({
-      household: hh.id,
+      space: hh.id,
       description: 'solo',
       amount: 123.45,
       category: onlyCat.id,
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=${PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${PERIOD}`)
     await page.waitForLoadState('networkidle')
 
     // chart.js renders the real tooltip on a canvas overlay (impossible to
@@ -136,10 +136,10 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
 
   test('empty period renders no-data placeholder', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createHousehold('Empty Donut Home')
+    const hh = await api.createSpace('Empty Donut Home')
 
     // No expenses seeded. Use a month far in the past where nothing exists.
-    await page.goto(`/dashboard/analytics?household=${hh.id}&period=2000-01`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&period=2000-01`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('category-donut')).toBeVisible()

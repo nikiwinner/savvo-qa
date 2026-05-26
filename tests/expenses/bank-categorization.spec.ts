@@ -5,33 +5,36 @@
  * the categorize flow works end-to-end.
  */
 import { test, expect } from '../../fixtures/index'
+import { ExpensesPage } from '../../pages/ExpensesPage'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
 test.describe('Bank transaction categorization', () => {
-  test('bank transaction shows category dropdown when uncategorized', async ({
+  test('bank transaction shows a set-category control when uncategorized', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Cat Dropdown Home')
+    const space = await api.createSpace('Cat Dropdown Home')
 
-    // Seed an uncategorized bank transaction assigned to the household
+    // Seed an uncategorized bank transaction assigned to the space
     await api.createBankTransaction({
       description: 'UNCATEGORIZED MERCHANT',
       amount: '25.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
-    // The bank row should have a .cat-select dropdown (not a badge-category)
+    // The bank row shows a .cat-map-btn (opens the category modal) and no
+    // assigned category badge yet.
     const bankRow = page.locator('tbody tr.row-bank', { hasText: 'UNCATEGORIZED MERCHANT' })
     await expect(bankRow).toBeVisible()
-    await expect(bankRow.locator('select.cat-select')).toBeVisible()
+    await expect(bankRow.locator('.cat-map-btn')).toBeVisible()
+    await expect(bankRow.locator('.badge-category')).not.toBeVisible()
   })
 
   test('selecting a category assigns it to the bank transaction', async ({
@@ -39,52 +42,45 @@ test.describe('Bank transaction categorization', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Cat Assign Home')
+    const space = await api.createSpace('Cat Assign Home')
 
     await api.createBankTransaction({
       description: 'MERCHANT TO CATEGORIZE',
       amount: '50.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
+    const expenses = new ExpensesPage(page)
     const bankRow = page.locator('tbody tr.row-bank', { hasText: 'MERCHANT TO CATEGORIZE' })
     await expect(bankRow).toBeVisible()
 
-    // Select "Groceries" from the cat-select dropdown
-    const catSelect = bankRow.locator('select.cat-select')
-    await expect(catSelect).toBeVisible()
-    // Find the Groceries option value and select by value to avoid regex label issue
-    const groceriesOption = catSelect.locator('option', { hasText: 'Groceries' }).first()
-    const groceriesValue = await groceriesOption.getAttribute('value')
-    await catSelect.selectOption(groceriesValue ?? '')
+    // Set "Groceries" via the category modal.
+    await expenses.categorizeRow(bankRow, 'Groceries')
 
-    // Wait for the async call to finish — the row should now show a badge-category
+    // The async categorize call finishes — the row should show a badge-category.
     await expect(bankRow.locator('.badge-category')).toBeVisible({ timeout: 5000 })
     await expect(bankRow.locator('.badge-category')).toContainText('Groceries')
-
-    // The dropdown should be gone (replaced by the badge + change button)
-    await expect(bankRow.locator('select.cat-select')).not.toBeVisible()
   })
 
   test('merchant_display_name is shown when set', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Merchant Display Home')
+    const space = await api.createSpace('Merchant Display Home')
 
     await api.createBankTransaction({
       description: 'RAW_MERCHANT_CODE_XYZ',
       amount: '12.99',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
       merchant_display_name: 'Friendly Merchant Name',
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // The cell-desc should show the display name, not the raw description
@@ -99,7 +95,7 @@ test.describe('Bank transaction categorization', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Fallback Chain Home')
+    const space = await api.createSpace('Fallback Chain Home')
 
     // Create a txn with a provider_category but no app category
     await api.createBankTransaction({
@@ -107,11 +103,11 @@ test.describe('Bank transaction categorization', () => {
       amount: '8.50',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
       provider_category_code: 'food-groceries',
     })
 
-    await page.goto(`/dashboard/expenses?household=${household.id}`)
+    await page.goto(`/dashboard/expenses?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const bankRow = page.locator('tbody tr.row-bank', { hasText: 'PROVIDER CAT MERCHANT' })

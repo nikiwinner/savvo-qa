@@ -2,8 +2,8 @@
  * Expenses — Data Scoping (Phase 01, Story 1.3)
  *
  * Verifies that:
- * 1. Users only see expenses from their own households in the UI.
- * 2. Creating an expense in a non-member household returns 400 (API-level).
+ * 1. Users only see expenses from their own spaces in the UI.
+ * 2. Creating an expense in a non-member space returns 400 (API-level).
  * 3. Fetching another user's expense directly returns 404 (API-level).
  */
 import { test, expect } from '../../fixtures/index'
@@ -21,9 +21,9 @@ test.describe('Expense data scoping', () => {
   }) => {
     // User A (loggedInPage) creates an expense
     const { api: apiA } = loggedInPage
-    const hhA = await apiA.createHousehold('Alice Kitchen')
+    const hhA = await apiA.createSpace('Alice Kitchen')
     await apiA.createExpense({
-      household: hhA.id,
+      space: hhA.id,
       description: 'Alice Secret Expense',
       amount: 999,
       expense_date: TODAY,
@@ -53,17 +53,17 @@ test.describe('Expense data scoping', () => {
   test('each user only sees their own expenses via the API', async ({ twoActors }) => {
     const { apiA, apiB } = twoActors
 
-    const hhA = await apiA.createHousehold('Alice Home')
-    const hhB = await apiB.createHousehold('Bob Home')
+    const hhA = await apiA.createSpace('Alice Home')
+    const hhB = await apiB.createSpace('Bob Home')
 
     const expA = await apiA.createExpense({
-      household: hhA.id,
+      space: hhA.id,
       description: 'Alice Expense',
       amount: 200,
       expense_date: TODAY,
     })
     const expB = await apiB.createExpense({
-      household: hhB.id,
+      space: hhB.id,
       description: 'Bob Expense',
       amount: 100,
       expense_date: TODAY,
@@ -79,16 +79,16 @@ test.describe('Expense data scoping', () => {
     expect(listB.map((e) => e.id)).not.toContain(expA.id)
   })
 
-  test('creating an expense in a non-member household returns 400', async ({ twoActors }) => {
+  test('creating an expense in a non-member space returns 400', async ({ twoActors }) => {
     const { apiA, apiB } = twoActors
 
-    // User A creates a household — user B is not a member
-    const hhA = await apiA.createHousehold('Alice Only')
+    // User A creates a space — user B is not a member
+    const hhA = await apiA.createSpace('Alice Only')
 
-    // User B tries to create an expense in Alice's household
+    // User B tries to create an expense in Alice's space
     try {
       await apiB.createExpense({
-        household: hhA.id,
+        space: hhA.id,
         description: 'Intrusion Attempt',
         amount: 1,
         expense_date: TODAY,
@@ -103,9 +103,9 @@ test.describe('Expense data scoping', () => {
   test("fetching another user's expense by ID returns 404", async ({ twoActors }) => {
     const { apiA, apiB } = twoActors
 
-    const hhA = await apiA.createHousehold('Alice Exclusive')
+    const hhA = await apiA.createSpace('Alice Exclusive')
     const expA = await apiA.createExpense({
-      household: hhA.id,
+      space: hhA.id,
       description: 'Private Expense',
       amount: 500,
       expense_date: TODAY,

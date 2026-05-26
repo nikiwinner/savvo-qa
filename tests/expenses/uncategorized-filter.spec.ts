@@ -6,6 +6,7 @@
  * on the next page load.
  */
 import { test, expect } from '../../fixtures/index'
+import { ExpensesPage } from '../../pages/ExpensesPage'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
@@ -15,7 +16,7 @@ test.describe('Uncategorized filter', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Uncat Filter Home')
+    const space = await api.createSpace('Uncat Filter Home')
 
     // Get a category to use for the pre-categorized txn
     const categories = await api.listCategories()
@@ -27,7 +28,7 @@ test.describe('Uncategorized filter', () => {
       amount: '20.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
       category_id: groceries?.id ?? null,
     })
 
@@ -36,11 +37,11 @@ test.describe('Uncategorized filter', () => {
       amount: '30.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
     // Navigate with ?category=none to filter to uncategorized only
-    await page.goto(`/dashboard/expenses?household=${household.id}&category=none`)
+    await page.goto(`/dashboard/expenses?space=${space.id}&category=none`)
     await page.waitForLoadState('networkidle')
 
     // Only the uncategorized txn should be visible
@@ -53,7 +54,7 @@ test.describe('Uncategorized filter', () => {
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Uncat Remove Home')
+    const space = await api.createSpace('Uncat Remove Home')
 
     // Seed two uncategorized txns
     const txnA = await api.createBankTransaction({
@@ -61,7 +62,7 @@ test.describe('Uncategorized filter', () => {
       amount: '15.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
     await api.createBankTransaction({
@@ -69,11 +70,11 @@ test.describe('Uncategorized filter', () => {
       amount: '25.00',
       type: 'expense',
       transaction_date: TODAY,
-      household_id: household.id,
+      space_id: space.id,
     })
 
     // Open expenses page with uncategorized filter active
-    await page.goto(`/dashboard/expenses?household=${household.id}&category=none`)
+    await page.goto(`/dashboard/expenses?space=${space.id}&category=none`)
     await page.waitForLoadState('networkidle')
 
     // Both rows should be visible
@@ -81,18 +82,15 @@ test.describe('Uncategorized filter', () => {
     await expect(rowToBeCateg).toBeVisible()
     await expect(page.locator('tbody tr.row-bank', { hasText: 'STAYS UNCATEGORIZED' })).toBeVisible()
 
-    // Categorize the first txn via its dropdown — get the Groceries option value
-    const catSelect = rowToBeCateg.locator('select.cat-select')
-    await expect(catSelect).toBeVisible()
-    const groceriesOpt = catSelect.locator('option', { hasText: 'Groceries' }).first()
-    const groceriesVal = await groceriesOpt.getAttribute('value')
-    await catSelect.selectOption(groceriesVal ?? '')
+    // Categorize the first txn via the category modal.
+    const expenses = new ExpensesPage(page)
+    await expenses.categorizeRow(rowToBeCateg, 'Groceries')
 
     // Wait for the network call to succeed — badge should appear
     await expect(rowToBeCateg.locator('.badge-category')).toBeVisible({ timeout: 5000 })
 
     // Reload the page with the same filter — the categorized txn should not appear
-    await page.goto(`/dashboard/expenses?household=${household.id}&category=none`)
+    await page.goto(`/dashboard/expenses?space=${space.id}&category=none`)
     await page.waitForLoadState('networkidle')
 
     // WILL BE CATEGORIZED is gone; STAYS UNCATEGORIZED remains

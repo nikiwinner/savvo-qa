@@ -8,9 +8,9 @@ import { test, expect } from '../../fixtures/index'
 test.describe('Category Rules settings page', () => {
   test('rules page is accessible from settings', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Rules Nav Home')
+    const space = await api.createSpace('Rules Nav Home')
 
-    await page.goto(`/dashboard/settings/rules?household=${household.id}`)
+    await page.goto(`/dashboard/settings/rules?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('h1', { hasText: 'Category Rules' })).toBeVisible()
@@ -18,9 +18,9 @@ test.describe('Category Rules settings page', () => {
 
   test('shows empty state when no rules exist', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Empty Rules Home')
+    const space = await api.createSpace('Empty Rules Home')
 
-    await page.goto(`/dashboard/settings/rules?household=${household.id}`)
+    await page.goto(`/dashboard/settings/rules?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Should show the empty state message
@@ -30,11 +30,11 @@ test.describe('Category Rules settings page', () => {
 
   test('can create a new rule', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Create Rule Home')
+    const space = await api.createSpace('Create Rule Home')
     const categories = await api.listCategories()
     const groceries = categories.find((c) => c.name === 'Groceries')
 
-    await page.goto(`/dashboard/settings/rules?household=${household.id}`)
+    await page.goto(`/dashboard/settings/rules?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Click "New Rule"
@@ -69,19 +69,19 @@ test.describe('Category Rules settings page', () => {
 
   test('can edit an existing rule', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Edit Rule Home')
+    const space = await api.createSpace('Edit Rule Home')
     const categories = await api.listCategories()
     const groceries = categories.find((c) => c.name === 'Groceries')
 
     // Create a rule via API
     await api.createCategoryRule({
-      household: household.id,
+      space: space.id,
       name: 'Rule To Edit',
       merchant_contains: 'EDITME',
       set_category: groceries?.id ?? null,
     })
 
-    await page.goto(`/dashboard/settings/rules?household=${household.id}`)
+    await page.goto(`/dashboard/settings/rules?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Click on the rule row to open edit form
@@ -111,19 +111,19 @@ test.describe('Category Rules settings page', () => {
 
   test('can delete a rule', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Delete Rule Home')
+    const space = await api.createSpace('Delete Rule Home')
     const categories = await api.listCategories()
     const groceries = categories.find((c) => c.name === 'Groceries')
 
     // Create a rule via API
     await api.createCategoryRule({
-      household: household.id,
+      space: space.id,
       name: 'Rule To Delete',
       merchant_contains: 'DELETEME',
       set_category: groceries?.id ?? null,
     })
 
-    await page.goto(`/dashboard/settings/rules?household=${household.id}`)
+    await page.goto(`/dashboard/settings/rules?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const ruleRow = page.locator('tbody tr.clickable-row', { hasText: 'Rule To Delete' })
@@ -145,19 +145,19 @@ test.describe('Category Rules settings page', () => {
 
   test('re-apply all rules button works', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Reapply Home')
+    const space = await api.createSpace('Reapply Home')
     const categories = await api.listCategories()
     const groceries = categories.find((c) => c.name === 'Groceries')
 
     // Create at least one rule
     await api.createCategoryRule({
-      household: household.id,
+      space: space.id,
       name: 'Reapply Rule',
       merchant_contains: 'REAPPLY',
       set_category: groceries?.id ?? null,
     })
 
-    await page.goto(`/dashboard/settings/rules?household=${household.id}`)
+    await page.goto(`/dashboard/settings/rules?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Click "Re-apply All Rules"
@@ -170,20 +170,20 @@ test.describe('Category Rules settings page', () => {
 
   test('auto-rules show Auto badge', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const household = await api.createHousehold('Auto Badge Home')
+    const space = await api.createSpace('Auto Badge Home')
     const categories = await api.listCategories()
     const groceries = categories.find((c) => c.name === 'Groceries')
 
     // Create a rule with is_auto=true directly via the API
     await api.createCategoryRule({
-      household: household.id,
+      space: space.id,
       name: 'Auto Generated Rule',
       merchant_contains: 'AUTO_MERCHANT',
       set_category: groceries?.id ?? null,
       is_auto: true,
     })
 
-    await page.goto(`/dashboard/settings/rules?household=${household.id}`)
+    await page.goto(`/dashboard/settings/rules?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Should see the "Auto" badge in at least one row

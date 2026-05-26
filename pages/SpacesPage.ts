@@ -1,27 +1,27 @@
 import { Page, Locator } from '@playwright/test'
 
-export class HouseholdsPage {
+export class SpacesPage {
   readonly heading: Locator
-  readonly newHouseholdButton: Locator
+  readonly newSpaceButton: Locator
   readonly createForm: Locator
   readonly emptyState: Locator
-  readonly householdsGrid: Locator
+  readonly spacesGrid: Locator
 
   constructor(private readonly page: Page) {
-    this.heading = page.locator('h1', { hasText: 'Households' })
-    this.newHouseholdButton = page.locator('button.btn-create', { hasText: 'New Household' })
+    this.heading = page.locator('h1', { hasText: 'Spaces' })
+    this.newSpaceButton = page.locator('button.btn-create', { hasText: 'New Space' })
     this.createForm = page.locator('.form-paper')
     this.emptyState = page.locator('.empty-state')
-    this.householdsGrid = page.locator('.households-grid')
+    this.spacesGrid = page.locator('.spaces-grid')
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/dashboard/households')
+    await this.page.goto('/dashboard/spaces')
     await this.page.waitForLoadState('networkidle')
   }
 
   async openCreateForm(): Promise<void> {
-    await this.newHouseholdButton.click()
+    await this.newSpaceButton.click()
     await this.createForm.waitFor()
   }
 
@@ -30,27 +30,27 @@ export class HouseholdsPage {
     if (description) {
       await this.createForm.locator('#description').fill(description)
     }
-    await this.createForm.locator('button', { hasText: 'Create Household' }).click()
+    await this.createForm.locator('button', { hasText: 'Create Space' }).click()
   }
 
-  async createHousehold(name: string, description = ''): Promise<void> {
+  async createSpace(name: string, description = ''): Promise<void> {
     await this.openCreateForm()
     await this.submitCreateForm(name, description)
   }
 
   card(name: string): Locator {
-    return this.page.locator(`.household-card[data-name="${name}"]`)
+    return this.page.locator(`.space-card[data-name="${name}"]`)
   }
 
   cards(): Locator {
-    return this.page.locator('.household-card')
+    return this.page.locator('.space-card')
   }
 
   cardNames(): Locator {
-    return this.page.locator('.household-card h3')
+    return this.page.locator('.space-card h3')
   }
 
-  async editHousehold(currentName: string, newName: string): Promise<void> {
+  async editSpace(currentName: string, newName: string): Promise<void> {
     const c = this.card(currentName)
     await c.locator('.action-btn[title="Edit"]').click()
     // The card switches to edit form — re-query by hidden id
@@ -65,7 +65,7 @@ export class HouseholdsPage {
     await c.locator('button', { hasText: 'Cancel' }).click()
   }
 
-  async deleteHousehold(name: string): Promise<void> {
+  async deleteSpace(name: string): Promise<void> {
     const c = this.card(name)
     await c.locator('.action-btn.action-btn-danger').click()
     // The app uses a custom ConfirmDialog (not the native confirm()).

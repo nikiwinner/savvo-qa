@@ -1,8 +1,8 @@
 import { Page, Locator } from '@playwright/test'
 
 export interface CreateExpenseForm {
-  householdLabel: string
-  householdId?: number
+  spaceLabel: string
+  spaceId?: number
   category: string
   description: string
   amount: string
@@ -15,7 +15,7 @@ export class ExpensesPage {
   readonly newExpenseButton: Locator
   readonly createForm: Locator
   readonly emptyState: Locator
-  readonly noHouseholdMessage: Locator
+  readonly noSpaceMessage: Locator
   readonly summaryValue: Locator
 
   constructor(private readonly page: Page) {
@@ -23,7 +23,7 @@ export class ExpensesPage {
     this.newExpenseButton = page.locator('button.btn-create', { hasText: 'New Transaction' })
     this.createForm = page.locator('.form-paper')
     this.emptyState = page.locator('.empty-state')
-    this.noHouseholdMessage = page.locator('.alert.alert-info')
+    this.noSpaceMessage = page.locator('.alert.alert-info')
     this.summaryValue = page.locator('.summary-strip .stat-expense .stat-value')
   }
 
@@ -32,8 +32,8 @@ export class ExpensesPage {
     await this.page.waitForLoadState('networkidle')
   }
 
-  async gotoWithHousehold(householdId: number): Promise<void> {
-    await this.page.goto(`/dashboard/expenses?household=${householdId}`)
+  async gotoWithSpace(spaceId: number): Promise<void> {
+    await this.page.goto(`/dashboard/expenses?space=${spaceId}`)
     await this.page.waitForLoadState('networkidle')
   }
 
@@ -108,12 +108,12 @@ export class ExpensesPage {
     // to prevent any pending Svelte re-renders from resetting them.
     await this.page.evaluate(
       ({
-        householdLabel,
+        spaceLabel,
         description,
         amount,
         categoryId,
       }: {
-        householdLabel: string
+        spaceLabel: string
         description: string
         amount: string
         categoryId: string | null
@@ -121,10 +121,10 @@ export class ExpensesPage {
         const form = document.querySelector('.form-paper form') as HTMLFormElement | null
         if (!form) return
 
-        const householdSelect = form.querySelector('#household_id') as HTMLSelectElement | null
-        if (householdSelect) {
-          const opt = Array.from(householdSelect.options).find((o) => o.text === householdLabel)
-          if (opt) householdSelect.value = opt.value
+        const spaceSelect = form.querySelector('#space_id') as HTMLSelectElement | null
+        if (spaceSelect) {
+          const opt = Array.from(spaceSelect.options).find((o) => o.text === spaceLabel)
+          if (opt) spaceSelect.value = opt.value
         }
 
         const descInput = form.querySelector('#description') as HTMLInputElement | null
@@ -139,7 +139,7 @@ export class ExpensesPage {
         if (hiddenCat) hiddenCat.value = categoryId ?? ''
       },
       {
-        householdLabel: data.householdLabel,
+        spaceLabel: data.spaceLabel,
         description: data.description,
         amount: data.amount,
         categoryId,
@@ -154,11 +154,11 @@ export class ExpensesPage {
   }
 
   async createExpense(data: CreateExpenseForm): Promise<void> {
-    // If householdId is provided, navigate with it to pre-select the household via URL.
+    // If spaceId is provided, navigate with it to pre-select the space via URL.
     // This ensures Svelte's reactive `selected` attribute on the select option is set
-    // based on activeHouseholdIds, which is more reliable than Playwright's selectOption.
-    if (data.householdId) {
-      await this.gotoWithHousehold(data.householdId)
+    // based on activeSpaceIds, which is more reliable than Playwright's selectOption.
+    if (data.spaceId) {
+      await this.gotoWithSpace(data.spaceId)
     }
     await this.openCreateForm()
     await this.submitCreateForm(data)
@@ -172,24 +172,73 @@ export class ExpensesPage {
     return this.page.locator('tbody tr', { hasText: description })
   }
 
+  // The edit UI is a modal (.edit-modal-overlay / .edit-modal-card), not an
+  // inline row. Field ids: #edit-description, #edit-amount, #edit-currency.
+  // Type is a radio group (input[name="type"]). Save/Cancel are buttons in
+  // .edit-modal-actions.
+  editModal(): Locator {
+    return this.page.locator('.edit-modal-card')
+  }
+
+  async openEditModal(description: string): Promise<void> {
+    await this.row(description).locator('.action-btn[title="Edit"]').click()
+    await this.editModal().waitFor({ state: 'visible' })
+  }
+
   async editExpense(
     description: string,
     updates: Partial<{ description: string; amount: string }>,
   ): Promise<void> {
-    await this.row(description).locator('.action-btn[title="Edit"]').click()
-    const editRow = this.page.locator('tr.edit-row')
+    await this.openEditModal(description)
+    const modal = this.editModal()
     if (updates.description) {
-      await editRow.locator('input[name="description"]').fill(updates.description)
+      await modal.locator('#edit-description').fill(updates.description)
     }
     if (updates.amount) {
-      await editRow.locator('input[name="amount"]').fill(updates.amount)
+      await modal.locator('#edit-amount').fill(updates.amount)
     }
-    await editRow.locator('button', { hasText: 'Save' }).click()
+    await modal.locator('.edit-modal-actions button', { hasText: 'Save' }).click()
+    await this.editModal().waitFor({ state: 'hidden' })
   }
 
   async cancelEdit(): Promise<void> {
-    const editRow = this.page.locator('tr.edit-row')
-    await editRow.locator('button', { hasText: 'Cancel' }).click()
+    const modal = this.editModal()
+    await modal.locator('.edit-modal-actions button', { hasText: 'Cancel' }).click()
+    await this.editModal().waitFor({ state: 'hidden' })
+  }
+
+  // ---- Filters drawer ----------------------------------------------------
+  // Filters now live inside a right-side <Drawer> that only renders its
+  // content while open. Open it by clicking the "Filters" button in the
+  // page header, then interact with .filter-chip / .btn-filter-action inside.
+  filtersDrawer(): Locator {
+    return this.page.locator('.drawer-panel')
+  }
+
+  async openFilters(): Promise<void> {
+    if (await this.filtersDrawer().isVisible()) return
+    await this.page.locator('button.btn-outline', { hasText: 'Filters' }).click()
+    await this.filtersDrawer().waitFor({ state: 'visible' })
+  }
+
+  // ---- Bank transaction categorization ----------------------------------
+  // Bank rows no longer carry an inline <select>; clicking the row's
+  // .cat-map-btn opens a centered modal (.cat-modal-card) with a
+  // CategoryChipPicker. Pick a chip by name, then confirm with Save.
+  categoryModal(): Locator {
+    return this.page.locator('.cat-modal-card')
+  }
+
+  async categorizeRow(rowLocator: Locator, categoryName: string): Promise<void> {
+    await rowLocator.locator('.cat-map-btn').click()
+    const modal = this.categoryModal()
+    await modal.waitFor({ state: 'visible' })
+    await modal
+      .locator('[role="radio"]', { hasText: categoryName })
+      .first()
+      .click()
+    await modal.locator('.cat-modal-actions button', { hasText: 'Save' }).click()
+    await this.categoryModal().waitFor({ state: 'hidden' })
   }
 
   async deleteExpense(description: string): Promise<void> {
