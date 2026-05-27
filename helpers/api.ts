@@ -144,19 +144,6 @@ export class ApiHelper {
     }
   }
 
-  /**
-   * PATCH /api/spaces/<id>/ — set primary_currency (Story 10.1 / 10.7).
-   */
-  async setSpacePrimaryCurrency(spaceId: number, code: string): Promise<void> {
-    const res = await this.ctx.patch(`${this.baseUrl}/api/spaces/${spaceId}/`, {
-      data: { primary_currency: code },
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
-    if (!res.ok()) {
-      throw new Error(`setSpacePrimaryCurrency failed (${res.status()}): ${await res.text()}`)
-    }
-  }
-
   async login(email: string, password: string): Promise<void> {
     // If a session already exists (e.g. after signup), DRF's SessionAuthentication
     // will enforce CSRF on the login request. Send the token when we have it.

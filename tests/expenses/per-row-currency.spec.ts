@@ -63,11 +63,14 @@ test.describe('Per-row currency rendering on /dashboard/expenses', () => {
     const amountCell = bobRow.locator('td.cell-amount')
     await expect(amountCell).toBeVisible()
 
-    // Phase 10 (Story 10.7) introduces the inline-converted hybrid display:
-    // off-currency rows now render a small `(≈ €Y.YY)` secondary line below
-    // the canonical `$X.XX`. To keep the original per-row currency invariant
-    // tight, scope the symbol assertions to the canonical line only — the
-    // FX hint legitimately contains the viewer's currency symbol.
+    // Display-currency-first layout (Story 10.7, revised): the primary
+    // `.canonical` line normally shows the viewer's display currency. But this
+    // test seeds NO exchange rate, and the QA backend's FX provider is
+    // unreachable — so USD->EUR cannot be converted, `converted_amount` is
+    // null, and the primary line falls back to the row's native amount
+    // (`$10.00`). That native fallback is exactly the per-row currency
+    // invariant we assert here; the converted display-currency path is covered
+    // by inline-converted.spec.ts (which does seed a rate).
     const canonical = amountCell.locator('.canonical')
     await expect(canonical).toBeVisible()
     const canonicalText = await canonical.innerText()

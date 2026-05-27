@@ -96,9 +96,10 @@ test.describe('Currency selector on the expense create form', () => {
       .toBe('USD')
 
     // Reload and verify the row renders with the USD symbol — not EUR.
-    // Phase 10 (Story 10.7) adds a hybrid `(≈ €X.YY)` secondary line for
-    // off-currency rows, so scope the symbol assertions to the canonical
-    // line only.
+    // Display-currency-first layout (Story 10.7, revised): the primary
+    // `.canonical` line shows the display currency, with the native amount as a
+    // small secondary line. Here the primary resolves to `$` (same-currency or
+    // native fallback), so scope the symbol assertions to the canonical line.
     await page.reload()
     await page.waitForLoadState('networkidle')
     const row = expenses.row(description)

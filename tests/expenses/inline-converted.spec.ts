@@ -1,12 +1,16 @@
 /**
- * Expenses — Inline FX-converted display (Phase 10, Story 10.7)
+ * Expenses — Display-currency-first amount (Phase 10 Story 10.7, revised).
  *
- * Verifies the per-row hybrid display contract from Implementation Rule #16:
- *   1. row.currency !== userCurrency && rate is seeded → secondary line
- *      shows `(≈ <userSymbol><value>)`.
- *   2. row.currency === userCurrency → no secondary line at all.
- *   3. row.currency !== userCurrency && no rate available → secondary line
- *      reads "rate unavailable" (italic, muted).
+ * The viewer's display currency is the PRIMARY, prominent figure on every row.
+ * When the row's native currency differs, the real native amount is kept as a
+ * small muted reference line below (never lie about money — the native figure
+ * is the real one, the primary is an FX conversion at today's rate).
+ *
+ *   1. row.currency !== userCurrency && rate seeded → primary shows the
+ *      converted display-currency amount; a secondary line shows the native.
+ *   2. row.currency === userCurrency → single line, no secondary.
+ *   3. row.currency !== userCurrency && no rate available → primary shows the
+ *      native amount; secondary reads "rate unavailable" (italic, muted).
  *
  * The QA backend points FX_PROVIDER_BASE_URL at an unreachable host, so any
  * pair without a pre-seeded ExchangeRate row triggers the failure path
@@ -16,8 +20,8 @@ import { test, expect } from '../../fixtures/index'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
-test.describe('Inline-converted display on /dashboard/expenses (Story 10.7)', () => {
-  test('off-currency expense row renders inline (≈ ...) line', async ({ page, loggedInPage }) => {
+test.describe('Display-currency-first amount on /dashboard/expenses (Story 10.7)', () => {
+  test('off-currency expense row shows converted primary + native secondary', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     await api.setUserCurrency('EUR')
 
@@ -39,25 +43,23 @@ test.describe('Inline-converted display on /dashboard/expenses (Story 10.7)', ()
 
     const row = page.locator('tbody tr', { hasText: description })
     await expect(row).toBeVisible({ timeout: 5000 })
-    const amountCell = row.locator('td.cell-amount')
-    await expect(amountCell).toBeVisible()
 
-    // Canonical USD line is present.
-    const cellText = await amountCell.innerText()
-    expect(cellText).toContain('$')
-    expect(cellText).toMatch(/200\.00/)
+    // Primary line is the converted display currency: 200 USD * 0.50 = 100 EUR.
+    const primary = row.locator('[data-testid="amount-primary"]')
+    await expect(primary).toBeVisible()
+    const primaryText = await primary.innerText()
+    expect(primaryText).toContain('€')
+    expect(primaryText).toMatch(/100\.00/)
 
-    // Secondary FX-converted line: 200 USD * 0.50 = 100 EUR. The component
-    // uses the data-testid="amount-converted" hook.
-    const converted = row.locator('[data-testid="amount-converted"]')
-    await expect(converted).toBeVisible()
-    const convertedText = await converted.innerText()
-    expect(convertedText).toContain('€')
-    expect(convertedText).toMatch(/100\.00/)
-    expect(convertedText).toMatch(/≈/)
+    // Secondary line keeps the real native amount: $200.00.
+    const native = row.locator('[data-testid="amount-native"]')
+    await expect(native).toBeVisible()
+    const nativeText = await native.innerText()
+    expect(nativeText).toContain('$')
+    expect(nativeText).toMatch(/200\.00/)
   })
 
-  test('same-currency rows do not render the secondary line', async ({ page, loggedInPage }) => {
+  test('same-currency rows render only the primary line', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     await api.setUserCurrency('EUR')
 
@@ -77,20 +79,19 @@ test.describe('Inline-converted display on /dashboard/expenses (Story 10.7)', ()
     const row = page.locator('tbody tr', { hasText: description })
     await expect(row).toBeVisible({ timeout: 5000 })
 
-    // No FX hint of either flavour for same-currency rows.
-    await expect(row.locator('[data-testid="amount-converted"]')).toHaveCount(0)
+    // Primary present; no native/unavailable secondary for same-currency rows.
+    await expect(row.locator('[data-testid="amount-primary"]')).toBeVisible()
+    await expect(row.locator('[data-testid="amount-native"]')).toHaveCount(0)
     await expect(row.locator('[data-testid="amount-rate-unavailable"]')).toHaveCount(0)
   })
 
-  test('FX-failed row shows "rate unavailable" hint', async ({ page, loggedInPage }) => {
+  test('FX-failed row shows native primary + "rate unavailable" hint', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     await api.setUserCurrency('EUR')
 
-    // No rate seeded for NOK->EUR. The QA backend's FX provider is
-    // unreachable, so the live fetch fails and the 14-day walk-back finds
-    // nothing → the serializer returns converted_amount: null while
-    // currency != userCurrency, which is the disambiguation rule for "FX
-    // failed" (Implementation Rule #16, branch c).
+    // No rate seeded for NOK->EUR. The QA backend's FX provider is unreachable,
+    // so the live fetch fails and the cache lookup finds nothing → the
+    // serializer returns converted_amount: null while currency != userCurrency.
     const hh = await api.createSpace('FX Failed Home')
     const description = `nok-row-${Date.now()}`
     await api.createExpense({
@@ -107,11 +108,16 @@ test.describe('Inline-converted display on /dashboard/expenses (Story 10.7)', ()
     const row = page.locator('tbody tr', { hasText: description })
     await expect(row).toBeVisible({ timeout: 5000 })
 
+    // Primary falls back to the native amount (can't convert).
+    const primary = row.locator('[data-testid="amount-primary"]')
+    await expect(primary).toBeVisible()
+    await expect(primary).toContainText(/99\.00/)
+
     const unavailable = row.locator('[data-testid="amount-rate-unavailable"]')
     await expect(unavailable).toBeVisible()
     await expect(unavailable).toContainText(/rate unavailable/i)
 
-    // The success-flavour secondary line must NOT also render.
-    await expect(row.locator('[data-testid="amount-converted"]')).toHaveCount(0)
+    // The success-flavour native line must NOT also render.
+    await expect(row.locator('[data-testid="amount-native"]')).toHaveCount(0)
   })
 })

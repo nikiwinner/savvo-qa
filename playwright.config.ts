@@ -51,7 +51,10 @@ export default defineConfig({
       // tests are seeded via POST /api/seed/exchange-rate/ (DEBUG-only, see
       // tenancy/views.py::seed_exchange_rate). Tests that omit the seed get
       // a deterministic FXRateUnavailableError → fx_stale=True.
-      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True OAUTH_TEST_MODE=True FRONTEND_URL=http://localhost:5174 FX_PROVIDER_BASE_URL=http://127.0.0.1:9 FX_FETCH_TIMEOUT_SECONDS=1 uv run python manage.py runserver 127.0.0.1:8001`,
+      // FX_AUTO_WARM=False disables the self-healing background warm
+      // (fx.ensure_rates_fresh) so requests stay hermetic — the cache only
+      // ever holds what a test explicitly seeds.
+      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True OAUTH_TEST_MODE=True FRONTEND_URL=http://localhost:5174 FX_PROVIDER_BASE_URL=http://127.0.0.1:9 FX_FETCH_TIMEOUT_SECONDS=1 FX_AUTO_WARM=False uv run python manage.py runserver 127.0.0.1:8001`,
       url: 'http://127.0.0.1:8001/api/auth/me/',
       reuseExistingServer: false,
       timeout: 30_000,
