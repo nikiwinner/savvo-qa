@@ -58,7 +58,7 @@ test.describe('Spaces CRUD', () => {
     await spaces.createSpace('Pre-fill Test')
 
     // Open edit form
-    await spaces.card('Pre-fill Test').locator('.action-btn[title="Edit"]').click()
+    await spaces.card('Pre-fill Test').locator('.action-btn[aria-label="Edit"]').click()
 
     const nameInput = spaces.card('Pre-fill Test').locator('input[name="name"]')
     await expect(nameInput).toHaveValue('Pre-fill Test')
@@ -71,7 +71,7 @@ test.describe('Spaces CRUD', () => {
 
     // Open edit, type a new name, then cancel
     const card = spaces.card('Original Name')
-    await card.locator('.action-btn[title="Edit"]').click()
+    await card.locator('.action-btn[aria-label="Edit"]').click()
     await card.locator('input[name="name"]').fill('Changed Name')
     await card.locator('button', { hasText: 'Cancel' }).click()
 
@@ -80,14 +80,21 @@ test.describe('Spaces CRUD', () => {
   })
 
   test('deletes a space — it disappears from the grid', async ({ page, loggedInPage: _ }) => {
+    // Phase 12: delete is a two-step flow (archive on active page, then
+    // delete permanently from the dedicated archived view). The page-object
+    // `archiveAndDelete` helper bundles both. The active-page single-confirm
+    // delete no longer exists.
     const spaces = new SpacesPage(page)
     await spaces.goto()
     await spaces.createSpace('To Delete')
 
     await expect(spaces.card('To Delete')).toBeVisible()
 
-    await spaces.deleteSpace('To Delete')
+    await spaces.archiveAndDelete('To Delete')
 
+    // After delete, the +page.svelte navigates back to /dashboard/spaces.
+    // The page-object already awaited that landing; just assert the card
+    // is gone.
     await expect(spaces.card('To Delete')).not.toBeVisible()
   })
 
@@ -96,8 +103,11 @@ test.describe('Spaces CRUD', () => {
     await spaces.goto()
     await spaces.createSpace('Last One')
 
-    await spaces.deleteSpace('Last One')
+    await spaces.archiveAndDelete('Last One')
 
+    // Archived view → after delete navigates to /dashboard/spaces. With zero
+    // active spaces, the empty state should render. The page-object already
+    // awaited the navigation; just check the resulting state.
     await expect(spaces.emptyState).toBeVisible()
   })
 

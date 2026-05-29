@@ -177,6 +177,32 @@ export class ApiHelper {
     return res.json()
   }
 
+  /**
+   * PATCH arbitrary editable fields on a space. Used by lifecycle tests to
+   * seed start_date / end_date directly after create (the SpacesPage UI only
+   * speaks DatePicker which is harder to drive via Playwright than a single
+   * PATCH).
+   */
+  async updateSpace(
+    spaceId: number,
+    fields: Partial<{
+      name: string
+      description: string
+      start_date: string | null
+      end_date: string | null
+      primary_currency: string
+    }>,
+  ): Promise<SpaceRecord> {
+    const res = await this.ctx.patch(`${this.baseUrl}/api/spaces/${spaceId}/`, {
+      data: fields,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`updateSpace failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
   async listSpaces(): Promise<SpaceRecord[]> {
     const res = await this.ctx.get(`${this.baseUrl}/api/spaces/`)
     if (!res.ok()) {

@@ -105,6 +105,12 @@ test.describe('Analytics page shell (Story 11.4)', () => {
   test('non-member space renders cleanly without crashing', async ({ page, twoActors, context }) => {
     const { userA, apiA, apiB } = twoActors
 
+    // A owns a space too — so she has a valid viewer context. Without this,
+    // Phase 12's `resolveActiveSpaces` short-circuits the zero-space user
+    // into a fixed "no space selected" empty state and never exercises the
+    // non-member path at all.
+    await apiA.createSpace('A Space')
+
     // B owns a space that A is not a member of.
     const hhB = await apiB.createSpace('B Space')
 
@@ -117,18 +123,23 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     const errors: string[] = []
     page.on('pageerror', (err) => errors.push(err.message))
 
-    // Force-feed B's space id while logged in as A. The backend should
-    // 403 on every analytics endpoint, which the loader catches into
-    // loadErrors — the page renders error states for each section. No crash.
+    // Force-feed B's space id while logged in as A. Phase 12's
+    // `resolveActiveSpaces` strips the unknown id from the URL and 302s back
+    // to /dashboard/analytics (no space param), where A's own spaces are used.
+    // The page renders normally — no crash, no JS errors. As a fallback the
+    // assertion still tolerates the older "page calls backend → 403 →
+    // error-placeholders render" path in case the frontend behaviour changes
+    // again.
     await page.goto(`/dashboard/analytics?space=${hhB.id}`)
     await page.waitForLoadState('networkidle')
 
     // Page heading still rendered.
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
 
-    // Either each section shows the empty-error placeholder, OR (if the loader
-    // redirected A to her first space with `?space=<idA>`) the URL no
-    // longer carries hhB.id. Both are acceptable per the DoD.
+    // Acceptable outcomes (any of):
+    //   1. The unknown id was stripped from the URL (Phase 12 redirect path).
+    //   2. The unknown id survived in the URL and each analytics section shows
+    //      an error placeholder (legacy 403-pass-through path).
     const stillOnOther = page.url().includes(`space=${hhB.id}`)
     if (stillOnOther) {
       const errorPlaceholders = page.getByTestId('analytics-section-error')
