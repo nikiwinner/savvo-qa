@@ -39,6 +39,64 @@ export interface BankTransactionRecord {
   space: number | null
   category: number | null
   merchant_display_name: string
+  /** Phase 13 — manual-override lock. Exposed read-only on BankTransactionSerializer. */
+  is_manually_assigned?: boolean
+}
+
+/** Phase 13 — SpaceClaimRule shape (banking). */
+export interface ClaimRuleRecord {
+  id: number
+  space: number
+  space_name: string
+  name: string
+  merchant_contains: string
+  merchant_exact: string
+  amount_min: string | null
+  amount_max: string | null
+  date_from: string | null
+  date_to: string | null
+  txn_type: string
+  category: number | null
+  bank_account: number | null
+  bank_account_name: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Phase 13 — body for POST /api/claim-rules/ (≥1 condition required). */
+export interface CreateClaimRuleData {
+  space: number
+  name?: string
+  merchant_contains?: string
+  merchant_exact?: string
+  amount_min?: string | null
+  amount_max?: string | null
+  date_from?: string | null
+  date_to?: string | null
+  txn_type?: 'expense' | 'income' | 'any'
+  category?: number | null
+  bank_account?: number | null
+}
+
+/** Phase 13 — body for POST /api/claim-rules/from_transaction/. */
+export interface FromTransactionData {
+  transaction_id: number
+  space_id: number
+  scope?: 'merchant' | 'account' | 'merchant_account'
+  merchant_contains?: string
+  apply_to_matching?: boolean
+}
+
+export interface FromTransactionResult {
+  rule: ClaimRuleRecord
+  assigned_transaction_id: number
+  matched_count: number
+}
+
+/** Phase 13 — GET /api/inbox/summary/ shape. */
+export interface InboxSummary {
+  total_unmapped: number
+  groups: { account_id: number; label: string; unmapped_count: number }[]
 }
 
 export interface CategoryRuleRecord {
@@ -191,6 +249,7 @@ export class ApiHelper {
       start_date: string | null
       end_date: string | null
       primary_currency: string
+      routing_priority: number
     }>,
   ): Promise<SpaceRecord> {
     const res = await this.ctx.patch(`${this.baseUrl}/api/spaces/${spaceId}/`, {
@@ -500,6 +559,147 @@ export class ApiHelper {
       throw new Error(`seedExchangeRate failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
+  }
+
+  // ── Spaces: routing_priority (Phase 13) ───────────────────────────────────
+
+  /**
+   * Raw PATCH on a space — returns APIResponse so negative tests can inspect
+   * the status code (e.g. out-of-range routing_priority → 400) without throwing.
+   */
+  async patchSpaceRaw(spaceId: number, fields: Record<string, unknown>): Promise<APIResponse> {
+    return this.ctx.patch(`${this.baseUrl}/api/spaces/${spaceId}/`, {
+      data: fields,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  /** Fetch a space's full record (includes routing_priority, start/end dates, is_archived). */
+  async getSpaceFull(spaceId: number): Promise<Record<string, unknown> | null> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/spaces/${spaceId}/`)
+    if (res.status() === 404) return null
+    if (!res.ok()) {
+      throw new Error(`getSpaceFull failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Claim Rules (Phase 13) ─────────────────────────────────────────────────
+
+  /** Raw POST — returns APIResponse so negative tests (zero conditions) can assert 400. */
+  async createClaimRuleRaw(data: CreateClaimRuleData): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/claim-rules/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async createClaimRule(data: CreateClaimRuleData): Promise<ClaimRuleRecord> {
+    const res = await this.createClaimRuleRaw(data)
+    if (!res.ok()) {
+      throw new Error(`createClaimRule failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async listClaimRules(spaceId?: number): Promise<ClaimRuleRecord[]> {
+    const url = spaceId
+      ? `${this.baseUrl}/api/claim-rules/?space=${spaceId}`
+      : `${this.baseUrl}/api/claim-rules/`
+    const res = await this.ctx.get(url)
+    if (!res.ok()) {
+      throw new Error(`listClaimRules failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  async deleteClaimRule(ruleId: number): Promise<APIResponse> {
+    return this.ctx.delete(`${this.baseUrl}/api/claim-rules/${ruleId}/`, {
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  /** Raw — returns APIResponse so negative tests (foreign/archived space) can assert 400. */
+  async fromTransactionRaw(data: FromTransactionData): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/claim-rules/from_transaction/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async fromTransaction(data: FromTransactionData): Promise<FromTransactionResult> {
+    const res = await this.fromTransactionRaw(data)
+    if (!res.ok()) {
+      throw new Error(`fromTransaction failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Bank transaction: single assign (Phase 13 override-stamping) ───────────
+
+  async assignTransactionRaw(transactionId: number, spaceId: number): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/bank-transactions/${transactionId}/assign/`, {
+      data: { space_id: spaceId },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  // ── Inbox (Phase 13) ────────────────────────────────────────────────────────
+
+  async inboxSummary(): Promise<InboxSummary> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/inbox/summary/`)
+    if (!res.ok()) {
+      throw new Error(`inboxSummary failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Orphaned manual expenses (Phase 13 Story 13.6) ────────────────────────
+
+  async listOrphanedExpenses(): Promise<ExpenseRecord[]> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/expenses/orphaned/`)
+    if (!res.ok()) {
+      throw new Error(`listOrphanedExpenses failed (${res.status()}): ${await res.text()}`)
+    }
+    const body = await res.json()
+    // The action may return a bare list or a paginated {results:[]} envelope.
+    return Array.isArray(body) ? body : (body.results ?? [])
+  }
+
+  async rehomeExpenseRaw(expenseId: number, spaceId: number): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/expenses/${expenseId}/rehome/`, {
+      data: { space_id: spaceId },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  /** Delete a space with an explicit rehome_to (null = orphan its rows). */
+  async deleteSpaceRehome(spaceId: number, rehomeTo: number | null): Promise<APIResponse> {
+    return this.ctx.delete(`${this.baseUrl}/api/spaces/${spaceId}/`, {
+      data: { rehome_to: rehomeTo },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  /** POST /api/spaces/<id>/archive/ — Phase 12 lifecycle action. */
+  async archiveSpaceRaw(spaceId: number): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/spaces/${spaceId}/archive/`, {
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  /** POST /api/bank-transactions/<id>/set_allocations/ — split across spaces. */
+  async setBankAllocationsRaw(
+    transactionId: number,
+    allocations: { space_id: number; amount: string }[],
+  ): Promise<APIResponse> {
+    return this.ctx.post(
+      `${this.baseUrl}/api/bank-transactions/${transactionId}/set_allocations/`,
+      {
+        data: { allocations },
+        headers: { 'X-CSRFToken': await this.csrfToken() },
+      },
+    )
   }
 
   // ── Internal ───────────────────────────────────────────────────────────────
