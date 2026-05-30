@@ -688,6 +688,28 @@ export class ApiHelper {
     })
   }
 
+  // ── Routing engine (DEBUG-only seed) ──────────────────────────────────────
+
+  /**
+   * POST /api/seed/route-unmapped/ — DEBUG-only endpoint that runs the REAL
+   * routing engine (`route_transaction`, incl. `resolve_conflict`) over the
+   * requesting user's unmapped (`space=NULL`), non-manually-assigned, non-split
+   * bank transactions and assigns each to the resolved space. This is the
+   * on-demand equivalent of routing-at-Tink-sync (which cannot be driven from
+   * E2E), so it lets us exercise the conflict resolver / single-space fallback
+   * branches. Returns `{ routed: N }` — the count of txns that resolved to a
+   * space (txns that stay in the Inbox are NOT counted).
+   */
+  async routeUnmapped(): Promise<{ routed: number }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/route-unmapped/`, {
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`routeUnmapped failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
   /** POST /api/bank-transactions/<id>/set_allocations/ — split across spaces. */
   async setBankAllocationsRaw(
     transactionId: number,

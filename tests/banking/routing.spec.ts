@@ -5,9 +5,13 @@
  * NOTE on scope: the routing engine (`banking/routing.py`) runs at SYNC time
  * (`route_transaction` inside `sync_transactions`) and on the opt-in
  * `apply_rule_to_matching` pass. A real Tink sync cannot be driven from E2E
- * (per the phase brief — do NOT fake a sync), so the priority CONFLICT
- * resolution (`resolve_conflict`: highest routing_priority wins, ties → lowest
- * id) is exercised by backend unit tests, not here. What we CAN drive E2E:
+ * (per the phase brief — do NOT fake a sync). CONFLICT resolution
+ * (`resolve_conflict`: highest routing_priority wins, ties → lowest id) and the
+ * single-space fallback are now E2E-covered via the DEBUG-only on-demand
+ * endpoint `POST /api/seed/route-unmapped/` (helper `api.routeUnmapped()`),
+ * which runs the REAL `route_transaction` over the user's unmapped /
+ * non-manually-assigned / non-split bank txns — see the "Conflict resolution"
+ * describe block at the bottom of this file. What else we drive E2E:
  *   - routing_priority is writable + persists (Story 13.1) via the space Edit
  *     dialog (UI) and PATCH (API), and the serializer rejects out-of-range.
  *   - the manual-override lock is honored on the re-route path (Story 13.2 /
@@ -145,6 +149,135 @@ test.describe('Archive guard on assign (Story 13.5)', () => {
     // into a space hidden by Phase-12 archive guards — no-fake-numbers).
     const res = await api.assignTransactionRaw(txn.id, toArchive.id)
     expect(res.status()).toBe(400)
+
+    const fresh = await api.getBankTransaction(txn.id)
+    expect(fresh!.space).toBeNull()
+  })
+})
+
+test.describe('Conflict resolution — real routing engine (seed/route-unmapped)', () => {
+  // Each test owns a fresh user (loggedInPage fixture) so there is zero
+  // cross-test data leakage: the seeded txn's candidate spaces are exactly the
+  // user's own non-archived spaces, and routeUnmapped only touches this user's
+  // unmapped/non-manual/non-split bank txns.
+
+  test('conflict → higher routing_priority space wins', async ({ loggedInPage }) => {
+    const { api } = loggedInPage
+
+    // Space A: High priority (2). Space B: Normal priority (0).
+    const spaceA = await api.createSpace('Conflict Winner A')
+    const spaceB = await api.createSpace('Conflict Loser B')
+    await api.updateSpace(spaceA.id, { routing_priority: 2 })
+    await api.updateSpace(spaceB.id, { routing_priority: 0 })
+
+    // A claim rule on EACH space matching the same merchant token.
+    await api.createClaimRule({
+      space: spaceA.id,
+      name: 'Spotify → A',
+      merchant_contains: 'spotify',
+    })
+    await api.createClaimRule({
+      space: spaceB.id,
+      name: 'Spotify → B',
+      merchant_contains: 'spotify',
+    })
+
+    // One unmapped bank txn whose description contains the shared token.
+    const txn = await api.createBankTransaction({
+      description: 'SPOTIFY PREMIUM SUB',
+      amount: '9.99',
+      type: 'expense',
+      transaction_date: TODAY,
+      space_id: null,
+    })
+
+    const result = await api.routeUnmapped()
+    expect(result.routed).toBe(1)
+
+    // Highest routing_priority wins → Space A.
+    const fresh = await api.getBankTransaction(txn.id)
+    expect(fresh!.space).toBe(spaceA.id)
+  })
+
+  test('conflict tie (equal priority) → lowest space id wins', async ({ loggedInPage }) => {
+    const { api } = loggedInPage
+
+    // Two spaces with EQUAL priority (both default 0). The first-created has
+    // the lower id, so the tie-break (lowest id) must land the txn there.
+    const first = await api.createSpace('Tie First (lower id)')
+    const second = await api.createSpace('Tie Second (higher id)')
+    expect(first.id).toBeLessThan(second.id)
+
+    await api.createClaimRule({
+      space: first.id,
+      name: 'Netflix → First',
+      merchant_contains: 'netflix',
+    })
+    await api.createClaimRule({
+      space: second.id,
+      name: 'Netflix → Second',
+      merchant_contains: 'netflix',
+    })
+
+    const txn = await api.createBankTransaction({
+      description: 'NETFLIX.COM MONTHLY',
+      amount: '15.49',
+      type: 'expense',
+      transaction_date: TODAY,
+      space_id: null,
+    })
+
+    const result = await api.routeUnmapped()
+    expect(result.routed).toBe(1)
+
+    // Tie on priority → lowest id wins → the first-created space.
+    const fresh = await api.getBankTransaction(txn.id)
+    expect(fresh!.space).toBe(first.id)
+  })
+
+  test('single-space fallback — no rule, one candidate space', async ({ loggedInPage }) => {
+    const { api } = loggedInPage
+
+    // Exactly ONE space, NO claim rule. No rule matches, but there is only one
+    // place the txn could go → automatic single-space fallback.
+    const lone = await api.createSpace('Lone Fallback Space')
+
+    const txn = await api.createBankTransaction({
+      description: 'CORNER SHOP GROCERIES',
+      amount: '23.40',
+      type: 'expense',
+      transaction_date: TODAY,
+      space_id: null,
+    })
+
+    const result = await api.routeUnmapped()
+    expect(result.routed).toBe(1)
+
+    const fresh = await api.getBankTransaction(txn.id)
+    expect(fresh!.space).toBe(lone.id)
+  })
+
+  test('no candidate / no match (≥2 spaces, no rule) → stays unmapped', async ({
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+
+    // Two spaces, NO claim rule on either. No rule matches and there is more
+    // than one candidate, so the engine cannot decide → the txn stays in the
+    // Inbox (space=NULL) and is NOT counted as routed.
+    await api.createSpace('Ambiguous Space One')
+    await api.createSpace('Ambiguous Space Two')
+
+    const txn = await api.createBankTransaction({
+      description: 'UNKNOWN MERCHANT XYZ',
+      amount: '4.20',
+      type: 'expense',
+      transaction_date: TODAY,
+      space_id: null,
+    })
+
+    const result = await api.routeUnmapped()
+    expect(result.routed).toBe(0)
 
     const fresh = await api.getBankTransaction(txn.id)
     expect(fresh!.space).toBeNull()
