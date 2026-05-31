@@ -181,7 +181,11 @@ export class ExpensesPage {
   }
 
   async openEditModal(description: string): Promise<void> {
-    await this.row(description).locator('.action-btn[title="Edit"]').click()
+    // The Edit button is wrapped in <Tooltip label="Edit"> (no native title=).
+    // It is the only non-danger .action-btn in a manual-expense row (Delete is
+    // .action-btn.action-btn-danger; bank-row category/space buttons use
+    // .cat-map-btn / .hh-map-btn), so :not(.action-btn-danger) uniquely matches.
+    await this.row(description).locator('.action-btn:not(.action-btn-danger)').click()
     await this.editModal().waitFor({ state: 'visible' })
   }
 

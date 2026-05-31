@@ -3,13 +3,15 @@
  *
  * Replaces the legacy <select> with a chip-grid picker that surfaces the user's
  * 3 most-recently-used categories under a "Recent" header, with the rest
- * alphabetised under "All categories".
+ * alphabetised below. The create-form picker passes `kind="expense"`, so it
+ * shows ONLY the 14 expense categories and HIDES the section headers (no
+ * "Expenses"/"Income"/"All categories" labels when a kind is fixed).
  *
  * Verifies:
- *   1. All default seeded categories render as chips in the picker.
+ *   1. All default seeded EXPENSE categories render as chips in the picker.
  *   2. Recency ordering: top three "Recent" chips reflect the most-recently-used
  *      categories (in encounter order from latest expense first), and those
- *      categories do not appear again in the "All categories" section.
+ *      categories do not appear again in the remaining expense grid.
  *   3. Submitting the form with a chip-selected category creates an expense
  *      with that category id.
  */
@@ -18,24 +20,32 @@ import { ExpensesPage } from '../../pages/ExpensesPage'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
+// The backend seeds 22 default categories on first space creation (14 expense +
+// 8 income — backend/src/app/tenancy/constants.py::DEFAULT_CATEGORIES). The
+// create-form picker is fixed to kind="expense", so it surfaces ONLY these 14
+// expense names (no Salary/Freelance/income, no "Dining Out" — renamed to
+// "Restaurant"; "Cafe" is new). Keep in sync.
 const DEFAULT_CATEGORY_NAMES = [
+  'Groceries',
+  'Restaurant',
+  'Cafe',
+  'Shopping',
   'Rent',
   'Utilities',
-  'Groceries',
-  'Transportation',
+  'Insurance',
   'Healthcare',
+  'Transportation',
+  'Travel',
   'Entertainment',
-  'Dining Out',
-  'Shopping',
-  'Salary',
-  'Freelance',
+  'Subscriptions',
+  'Education',
   'Other',
 ]
 
 test.describe('Category chip picker', () => {
   test('chip picker renders all default seeded categories', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    // Creating a space seeds the 11 default categories.
+    // Creating a space seeds the 15 default categories.
     await api.createSpace('Chip Picker Home')
 
     const expenses = new ExpensesPage(page)
@@ -49,9 +59,11 @@ test.describe('Category chip picker', () => {
 
     // Without prior expenses there is nothing in the "Recent" section.
     await expect(picker.locator('.chip-section-header', { hasText: 'Recent' })).toHaveCount(0)
-    await expect(picker.locator('.chip-section-header', { hasText: 'All categories' })).toBeVisible()
+    // With a fixed kind the picker hides ALL section headers (no "Expenses",
+    // "Income", or "All categories" label) — assert none are rendered.
+    await expect(picker.locator('.chip-section-header')).toHaveCount(0)
 
-    // Every default seeded category must have a chip with its name.
+    // Every default seeded EXPENSE category must have a chip with its name.
     // (We deliberately don't assert an exact total chip count: the QA test DB
     // is shared across runs and may carry custom user-created categories from
     // sibling specs — categories are global per Gotcha #9. Asserting presence
@@ -128,7 +140,8 @@ test.describe('Category chip picker', () => {
     await expect(picker.locator('.chip-section-header', { hasText: 'Recent' })).toBeVisible()
 
     // The first .chip-grid inside the picker holds the recent chips. The second
-    // .chip-grid is the alphabetised "All categories" grid.
+    // .chip-grid is the remaining expense categories (the picker is fixed to
+    // kind="expense", so there is no income grid and no section headers).
     const recentGrid = picker.locator('.chip-grid').first()
     const recentChips = recentGrid.locator('[role="radio"]')
     await expect(recentChips).toHaveCount(3)
@@ -143,27 +156,28 @@ test.describe('Category chip picker', () => {
     await expect(recentChips.nth(1)).toHaveAttribute('data-chip-cat-id', String(transportation!.id))
     await expect(recentChips.nth(2)).toHaveAttribute('data-chip-cat-id', String(utilities!.id))
 
-    // The "All categories" grid must NOT include any of the recent three.
+    // The remaining-expense grid must NOT include any of the recent three.
     const allGrid = picker.locator('.chip-grid').nth(1)
     await expect(allGrid).toBeVisible()
     for (const recentId of [groceries!.id, transportation!.id, utilities!.id]) {
       await expect(
         allGrid.locator(`[role="radio"][data-chip-cat-id="${recentId}"]`),
-        `recent category id ${recentId} should not appear in "All categories"`,
+        `recent category id ${recentId} should not appear in the remaining grid`,
       ).toHaveCount(0)
     }
 
-    // Sanity: each remaining default (the 8 not in Recent) is still reachable
-    // in the "All categories" grid. We assert presence rather than an exact
-    // total — the shared QA DB may carry user-created categories from sibling
-    // specs (categories are global per Gotcha #9).
+    // Sanity: each remaining default expense category (the 11 not in Recent) is
+    // still reachable in the remaining-expense grid. We assert presence rather
+    // than an exact total — the shared QA DB may carry user-created categories
+    // from sibling specs (categories are global per Gotcha #9).
     const remainingDefaults = DEFAULT_CATEGORY_NAMES.filter(
       (n) => n !== 'Groceries' && n !== 'Transportation' && n !== 'Utilities',
     )
     for (const name of remainingDefaults) {
+      const exactWord = new RegExp(`(?:^|\\s)${name}(?:\\s|$)`)
       await expect(
-        allGrid.locator('[role="radio"]', { hasText: name }),
-        `default category "${name}" should appear in "All categories"`,
+        allGrid.locator('[role="radio"]', { hasText: exactWord }),
+        `default expense category "${name}" should appear in the remaining grid`,
       ).toHaveCount(1)
     }
   })

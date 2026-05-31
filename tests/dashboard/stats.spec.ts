@@ -69,6 +69,11 @@ test.describe('Dashboard stats', () => {
     const hh = await api.createSpace('Monthly Stats Home')
 
     const lastMonth = new Date()
+    // Anchor to mid-month BEFORE subtracting so month-end days (e.g. the 31st)
+    // don't overflow back into the current month. `setMonth(getMonth() - 1)` on,
+    // say, May 31 yields May 1 (April has 30 days), which would put the "last
+    // month" expense in the current month and break the monthly-amount assertion.
+    lastMonth.setDate(15)
     lastMonth.setMonth(lastMonth.getMonth() - 1)
     const lastMonthStr = lastMonth.toISOString().split('T')[0]
 

@@ -496,6 +496,153 @@ export class ApiHelper {
     return res.json()
   }
 
+  // ── Categorization (Phase 14) ──────────────────────────────────────────────
+
+  /**
+   * POST /api/bank-transactions/<id>/categorize/ — hand-categorize a bank txn.
+   * Server-side this stamps `category_set_manually=True` (the manual lock). An
+   * explicit `categoryId: null` clears the category AND the lock. `createRule`
+   * optionally spawns a non-auto CategoryRule (default false).
+   *
+   * Raw form returns APIResponse so negative tests can inspect the status.
+   */
+  async categorizeBankTransactionRaw(
+    transactionId: number,
+    categoryId: number | null,
+    createRule = false,
+  ): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/bank-transactions/${transactionId}/categorize/`, {
+      data: { category_id: categoryId, create_rule: createRule },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async categorizeBankTransaction(
+    transactionId: number,
+    categoryId: number | null,
+    createRule = false,
+  ): Promise<BankTransactionRecord> {
+    const res = await this.categorizeBankTransactionRaw(transactionId, categoryId, createRule)
+    if (!res.ok()) {
+      throw new Error(`categorizeBankTransaction failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * POST /api/categorization/reapply/ — full-cascade reapply over one space's
+   * non-manual, non-pending bank txns (seed/provider FILL then a matching
+   * CategoryRule OVERRIDES). Returns per-layer counts.
+   */
+  async categorizationReapply(
+    spaceId: number,
+  ): Promise<{ provider: number; seed: number; rule: number; total: number }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/categorization/reapply/`, {
+      data: { space_id: spaceId },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`categorizationReapply failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** GET /api/categorization/suggestions/ — pending rung-2 auto-suggestions. */
+  async listCategorySuggestions(): Promise<
+    { merchant: string; category_id: number; category_name: string; occurrence_count: number; space_id: number }[]
+  > {
+    const res = await this.ctx.get(`${this.baseUrl}/api/categorization/suggestions/`)
+    if (!res.ok()) {
+      throw new Error(`listCategorySuggestions failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Provider categories + mappings (Phase 14, rung 4) ──────────────────────
+
+  /** GET /api/provider-categories/ — GLOBAL list of bank PFM categories. */
+  async listProviderCategories(): Promise<
+    { id: number; provider: string; code: string; display_name: string; type: string }[]
+  > {
+    const res = await this.ctx.get(`${this.baseUrl}/api/provider-categories/`)
+    if (!res.ok()) {
+      throw new Error(`listProviderCategories failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** Find a provider category by its raw `code` (e.g. 'expenses:food.groceries'). */
+  async getProviderCategoryByCode(
+    code: string,
+  ): Promise<{ id: number; code: string; display_name: string; type: string } | null> {
+    const all = await this.listProviderCategories()
+    return all.find((c) => c.code === code) ?? null
+  }
+
+  /** GET /api/provider-category-mappings/ — GLOBAL ProviderCategory → Category map. */
+  async listProviderCategoryMappings(): Promise<
+    { id: number; provider_category: number; category: number; is_seeded: boolean }[]
+  > {
+    const res = await this.ctx.get(`${this.baseUrl}/api/provider-category-mappings/`)
+    if (!res.ok()) {
+      throw new Error(`listProviderCategoryMappings failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** Raw POST — returns APIResponse so duplicate-create tests can assert 400. */
+  async createProviderCategoryMappingRaw(
+    providerCategoryId: number,
+    categoryId: number,
+  ): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/provider-category-mappings/`, {
+      data: { provider_category: providerCategoryId, category: categoryId },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async createProviderCategoryMapping(
+    providerCategoryId: number,
+    categoryId: number,
+  ): Promise<{ id: number; provider_category: number; category: number; is_seeded: boolean }> {
+    const res = await this.createProviderCategoryMappingRaw(providerCategoryId, categoryId)
+    if (!res.ok()) {
+      throw new Error(`createProviderCategoryMapping failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * Idempotent: maps the provider category to the given category, reusing the
+   * existing mapping (PATCH) when one already exists (mappings are global +
+   * the OneToOne rejects a duplicate create with a 400). Returns the mapping id.
+   */
+  async ensureProviderCategoryMapping(providerCategoryId: number, categoryId: number): Promise<number> {
+    const existing = (await this.listProviderCategoryMappings()).find(
+      (m) => m.provider_category === providerCategoryId,
+    )
+    if (existing) {
+      const res = await this.ctx.patch(
+        `${this.baseUrl}/api/provider-category-mappings/${existing.id}/`,
+        { data: { category: categoryId }, headers: { 'X-CSRFToken': await this.csrfToken() } },
+      )
+      if (!res.ok()) {
+        throw new Error(`ensureProviderCategoryMapping PATCH failed (${res.status()}): ${await res.text()}`)
+      }
+      return existing.id
+    }
+    const created = await this.createProviderCategoryMapping(providerCategoryId, categoryId)
+    return created.id
+  }
+
+  /** PATCH /api/provider-category-mappings/<id>/ — remap to a new category. */
+  async patchProviderCategoryMapping(mappingId: number, categoryId: number): Promise<APIResponse> {
+    return this.ctx.patch(`${this.baseUrl}/api/provider-category-mappings/${mappingId}/`, {
+      data: { category: categoryId },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
   // ── Bank Accounts (DEBUG-only seed) ────────────────────────────────────────
 
   /**

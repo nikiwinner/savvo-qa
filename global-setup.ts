@@ -66,4 +66,25 @@ export default async function globalSetup(): Promise<void> {
     console.error('\n❌ Database flush failed.')
     throw err
   }
+
+  // 4. Seed the Phase-14 categorization tables (MerchantSeed + the 15 default
+  // Category rows). The categorization reapply endpoint does NOT lazily seed
+  // (only Tink sync does, which E2E can't drive), so the merchant-seed library
+  // must exist up-front for the seed-token cascade tests (`lidl` → Groceries,
+  // `netflix` → Subscriptions). This is idempotent; provider mappings are 0
+  // here (no ProviderCategory rows exist on a fresh DB — each test seeds its
+  // own provider category + maps it via the API).
+  console.log('🌱 Seeding categorization tables (MerchantSeed + default categories)...')
+  try {
+    execSync('uv run python manage.py seed_categorization', {
+      cwd: backendDir,
+      env: { ...process.env, ...testDbEnv },
+      stdio: 'inherit',
+      timeout: 30_000,
+    })
+    console.log('✅ Categorization seed complete.\n')
+  } catch (err) {
+    console.error('\n❌ seed_categorization failed.')
+    throw err
+  }
 }

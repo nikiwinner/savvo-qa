@@ -41,7 +41,13 @@ test.describe('Per-row currency rendering on /dashboard/expenses', () => {
 
     // Bob seeds an expense — backend snapshots Expense.currency from Bob's
     // user.currency (USD) at create-time per gotcha #23.
-    const distinctiveDescription = `bob-usd-10-${Date.now()}`
+    //
+    // `hasText` is a substring match and the savvo_test DB persists across
+    // parallel workers, so a bare `Date.now()` can collide (same ms) AND a
+    // shorter timestamp is a substring of a longer one. A random token makes
+    // the description — and therefore the row locator — collision-proof.
+    const rand = Math.random().toString(36).slice(2, 8)
+    const distinctiveDescription = `bob-usd-10-${Date.now()}-${rand}`
     await apiBob.createExpense({
       space: space.id,
       description: distinctiveDescription,
@@ -64,19 +70,19 @@ test.describe('Per-row currency rendering on /dashboard/expenses', () => {
     await expect(amountCell).toBeVisible()
 
     // Display-currency-first layout (Story 10.7, revised): the primary
-    // `.canonical` line normally shows the viewer's display currency. But this
-    // test seeds NO exchange rate, and the QA backend's FX provider is
-    // unreachable — so USD->EUR cannot be converted, `converted_amount` is
-    // null, and the primary line falls back to the row's native amount
-    // (`$10.00`). That native fallback is exactly the per-row currency
-    // invariant we assert here; the converted display-currency path is covered
-    // by inline-converted.spec.ts (which does seed a rate).
-    const canonical = amountCell.locator('.canonical')
-    await expect(canonical).toBeVisible()
-    const canonicalText = await canonical.innerText()
-    expect(canonicalText).toContain('$')
-    expect(canonicalText).not.toContain('€')
-    expect(canonicalText).toMatch(/10\.00/)
+    // `.canonical` line shows the viewer's display currency when a rate exists,
+    // otherwise it falls back to the row's native amount. Either way the row's
+    // OWN currency ($) is rendered SOMEWHERE inside `.amount-with-fx` — as the
+    // primary when no rate is cached, or as the small `.native` reference line
+    // when a USD->EUR rate IS present (sibling FX specs seed a global,
+    // non-user-scoped USD->EUR rate into the shared savvo_test ExchangeRate
+    // cache, so under the full parallel suite a rate often IS available).
+    // Assert rate-agnostically against the whole cell so the test holds in both
+    // worlds — and never couple to the leaked converted € value.
+    const amountWidget = amountCell.locator('.amount-with-fx')
+    await expect(amountWidget).toBeVisible()
+    await expect(amountWidget).toContainText('$')
+    await expect(amountWidget).toContainText('10.00')
 
     await ctxAlice.dispose()
     await ctxBob.dispose()

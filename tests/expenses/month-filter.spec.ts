@@ -15,7 +15,12 @@ import { ExpensesPage } from '../../pages/ExpensesPage'
 const TODAY = new Date().toISOString().split('T')[0]
 
 function lastMonthStr(): string {
+  // Anchor to mid-month BEFORE subtracting so month-end days (e.g. the 31st)
+  // don't overflow back into the current month. `setMonth(getMonth() - 1)` on,
+  // say, May 31 yields May 1 (April has 30 days), which would put the "last
+  // month" expense in the current month and break the filter assertions.
   const d = new Date()
+  d.setDate(15)
   d.setMonth(d.getMonth() - 1)
   return d.toISOString().split('T')[0]
 }

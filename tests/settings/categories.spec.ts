@@ -37,17 +37,21 @@ test.describe('Categories settings page', () => {
     await page.goto('/dashboard/settings/categories')
     await page.waitForLoadState('networkidle')
 
-    // Table should be visible with rows
-    await expect(page.locator('table')).toBeVisible()
+    // Scope to the FIRST `.paper table` — the categories table. A second
+    // `.paper table` (the bank category-mappings table) is present whenever
+    // sibling specs have seeded provider categories (they are global, gotcha
+    // #9), so a bare `table` / `tbody tr` locator hits a strict-mode violation.
+    const categoriesTable = page.locator('.paper table').first()
+    await expect(categoriesTable).toBeVisible()
     // At least one row for Groceries. Use exact-word regex so parallel-test
     // categories like "Groceries-IM"/"Groceries-D1" (categories are global
     // per Gotcha #9) don't trigger a strict-mode multiple-match violation.
     const groceriesRowExact = /(?:^|\s)Groceries(?:\s|$)/
-    await expect(page.locator('tbody tr', { hasText: groceriesRowExact })).toBeVisible()
+    await expect(categoriesTable.locator('tbody tr', { hasText: groceriesRowExact })).toBeVisible()
 
     // If we added an expense with Groceries, the usage column should be non-empty
     if (groceries) {
-      const groceriesRow = page.locator('tbody tr', { hasText: groceriesRowExact })
+      const groceriesRow = categoriesTable.locator('tbody tr', { hasText: groceriesRowExact })
       const usageText = await groceriesRow.locator('.usage-text').textContent()
       // Should contain "1 expense" or "1 transaction" — just check it's not "—"
       expect(usageText).not.toBe('—')
@@ -60,8 +64,9 @@ test.describe('Categories settings page', () => {
     await page.goto('/dashboard/settings/categories')
     await page.waitForLoadState('networkidle')
 
-    // Click "New Category"
-    await page.locator('button.btn-create', { hasText: 'New Category' }).click()
+    // Click "New Expense Category" (default tab is Expenses; the button label
+    // is now kind-specific: "New Expense Category" / "New Income Category").
+    await page.locator('button.btn-create', { hasText: /New (Expense|Income) Category/ }).click()
     await expect(page.locator('.form-panel')).toBeVisible()
 
     // Fill in the form
@@ -75,8 +80,13 @@ test.describe('Categories settings page', () => {
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 5000 })
     await expect(page.locator('.alert-success')).toContainText(uniqueName)
 
-    // Category appears in the table
-    await expect(page.locator('tbody tr', { hasText: uniqueName })).toBeVisible()
+    // Category appears in the table. Scope to the FIRST `.paper table` — the
+    // categories table. A second `.paper table` (the bank category-mappings
+    // table) is present whenever sibling specs have seeded provider categories
+    // (global, gotcha #9), and its <option>s contain the category name, so a
+    // bare `tbody tr` locator hits a strict-mode violation.
+    const categoriesTbody = page.locator('.paper table').first().locator('tbody')
+    await expect(categoriesTbody.locator('tr', { hasText: uniqueName })).toBeVisible()
   })
 
   test('can edit a category', async ({ page, loggedInPage }) => {
@@ -89,8 +99,13 @@ test.describe('Categories settings page', () => {
     await page.goto('/dashboard/settings/categories')
     await page.waitForLoadState('networkidle')
 
+    // Scope to the FIRST `.paper table` — the categories table. The bank
+    // category-mappings table (a second `.paper table` when provider categories
+    // exist DB-wide) would otherwise widen the `tbody tr` matches below.
+    const categoriesTbody = page.locator('.paper table').first().locator('tbody')
+
     // Click on the category row to open edit form
-    const catRow = page.locator('tbody tr.clickable-row', { hasText: originalName })
+    const catRow = categoriesTbody.locator('tr.clickable-row', { hasText: originalName })
     await expect(catRow).toBeVisible()
     await catRow.click()
 
@@ -108,9 +123,9 @@ test.describe('Categories settings page', () => {
     await expect(page.locator('.alert-success')).toBeVisible({ timeout: 5000 })
     await expect(page.locator('.alert-success')).toContainText(updatedName)
 
-    // Table updates
-    await expect(page.locator('tbody tr', { hasText: updatedName })).toBeVisible()
-    await expect(page.locator('tbody tr', { hasText: originalName })).not.toBeVisible()
+    // Table updates (scoped to the categories table, not the mappings table)
+    await expect(categoriesTbody.locator('tr', { hasText: updatedName })).toBeVisible()
+    await expect(categoriesTbody.locator('tr', { hasText: originalName })).not.toBeVisible()
   })
 
   test('can delete an unused category', async ({ page, loggedInPage }) => {

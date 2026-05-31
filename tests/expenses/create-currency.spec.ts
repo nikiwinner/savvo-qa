@@ -17,7 +17,11 @@ test.describe('Currency selector on the expense create form', () => {
     const { api } = loggedInPage
     // Default user.currency is 'EUR'; we'll switch to 'USD' at create time.
     const space = await api.createSpace('Create Currency Home')
-    const description = `create-currency-${Date.now()}`
+    // `hasText` is a substring match and the savvo_test DB persists across
+    // parallel workers, so a bare `Date.now()` can collide (same ms) AND a
+    // shorter timestamp is a substring of a longer one. A random token makes
+    // the description — and the `expenses.row(description)` locator — unique.
+    const description = `create-currency-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     const expenses = new ExpensesPage(page)
     await expenses.gotoWithSpace(space.id)
@@ -95,19 +99,23 @@ test.describe('Currency selector on the expense create form', () => {
       )
       .toBe('USD')
 
-    // Reload and verify the row renders with the USD symbol — not EUR.
+    // Reload and verify the row renders with the USD symbol somewhere.
     // Display-currency-first layout (Story 10.7, revised): the primary
-    // `.canonical` line shows the display currency, with the native amount as a
-    // small secondary line. Here the primary resolves to `$` (same-currency or
-    // native fallback), so scope the symbol assertions to the canonical line.
+    // `.canonical` line shows the viewer's display currency when a USD->EUR rate
+    // exists, otherwise it falls back to the native amount. Either way the row's
+    // OWN currency ($) is rendered SOMEWHERE inside `.amount-with-fx` — as the
+    // primary when no rate is cached, or as the small `.native` reference line
+    // when a rate IS present (sibling FX specs seed a global, non-user-scoped
+    // USD->EUR rate into the shared savvo_test ExchangeRate cache, so under the
+    // full parallel suite a rate often IS available). Assert rate-agnostically
+    // against the whole widget so the test holds in both worlds — and never
+    // couple to the leaked converted € value.
     await page.reload()
     await page.waitForLoadState('networkidle')
     const row = expenses.row(description)
     await expect(row).toBeVisible({ timeout: 5000 })
-    const canonical = row.locator('td.cell-amount .canonical')
-    await expect(canonical).toBeVisible()
-    const canonicalText = await canonical.innerText()
-    expect(canonicalText).toContain('$')
-    expect(canonicalText).not.toContain('€')
+    const amountWidget = row.locator('td.cell-amount .amount-with-fx')
+    await expect(amountWidget).toBeVisible()
+    await expect(amountWidget).toContainText('$')
   })
 })
