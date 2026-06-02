@@ -19,8 +19,8 @@ test.describe('Unauthenticated route protection', () => {
     await expect(page).toHaveURL('/login')
   })
 
-  test('/dashboard/expenses redirects unauthenticated users to /login', async ({ page }) => {
-    await page.goto('/dashboard/expenses')
+  test('/dashboard/transactions redirects unauthenticated users to /login', async ({ page }) => {
+    await page.goto('/dashboard/transactions')
     await expect(page).toHaveURL('/login')
   })
 })

@@ -1,7 +1,7 @@
 /**
  * Expenses — currency selector in the create form (Phase 08, Story 8.10)
  *
- * Verifies that the create form on /dashboard/expenses exposes a currency
+ * Verifies that the create form on /dashboard/transactions exposes a currency
  * dropdown defaulted to the viewer's currency, that picking a different
  * currency persists on submit, and that the new row renders with the
  * correct currency symbol.

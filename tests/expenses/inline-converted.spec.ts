@@ -20,7 +20,7 @@ import { test, expect } from '../../fixtures/index'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
-test.describe('Display-currency-first amount on /dashboard/expenses (Story 10.7)', () => {
+test.describe('Display-currency-first amount on /dashboard/transactions (Story 10.7)', () => {
   test('off-currency expense row shows converted primary + native secondary', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     await api.setUserCurrency('EUR')
@@ -38,7 +38,7 @@ test.describe('Display-currency-first amount on /dashboard/expenses (Story 10.7)
       currency: 'USD',
     })
 
-    await page.goto(`/dashboard/expenses?space=${hh.id}`)
+    await page.goto(`/dashboard/transactions?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr', { hasText: description })
@@ -73,7 +73,7 @@ test.describe('Display-currency-first amount on /dashboard/expenses (Story 10.7)
       currency: 'EUR',
     })
 
-    await page.goto(`/dashboard/expenses?space=${hh.id}`)
+    await page.goto(`/dashboard/transactions?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr', { hasText: description })
@@ -102,7 +102,7 @@ test.describe('Display-currency-first amount on /dashboard/expenses (Story 10.7)
       currency: 'NOK',
     })
 
-    await page.goto(`/dashboard/expenses?space=${hh.id}`)
+    await page.goto(`/dashboard/transactions?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr', { hasText: description })

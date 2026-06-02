@@ -39,7 +39,7 @@ test.describe('Logout', () => {
     await page.goto('/dashboard/spaces')
     await expect(page).toHaveURL('/login')
 
-    await page.goto('/dashboard/expenses')
+    await page.goto('/dashboard/transactions')
     await expect(page).toHaveURL('/login')
   })
 

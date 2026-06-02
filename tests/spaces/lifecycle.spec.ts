@@ -187,7 +187,7 @@ test.describe('Spaces lifecycle — archive / restore / delete (Phase 12)', () =
     await expect(spaces.card('Source H1 Rehome')).not.toBeVisible()
 
     // The expense is now reachable under H2 on the expenses page.
-    await page.goto(`/dashboard/expenses?space=${h2.id}`)
+    await page.goto(`/dashboard/transactions?space=${h2.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('tbody tr', { hasText: 'Rehome Me Expense' })).toBeVisible()
@@ -277,7 +277,7 @@ test.describe('Spaces lifecycle — archive / restore / delete (Phase 12)', () =
     // The expense rode along with the re-home.
     const target = (await api.listSpaces()).find((s) => s.name === 'Active Delete Target')
     expect(target).toBeDefined()
-    await page.goto(`/dashboard/expenses?space=${target!.id}`)
+    await page.goto(`/dashboard/transactions?space=${target!.id}`)
     await page.waitForLoadState('networkidle')
     await expect(page.locator('tbody tr', { hasText: 'Direct Delete Re-home' })).toBeVisible()
   })

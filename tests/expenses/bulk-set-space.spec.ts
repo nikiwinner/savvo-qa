@@ -45,7 +45,7 @@ test.describe('Bulk set space (bank transactions)', () => {
       space_id: spaceA.id,
     })
 
-    await page.goto(`/dashboard/expenses?space=${spaceA.id}`)
+    await page.goto(`/dashboard/transactions?space=${spaceA.id}`)
     await page.waitForLoadState('networkidle')
 
     // Select the three seeded rows directly.

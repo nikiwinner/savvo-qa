@@ -152,59 +152,35 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     })
     expect(archiveRes.ok()).toBeTruthy()
 
-    await page.goto('/dashboard/expenses')
+    await page.goto('/dashboard/transactions')
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('tbody tr', { hasText: 'Stay In List' })).toBeVisible()
     await expect(page.locator('tbody tr', { hasText: 'Drop From List' })).not.toBeVisible()
   })
 
-  test('archived space drops out of the dashboard totals', async ({ page, loggedInPage }) => {
+  test('archived space drops out of the dashboard summary cards', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const h1 = await api.createSpace('Totals Archive H1')
     const h2 = await api.createSpace('Totals Active H2')
 
-    // Distinct round numbers so we can read them out of the summary cards.
-    // H1 → 100 income + 30 expense. H2 → 5 income + 1 expense. After archive
-    // H1, only H2's amounts count.
-    await api.createExpense({
-      space: h1.id,
-      description: 'H1 Income',
-      amount: 100,
-      type: 'income',
-      expense_date: TODAY_ISO,
-    })
-    await api.createExpense({
-      space: h1.id,
-      description: 'H1 Expense',
-      amount: 30,
-      expense_date: TODAY_ISO,
-    })
-    await api.createExpense({
-      space: h2.id,
-      description: 'H2 Income',
-      amount: 5,
-      type: 'income',
-      expense_date: TODAY_ISO,
-    })
-    await api.createExpense({
-      space: h2.id,
-      description: 'H2 Expense',
-      amount: 1,
-      expense_date: TODAY_ISO,
-    })
+    // H1 → 100 income + 30 expense. H2 → 5 income + 1 expense. The dashboard's
+    // money display is the per-space summary card; archiving H1 removes its card.
+    await api.createExpense({ space: h1.id, description: 'H1 Income', amount: 100, type: 'income', expense_date: TODAY_ISO })
+    await api.createExpense({ space: h1.id, description: 'H1 Expense', amount: 30, expense_date: TODAY_ISO })
+    await api.createExpense({ space: h2.id, description: 'H2 Income', amount: 5, type: 'income', expense_date: TODAY_ISO })
+    await api.createExpense({ space: h2.id, description: 'H2 Expense', amount: 1, expense_date: TODAY_ISO })
 
-    // Before archive: dashboard totals fold in H1 + H2 (no `?space` ⇒ all).
+    const h1Card = page.locator(`[data-testid="space-summary-card"][data-space-id="${h1.id}"]`)
+    const h2Card = page.locator(`[data-testid="space-summary-card"][data-space-id="${h2.id}"]`)
+
+    // Before archive: both spaces have a card (data dated today → this-month default).
     await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
-
-    // Summary stat-value at index 2 = Total Income, index 3 = Total Expenses
-    // (see DashboardPage page object). Before archive, total income ≥ 100
-    // (H1's contribution) and total expenses ≥ 30.
-    const beforeIncome = (await page.locator('.stat-value').nth(2).textContent()) ?? ''
-    const beforeExpense = (await page.locator('.stat-value').nth(3).textContent()) ?? ''
-    expect(beforeIncome).toContain('105')
-    expect(beforeExpense).toContain('31')
+    await expect(h1Card).toBeVisible()
+    await expect(h2Card).toBeVisible()
+    await expect(h1Card.locator('[data-testid="summary-figure-inflow"] .figure-value')).toContainText('100')
+    await expect(h1Card.locator('[data-testid="summary-figure-outflow"] .figure-value')).toContainText('30')
 
     // Archive H1.
     const csrf = (await api.cookies()).find((c) => c.name === 'csrftoken')?.value ?? ''
@@ -213,19 +189,14 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     })
     expect(archiveRes.ok()).toBeTruthy()
 
-    // After archive: only H2 counts. Income = 5, Expense = 1.
+    // After archive: H1's card is gone; H2's remains.
     await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
-    const afterIncome = (await page.locator('.stat-value').nth(2).textContent()) ?? ''
-    const afterExpense = (await page.locator('.stat-value').nth(3).textContent()) ?? ''
-    expect(afterIncome).toContain('5')
-    expect(afterIncome).not.toContain('105')
-    expect(afterIncome).not.toContain('100')
-    expect(afterExpense).toContain('1')
-    expect(afterExpense).not.toContain('31')
-    expect(afterExpense).not.toContain('30')
+    await expect(h1Card).toHaveCount(0)
+    await expect(h2Card).toBeVisible()
+    await expect(h2Card.locator('[data-testid="summary-figure-inflow"] .figure-value')).toContainText('5')
 
-    // Restore re-includes the H1 amounts.
+    // Restore re-includes H1's card.
     const restoreRes = await page.request.post(`${BACKEND_URL}/api/spaces/${h1.id}/restore/`, {
       headers: { 'X-CSRFToken': csrf },
     })
@@ -233,10 +204,8 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
 
     await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
-    const restoredIncome = (await page.locator('.stat-value').nth(2).textContent()) ?? ''
-    const restoredExpense = (await page.locator('.stat-value').nth(3).textContent()) ?? ''
-    expect(restoredIncome).toContain('105')
-    expect(restoredExpense).toContain('31')
+    await expect(h1Card).toBeVisible()
+    await expect(h1Card.locator('[data-testid="summary-figure-inflow"] .figure-value')).toContainText('100')
   })
 
   test('mixed ?space=active,archived returns only active data', async ({ page, loggedInPage }) => {

@@ -21,7 +21,7 @@ test.describe('Bulk categorization', () => {
       space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Bank rows with a space should have a checkbox in the cell-checkbox td
@@ -50,7 +50,7 @@ test.describe('Bulk categorization', () => {
       space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Click the header checkbox (select all)
@@ -99,7 +99,7 @@ test.describe('Bulk categorization', () => {
       space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Select only our three seeded rows directly (not "select all" — the seed endpoint
@@ -152,7 +152,7 @@ test.describe('Bulk categorization', () => {
       space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Action bar should not be visible initially

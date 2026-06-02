@@ -121,10 +121,11 @@ test.describe('Transaction type (income vs expense)', () => {
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    // Income stat shows 2000, expense stat shows 150
-    await expect(dashboard.totalIncome()).toContainText('2000')
-    await expect(dashboard.totalExpenseAmount()).toContainText('150')
+    // The per-space summary card splits income vs expense (current-month default).
+    // Figures render with thousands separators (e.g. €2,000.00).
+    await expect(dashboard.summaryInflow()).toContainText('2,000.00')
+    await expect(dashboard.summaryOutflow()).toContainText('150.00')
     // Net = 2000 - 150 = 1850
-    await expect(dashboard.netBalance()).toContainText('1850')
+    await expect(dashboard.summaryNet()).toContainText('1,850.00')
   })
 })

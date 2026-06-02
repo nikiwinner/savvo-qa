@@ -26,7 +26,7 @@ test.describe('Bank transaction categorization', () => {
       space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // The bank row shows a .cat-map-btn (opens the category modal) and no
@@ -52,7 +52,7 @@ test.describe('Bank transaction categorization', () => {
       space_id: space.id,
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const expenses = new ExpensesPage(page)
@@ -80,7 +80,7 @@ test.describe('Bank transaction categorization', () => {
       merchant_display_name: 'Friendly Merchant Name',
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // The cell-desc should show the display name, not the raw description
@@ -107,7 +107,7 @@ test.describe('Bank transaction categorization', () => {
       provider_category_code: 'food-groceries',
     })
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const bankRow = page.locator('tbody tr.row-bank', { hasText: 'PROVIDER CAT MERCHANT' })

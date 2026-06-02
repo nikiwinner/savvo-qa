@@ -73,7 +73,7 @@ test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
     await api.categorizeBankTransaction(t1.id, dining!.id)
     await api.categorizeBankTransaction(t2.id, dining!.id)
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const chip = page
@@ -131,7 +131,7 @@ test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
     await api.categorizeBankTransaction(t1.id, dining!.id)
     await api.categorizeBankTransaction(t2.id, dining!.id)
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     // Accept the suggestion (one tap on the chip's "Yes"). Wait on the actual
@@ -202,7 +202,7 @@ test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
     await api.categorizeBankTransaction(t1.id, dining!.id)
     await api.categorizeBankTransaction(t2.id, dining!.id)
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const chip = page
@@ -247,7 +247,7 @@ test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
     expect(groceries).not.toBeNull()
 
     const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
     const row = page.locator('tbody tr.row-bank', { hasText: lidlDesc })
     await expect(row).toBeVisible()
@@ -284,7 +284,7 @@ test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
     // Run the cascade so we assert the POST-cascade uncategorized state.
     await api.categorizationReapply(space.id)
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
     const row = page.locator('tbody tr.row-bank', { hasText: unknownDesc })
     await expect(row).toBeVisible()

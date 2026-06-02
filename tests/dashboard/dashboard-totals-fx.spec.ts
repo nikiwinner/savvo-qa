@@ -43,9 +43,10 @@ test.describe('Dashboard totals FX', () => {
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
 
-    // Total expenses: 100 EUR + 100 EUR (= USD 200 * 0.50) = 200.00 EUR
-    await expect(dashboard.totalExpenseAmount()).toContainText('€')
-    await expect(dashboard.totalExpenseAmount()).toContainText('200.00')
+    // The dashboard's money display is now the per-space summary card (FX-aware,
+    // current-month default). Expense: 100 EUR + 100 EUR (= USD 200 * 0.50) = 200.00 EUR
+    await expect(dashboard.summaryOutflow()).toContainText('€')
+    await expect(dashboard.summaryOutflow()).toContainText('200.00')
 
     // The fx-stale indicator must NOT appear when every rate is available.
     const indicator = page.getByTestId('fx-stale-indicator')

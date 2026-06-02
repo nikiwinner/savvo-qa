@@ -28,12 +28,23 @@ export class ExpensesPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/dashboard/expenses')
+    // The transactions page lives at /dashboard/transactions (Phase 15, Story
+    // 15.2). The legacy /dashboard/expenses route still redirects here, but
+    // tests navigate to the canonical path directly.
+    await this.page.goto('/dashboard/transactions')
     await this.page.waitForLoadState('networkidle')
   }
 
   async gotoWithSpace(spaceId: number): Promise<void> {
-    await this.page.goto(`/dashboard/expenses?space=${spaceId}`)
+    await this.page.goto(`/dashboard/transactions?space=${spaceId}`)
+    await this.page.waitForLoadState('networkidle')
+  }
+
+  // Navigate to the legacy /dashboard/expenses route to exercise the Phase-15
+  // redirect. The server redirects (307) to /dashboard/transactions, preserving
+  // the query string. Used by the redirect assertion test.
+  async gotoLegacy(search = ''): Promise<void> {
+    await this.page.goto(`/dashboard/expenses${search}`)
     await this.page.waitForLoadState('networkidle')
   }
 

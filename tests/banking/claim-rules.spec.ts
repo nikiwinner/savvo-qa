@@ -10,7 +10,7 @@
  *                                               optional apply_to_matching re-route, dedupe.
  *
  * UI: the "Make a rule" Wand2 icon on an unmapped/assigned bank row on
- * /dashboard/expenses opens MakeRulePopover (`.dialog[role="dialog"]`,
+ * /dashboard/transactions opens MakeRulePopover (`.dialog[role="dialog"]`,
  * `<select id="make-rule-space">`, scope radios `input[name="scope"]`,
  * apply-to-matching checkbox, `.btn-confirm` "Create rule").
  */
@@ -302,8 +302,8 @@ test.describe('Claim rules — make-rule popover (UI)', () => {
       space_id: null,
     })
 
-    // Open the Transactions page with the Unassigned filter so the unmapped row shows.
-    await page.goto('/dashboard/expenses?unmapped=true')
+    // Open the Transactions page with the Inbox filter so the unmapped row shows.
+    await page.goto('/dashboard/transactions?unmapped=true')
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr.row-bank', { hasText: 'CARREFOUR PARIS' })
@@ -352,7 +352,7 @@ test.describe('Claim rules — make-rule popover (UI)', () => {
     ])
     expect(allocRes.ok(), `set_allocations failed: ${await allocRes.text()}`).toBeTruthy()
 
-    await page.goto(`/dashboard/expenses?space=${spaceA.id}`)
+    await page.goto(`/dashboard/transactions?space=${spaceA.id}`)
     await page.waitForLoadState('networkidle')
 
     const row = page.locator('tbody tr.row-bank', { hasText: 'SPLIT MERCHANT XYZ' })

@@ -2,7 +2,7 @@
  * Expenses — Income vs Expense Split Filter (Phase 09, Story 9.1)
  *
  * Verifies the new sidebar Type filter (Income / Expense chips) on
- * /dashboard/expenses:
+ * /dashboard/transactions:
  *   1. Income chip scopes the table to type=income rows; URL gets ?type=income.
  *   2. Income rows render with a positive sign and the row-income accent class.
  *   3. Expense chip excludes income rows; URL gets ?type=expense.

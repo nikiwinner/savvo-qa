@@ -61,7 +61,7 @@ test.describe('Categorization cascade (via reapply)', () => {
     expect(after!.category).toBe(groceries!.id)
 
     // UI: the row shows the assigned category badge (not the raw bank-cat badge).
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
     const row = page.locator('tbody tr.row-bank', { hasText: 'UNKNOWN PROVIDER MERCHANT ZZX' })
     await expect(row).toBeVisible()
@@ -93,7 +93,7 @@ test.describe('Categorization cascade (via reapply)', () => {
     const after = await api.getBankTransaction(txn.id)
     expect(after!.category).toBe(groceries!.id)
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
     const row = page.locator('tbody tr.row-bank', { hasText: 'LIDL 4821 BERLIN' })
     await expect(row).toBeVisible()
@@ -138,7 +138,7 @@ test.describe('Categorization cascade (via reapply)', () => {
     expect(after!.category).toBe(ruleCategory!.id)
     expect(after!.category).not.toBe(seedCategory!.id)
 
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
     const row = page.locator('tbody tr.row-bank', { hasText: 'NETFLIX.COM' })
     await expect(row).toBeVisible()
@@ -166,7 +166,7 @@ test.describe('Categorization cascade (via reapply)', () => {
 
     // Hand-categorize through the UI modal so we exercise the real lock-stamping
     // path (`category_set_manually=True`).
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
     const expenses = new ExpensesPage(page)
     const row = page.locator('tbody tr.row-bank', { hasText: 'LIDL 5290 MUNICH' })

@@ -1,14 +1,14 @@
 import { Page, Locator } from '@playwright/test'
 
 export class DashboardPage {
-  /** stat-value elements in DOM order (after Story 1.9):
-   * 0: Total Spaces
-   * 1: Total Transactions
-   * 2: Total Income ($)
-   * 3: Total Expenses ($)
-   * 4: Net Balance ($)
-   * 5: This Month Income ($)
-   * 6: This Month Expenses ($)
+  /**
+   * After the user-review 2026-06-02 rework the dashboard's money display is the
+   * per-space summary card (Income/Expense/Net for the selected period), NOT a
+   * grid of all-time totals. The only `.stat-value` cards left are:
+   *   0: Total Spaces
+   *   1: Transactions (in the selected period)
+   * Use the summary* helpers for money figures and periodPreset* for the period
+   * control.
    */
   readonly statValues: Locator
   readonly statCards: Locator
@@ -23,7 +23,9 @@ export class DashboardPage {
     this.logoutButton = page.locator('.logout-topbar-btn')
     this.userName = page.locator('.user-name')
     this.spacesLink = page.locator('a[href="/dashboard/spaces"]')
-    this.expensesLink = page.locator('a[href="/dashboard/expenses"]')
+    // The "Transactions" sidebar entry points at /dashboard/transactions
+    // (Phase 15, Story 15.2). navHref may append ?space=, so match by prefix.
+    this.expensesLink = page.locator('a[href^="/dashboard/transactions"]')
   }
 
   async goto(): Promise<void> {
@@ -33,50 +35,45 @@ export class DashboardPage {
 
   async logout(): Promise<void> {
     await this.logoutButton.click()
-    // Wait for the server to process logout and redirect to /login
     await this.page.waitForURL('/login')
   }
 
+  // ---- Secondary stat cards ----------------------------------------------
   totalSpaces(): Locator {
     return this.statValues.nth(0)
   }
 
+  /** Transactions in the selected period (user review 2026-06-02). */
   totalTransactions(): Locator {
-    return this.statValues.nth(1)
+    return this.page.getByTestId('period-transactions-count')
   }
 
-  /** @deprecated use totalTransactions() — label changed to "Total Transactions" */
-  totalExpenses(): Locator {
-    return this.statValues.nth(1)
+  // ---- Per-space summary card figures (the dashboard's money display) ------
+  // Period-scoped, in the viewer's currency. `.first()` targets the first/only
+  // card; scope the dashboard with ?space= to isolate a specific space's card.
+  summaryInflow(): Locator {
+    return this.page.locator('[data-testid="summary-figure-inflow"] .figure-value').first()
   }
 
-  totalIncome(): Locator {
-    return this.statValues.nth(2)
+  summaryOutflow(): Locator {
+    return this.page.locator('[data-testid="summary-figure-outflow"] .figure-value').first()
   }
 
-  totalExpenseAmount(): Locator {
-    return this.statValues.nth(3)
+  summaryNet(): Locator {
+    return this.page.locator('[data-testid="summary-figure-net"] .figure-value').first()
   }
 
-  netBalance(): Locator {
-    return this.statValues.nth(4)
+  /** The clickable Expense figure (the <a> deep-link), first/only card. */
+  summaryOutflowLink(): Locator {
+    return this.page.locator('[data-testid="summary-figure-outflow"]').first()
   }
 
-  monthlyIncomeAmount(): Locator {
-    return this.statValues.nth(5)
+  // ---- Period selector ----------------------------------------------------
+  periodPreset(key: string): Locator {
+    return this.page.getByTestId(`period-preset-${key}`)
   }
 
-  monthlyExpenseAmount(): Locator {
-    return this.statValues.nth(6)
-  }
-
-  /** @deprecated use totalIncome() or totalExpenseAmount() instead */
-  totalAmount(): Locator {
-    return this.statValues.nth(2)
-  }
-
-  /** @deprecated use monthlyExpenseAmount() instead */
-  monthlyAmount(): Locator {
-    return this.statValues.nth(6)
+  periodWindowLabel(): Locator {
+    return this.page.getByTestId('period-window-label')
   }
 }

@@ -41,7 +41,7 @@ test.describe('Uncategorized filter', () => {
     })
 
     // Navigate with ?category=none to filter to uncategorized only
-    await page.goto(`/dashboard/expenses?space=${space.id}&category=none`)
+    await page.goto(`/dashboard/transactions?space=${space.id}&category=none`)
     await page.waitForLoadState('networkidle')
 
     // Only the uncategorized txn should be visible
@@ -73,27 +73,21 @@ test.describe('Uncategorized filter', () => {
       space_id: space.id,
     })
 
-    // Open expenses page with uncategorized filter active
-    await page.goto(`/dashboard/expenses?space=${space.id}&category=none`)
+    // Both start uncategorized → both appear under the ?category=none filter.
+    await page.goto(`/dashboard/transactions?space=${space.id}&category=none`)
     await page.waitForLoadState('networkidle')
-
-    // Both rows should be visible
+    const expenses = new ExpensesPage(page)
     const rowToBeCateg = page.locator('tbody tr.row-bank', { hasText: 'WILL BE CATEGORIZED' })
     await expect(rowToBeCateg).toBeVisible()
     await expect(page.locator('tbody tr.row-bank', { hasText: 'STAYS UNCATEGORIZED' })).toBeVisible()
 
-    // Categorize the first txn via the category modal.
-    const expenses = new ExpensesPage(page)
+    // The ?category=none filter is server-side: categorizing the row under the
+    // active filter makes invalidateAll re-query the filtered feed, so the
+    // now-categorized row drops straight out of the uncategorized view — which is
+    // exactly the behaviour this test asserts.
     await expenses.categorizeRow(rowToBeCateg, 'Groceries')
 
-    // Wait for the network call to succeed — badge should appear
-    await expect(rowToBeCateg.locator('.badge-category')).toBeVisible({ timeout: 5000 })
-
-    // Reload the page with the same filter — the categorized txn should not appear
-    await page.goto(`/dashboard/expenses?space=${space.id}&category=none`)
-    await page.waitForLoadState('networkidle')
-
-    // WILL BE CATEGORIZED is gone; STAYS UNCATEGORIZED remains
+    // WILL BE CATEGORIZED is gone from the uncategorized view; STAYS remains.
     await expect(page.locator('tbody tr.row-bank', { hasText: 'WILL BE CATEGORIZED' })).not.toBeVisible()
     await expect(page.locator('tbody tr.row-bank', { hasText: 'STAYS UNCATEGORIZED' })).toBeVisible()
   })

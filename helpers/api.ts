@@ -871,6 +871,91 @@ export class ApiHelper {
     )
   }
 
+  /**
+   * POST /api/expenses/<id>/set_allocations/ — split a manual expense across
+   * spaces (gotcha #33). The allocation amounts MUST sum to the parent's full
+   * amount (rejection, never proration). Raw form returns APIResponse so
+   * negative tests can inspect the status without throwing.
+   */
+  async setExpenseAllocationsRaw(
+    expenseId: number,
+    allocations: { space_id: number; amount: string }[],
+  ): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/expenses/${expenseId}/set_allocations/`, {
+      data: { allocations },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async setExpenseAllocations(
+    expenseId: number,
+    allocations: { space_id: number; amount: string }[],
+  ): Promise<void> {
+    const res = await this.setExpenseAllocationsRaw(expenseId, allocations)
+    if (!res.ok()) {
+      throw new Error(`setExpenseAllocations failed (${res.status()}): ${await res.text()}`)
+    }
+  }
+
+  // ── Unified transactions feed (Phase 15) ──────────────────────────────────
+
+  /**
+   * GET /api/transactions/ — the unified, allocation-aware feed (contract A).
+   * Returns the raw paginated envelope `{count,next,previous,totals,results}`.
+   * `query` is a ready-made query string WITHOUT the leading `?` (e.g.
+   * `space=3&type=income`). Used to assert card↔feed sum-parity from a test.
+   */
+  async getTransactionsFeed(query = ''): Promise<{
+    count: number
+    next: string | null
+    previous: string | null
+    totals: { income: string; expense: string; net: string; currency: string; fx_stale: boolean }
+    results: {
+      kind: 'manual' | 'bank'
+      id: number
+      attributed_amount: string
+      attributed_currency: string
+      is_split: boolean
+      allocation_count: number
+      type: 'expense' | 'income'
+      space_id: number | null
+      [key: string]: unknown
+    }[]
+  }> {
+    const url = query ? `${this.baseUrl}/api/transactions/?${query}` : `${this.baseUrl}/api/transactions/`
+    const res = await this.ctx.get(url)
+    if (!res.ok()) {
+      throw new Error(`getTransactionsFeed failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Per-space summary (Phase 15) ───────────────────────────────────────────
+
+  /**
+   * GET /api/spaces/summary/ — per-space Income/Expense/Net (contract B).
+   * `query` is a query string WITHOUT the leading `?` (e.g. `space=3&period=2026-06`).
+   */
+  async getSpacesSummary(query = ''): Promise<{
+    period: string
+    currency: string
+    spaces: {
+      space_id: number
+      space_name: string
+      inflow: string
+      outflow: string
+      net: string
+      fx_stale: boolean
+    }[]
+  }> {
+    const url = query ? `${this.baseUrl}/api/spaces/summary/?${query}` : `${this.baseUrl}/api/spaces/summary/`
+    const res = await this.ctx.get(url)
+    if (!res.ok()) {
+      throw new Error(`getSpacesSummary failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
   // ── Internal ───────────────────────────────────────────────────────────────
 
   private async csrfToken(): Promise<string> {

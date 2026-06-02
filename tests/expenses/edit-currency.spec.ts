@@ -11,7 +11,7 @@ import { ExpensesPage } from '../../pages/ExpensesPage'
 
 const TARGET_DATE = '2026-05-15' // matches the seed pattern from per-row tests
 
-test.describe('Editable currency on /dashboard/expenses (Story 10.5)', () => {
+test.describe('Editable currency on /dashboard/transactions (Story 10.5)', () => {
   test('currency change on a manual expense submits immediately and persists', async ({
     page,
     loggedInPage,
@@ -30,7 +30,10 @@ test.describe('Editable currency on /dashboard/expenses (Story 10.5)', () => {
     const createdId = Number(created.id)
 
     const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    // Feed defaults to "this month" (shared dashboard period model); the seed
+    // row is dated 2026-05-15, so pin ?preset=all to keep this currency test
+    // period-agnostic.
+    await page.goto(`/dashboard/transactions?space=${space.id}&preset=all`)
     await page.waitForLoadState('networkidle')
 
     await expenses.openEditModal(description)

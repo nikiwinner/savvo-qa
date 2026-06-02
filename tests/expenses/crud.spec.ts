@@ -11,6 +11,18 @@ import { ExpensesPage } from '../../pages/ExpensesPage'
 const TODAY = new Date().toISOString().split('T')[0]
 
 test.describe('Expenses CRUD', () => {
+  // Phase 15, Story 15.2 — the page moved to /dashboard/transactions; the legacy
+  // /dashboard/expenses route now redirects, preserving the query string so
+  // bookmarked links keep working.
+  test('legacy /dashboard/expenses redirects to /dashboard/transactions preserving query', async ({
+    page,
+    loggedInPage: _,
+  }) => {
+    await page.goto('/dashboard/expenses?unmapped=true')
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL('/dashboard/transactions?unmapped=true')
+  })
+
   test('shows info message when user has no spaces', async ({ page, loggedInPage: _ }) => {
     const expenses = new ExpensesPage(page)
     await expenses.goto()
@@ -29,7 +41,7 @@ test.describe('Expenses CRUD', () => {
     await api.createSpace('Test Home')
 
     const expenses = new ExpensesPage(page)
-    await page.goto('/dashboard/expenses')
+    await page.goto('/dashboard/transactions')
     await page.waitForLoadState('networkidle')
 
     await expect(expenses.emptyState).toBeVisible()

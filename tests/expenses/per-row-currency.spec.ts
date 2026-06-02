@@ -12,7 +12,7 @@
 import { test, expect } from '@playwright/test'
 import { ApiHelper, uniqueUser } from '../../helpers/api'
 
-test.describe('Per-row currency rendering on /dashboard/expenses', () => {
+test.describe('Per-row currency rendering on /dashboard/transactions', () => {
   test('expense row shows the row\'s own currency symbol regardless of viewer preference', async ({
     page,
     context,
@@ -57,9 +57,11 @@ test.describe('Per-row currency rendering on /dashboard/expenses', () => {
     })
 
     // Push Alice's session cookies into the browser context, then visit the
-    // expenses page scoped to the shared space.
+    // expenses page scoped to the shared space. The feed now defaults to "this
+    // month" (shared dashboard period model); the seed row is dated 2026-05-15,
+    // so pin ?preset=all to keep this currency test period-agnostic.
     await context.addCookies(await apiAlice.cookies())
-    await page.goto(`/dashboard/expenses?space=${space.id}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}&preset=all`)
     await page.waitForLoadState('networkidle')
 
     // Locate Bob's row by description and assert per-row symbol.

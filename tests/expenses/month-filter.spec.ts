@@ -1,143 +1,161 @@
 /**
- * Expenses — Month Filter (Phase 01, Story 1.9)
+ * Transactions — Period filter (rework 2026-06-02)
  *
- * Verifies that the month filter chips filter the transaction list,
- * the "All" button shows everything, and the filter state is URL-driven.
+ * The old "Months" drawer section + `?month=` deep-link were removed. Period is
+ * now driven by the DashboardPeriodSelector rendered at the TOP of the feed view
+ * (above the table). URL model: `?preset=month|3m|6m|year|all` or
+ * `?preset=custom&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD`; default (no preset) =
+ * this month.
  *
- * The filter UI lives inside a right-side <Drawer> (opened via the "Filters"
- * button in the page header). Each month is a checkbox chip (label.filter-chip);
- * the "All"/"Clear" button (.btn-filter-action) appears in the Months section
- * header. The drawer only renders its content while open.
+ * This spec is the TRANSACTIONS-page counterpart to the dashboard's
+ * period-selector spec — it asserts the same control narrows / widens the unified
+ * feed (not the dashboard summary cards).
+ *
+ * Everything is seeded in EUR (default User.currency) so figures equal native
+ * amounts with no FX conversion.
  */
 import { test, expect } from '../../fixtures/index'
 import { ExpensesPage } from '../../pages/ExpensesPage'
 
-const TODAY = new Date().toISOString().split('T')[0]
+const NOW = new Date()
+const CURRENT_MONTH = `${NOW.getFullYear()}-${String(NOW.getMonth() + 1).padStart(2, '0')}`
+const THIS_MID = `${CURRENT_MONTH}-15`
 
-function lastMonthStr(): string {
+function lastMonthMid(): string {
   // Anchor to mid-month BEFORE subtracting so month-end days (e.g. the 31st)
-  // don't overflow back into the current month. `setMonth(getMonth() - 1)` on,
-  // say, May 31 yields May 1 (April has 30 days), which would put the "last
-  // month" expense in the current month and break the filter assertions.
+  // don't overflow back into the current month.
   const d = new Date()
   d.setDate(15)
   d.setMonth(d.getMonth() - 1)
   return d.toISOString().split('T')[0]
 }
 
-function currentMonthParam(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-}
-
-test.describe('Month filter', () => {
-  test('month filter is present in the filters drawer', async ({ page, loggedInPage }) => {
+test.describe('Transactions period filter', () => {
+  test('the period selector is rendered above the feed', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    await api.createSpace('Filter Home')
+    await api.createSpace('Period Filter Space')
 
     const expenses = new ExpensesPage(page)
     await expenses.goto()
 
-    // Open the filters drawer.
-    await expenses.openFilters()
-    const drawer = expenses.filtersDrawer()
-    await expect(drawer).toBeVisible()
-    // The Months filter section exists inside the drawer.
-    await expect(drawer.locator('.filter-section-title', { hasText: 'Months' })).toBeVisible()
+    // The DashboardPeriodSelector lives on the feed view (not inside the drawer).
+    await expect(page.getByTestId('dashboard-period-selector')).toBeVisible()
+    // Default (no preset) → "This month" preset is pressed.
+    await expect(page.getByTestId('period-preset-month')).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test('changing the month filter updates the displayed transactions', async ({
+  test('default window = this month; the "All" preset widens it', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createSpace('Month Filter Home')
+    const space = await api.createSpace('Period Widen Space')
 
-    // Create one expense this month and one last month
-    await api.createExpense({ space: hh.id, description: 'This Month Expense', amount: 100, expense_date: TODAY })
-    await api.createExpense({ space: hh.id, description: 'Last Month Expense', amount: 200, expense_date: lastMonthStr() })
-
-    // Navigate with current month filter applied
-    const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?space=${hh.id}&month=${currentMonthParam()}`)
-    await page.waitForLoadState('networkidle')
-
-    // Should see this month's expense but not last month's
-    await expect(page.locator('tbody tr', { hasText: 'This Month Expense' })).toBeVisible()
-    await expect(page.locator('tbody tr', { hasText: 'Last Month Expense' })).not.toBeVisible()
-  })
-
-  test('"All" filter shows all transactions', async ({ page, loggedInPage }) => {
-    const { api } = loggedInPage
-    const hh = await api.createSpace('All Time Home')
-
-    await api.createExpense({ space: hh.id, description: 'This Month', amount: 100, expense_date: TODAY })
-    await api.createExpense({ space: hh.id, description: 'Last Month', amount: 200, expense_date: lastMonthStr() })
-
-    // Navigate with current month filter set first — only this month shows
-    await page.goto(`/dashboard/expenses?space=${hh.id}&month=${currentMonthParam()}`)
-    await page.waitForLoadState('networkidle')
-
-    await expect(page.locator('tbody tr', { hasText: 'This Month' })).toBeVisible()
-    await expect(page.locator('tbody tr', { hasText: 'Last Month' })).not.toBeVisible()
-
-    // Open the drawer and click the Months section's "All" button to show
-    // all transactions.
-    const expenses = new ExpensesPage(page)
-    await expenses.openFilters()
-    const monthsSection = expenses
-      .filtersDrawer()
-      .locator('.filter-section')
-      .filter({ has: page.locator('.filter-section-title', { hasText: 'Months' }) })
-    await monthsSection.locator('.btn-filter-action', { hasText: 'All' }).click()
-    await page.waitForLoadState('networkidle')
-
-    // Now both should be visible
-    await expect(page.locator('tbody tr', { hasText: 'This Month' })).toBeVisible()
-    await expect(page.locator('tbody tr', { hasText: 'Last Month' })).toBeVisible()
-  })
-
-  test('month filter is reflected in the URL', async ({ page, loggedInPage }) => {
-    const { api } = loggedInPage
-    const hh = await api.createSpace('URL State Home')
-
-    // Navigate directly with the month param — URL-driven state
-    const monthParam = currentMonthParam()
-    await page.goto(`/dashboard/expenses?space=${hh.id}&month=${monthParam}`)
-    await page.waitForLoadState('networkidle')
-
-    // The URL should still contain the month param after navigation
-    expect(page.url()).toContain(`month=${monthParam}`)
-
-    // Open the drawer; the corresponding month chip should be checked in the
-    // Months filter section.
-    const expenses = new ExpensesPage(page)
-    await expenses.openFilters()
-    const monthsSection = expenses
-      .filtersDrawer()
-      .locator('.filter-section')
-      .filter({ has: page.locator('.filter-section-title', { hasText: 'Months' }) })
-    const chipLabel = monthsSection.locator('.filter-chip').filter({
-      has: page.locator('input[type="checkbox"]:checked'),
+    // One expense this month, one last month.
+    await api.createExpense({
+      space: space.id,
+      description: 'This Month Expense',
+      amount: 100,
+      expense_date: THIS_MID,
     })
-    await expect(chipLabel.first()).toBeVisible()
+    await api.createExpense({
+      space: space.id,
+      description: 'Last Month Expense',
+      amount: 200,
+      expense_date: lastMonthMid(),
+    })
+
+    // Default landing = this month → only this month's row shows.
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
+    await page.waitForLoadState('networkidle')
+    await expect(page.locator('tbody tr', { hasText: 'This Month Expense' })).toBeVisible()
+    await expect(page.locator('tbody tr', { hasText: 'Last Month Expense' })).toHaveCount(0)
+
+    // Click the "All" preset → both months fold in.
+    await page.getByTestId('period-preset-all').click()
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL(/preset=all/)
+    await expect(page.locator('tbody tr', { hasText: 'This Month Expense' })).toBeVisible()
+    await expect(page.locator('tbody tr', { hasText: 'Last Month Expense' })).toBeVisible()
   })
 
-  test('empty state shown when no transactions exist for selected month', async ({
+  test('a custom day-range deep-link narrows the feed', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    const space = await api.createSpace('Custom Range Space')
+
+    // Two rows in the current month, on distinct days.
+    await api.createExpense({
+      space: space.id,
+      description: 'EARLY Expense',
+      amount: 11,
+      expense_date: `${CURRENT_MONTH}-05`,
+    })
+    await api.createExpense({
+      space: space.id,
+      description: 'LATE Expense',
+      amount: 22,
+      expense_date: `${CURRENT_MONTH}-25`,
+    })
+
+    // Custom range covering only the early day.
+    await page.goto(
+      `/dashboard/transactions?space=${space.id}&preset=custom&date_from=${CURRENT_MONTH}-01&date_to=${CURRENT_MONTH}-10`,
+    )
+    await page.waitForLoadState('networkidle')
+
+    // The custom preset chip reflects the active window.
+    await expect(page.getByTestId('period-preset-custom')).toHaveAttribute('aria-pressed', 'true')
+
+    // Only the early row is in scope.
+    await expect(page.locator('tbody tr', { hasText: 'EARLY Expense' })).toBeVisible()
+    await expect(page.locator('tbody tr', { hasText: 'LATE Expense' })).toHaveCount(0)
+  })
+
+  test('the active period is reflected in the URL and the active-filters bar', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const hh = await api.createSpace('Empty Month Home')
+    const space = await api.createSpace('Period URL Space')
+    await api.createExpense({
+      space: space.id,
+      description: 'URL Row',
+      amount: 30,
+      expense_date: THIS_MID,
+    })
 
-    // Create an expense last month only — this month should show empty
-    await api.createExpense({ space: hh.id, description: 'Old Expense', amount: 50, expense_date: lastMonthStr() })
+    await page.goto(`/dashboard/transactions?space=${space.id}&preset=all`)
+    await page.waitForLoadState('networkidle')
+
+    // The URL keeps the preset param.
+    expect(page.url()).toContain('preset=all')
+
+    // A non-default period surfaces a removable chip in the active-filters bar.
+    const bar = page.getByTestId('active-filters-bar')
+    await expect(bar).toBeVisible()
+    await expect(bar).toContainText('All time')
+  })
+
+  test('empty state shown when no transactions fall in the selected window', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const space = await api.createSpace('Empty Window Space')
+
+    // Only a last-month expense — the default (this-month) window is empty.
+    await api.createExpense({
+      space: space.id,
+      description: 'Old Expense',
+      amount: 50,
+      expense_date: lastMonthMid(),
+    })
 
     const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?space=${hh.id}&month=${currentMonthParam()}`)
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(expenses.emptyState).toBeVisible()
-    await expect(page.locator('tbody tr', { hasText: 'Old Expense' })).not.toBeVisible()
+    await expect(page.locator('tbody tr', { hasText: 'Old Expense' })).toHaveCount(0)
   })
 })

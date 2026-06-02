@@ -19,7 +19,7 @@ test.describe('Active space context', () => {
     const h1 = await api.createSpace('Param House One')
     await api.createSpace('Param House Two')
 
-    await page.goto(`/dashboard/expenses?space=${h1.id}`)
+    await page.goto(`/dashboard/transactions?space=${h1.id}`)
     await page.waitForLoadState('networkidle')
 
     expect(page.url()).toContain(`space=${h1.id}`)
@@ -34,14 +34,14 @@ test.describe('Active space context', () => {
     await api.createExpense({ space: h2.id, description: 'House B Expense', amount: 200, expense_date: TODAY })
 
     // Navigate to h1
-    await page.goto(`/dashboard/expenses?space=${h1.id}`)
+    await page.goto(`/dashboard/transactions?space=${h1.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('tbody tr', { hasText: 'House A Expense' })).toBeVisible()
     await expect(page.locator('tbody tr', { hasText: 'House B Expense' })).not.toBeVisible()
 
     // Switch to h2 via URL
-    await page.goto(`/dashboard/expenses?space=${h2.id}`)
+    await page.goto(`/dashboard/transactions?space=${h2.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.locator('tbody tr', { hasText: 'House B Expense' })).toBeVisible()
@@ -57,7 +57,7 @@ test.describe('Active space context', () => {
     const h2 = await api.createSpace('Preselect House B')
 
     const expenses = new ExpensesPage(page)
-    await page.goto(`/dashboard/expenses?space=${h2.id}`)
+    await page.goto(`/dashboard/transactions?space=${h2.id}`)
     await page.waitForLoadState('networkidle')
 
     await expenses.openCreateForm()
@@ -80,9 +80,9 @@ test.describe('Active space context', () => {
     await page.goto(`/dashboard?space=${h1.id}`)
     await page.waitForLoadState('networkidle')
 
-    // Should show h1's expense amount only
-    await expect(dashboard.totalExpenseAmount()).toContainText('500')
-    await expect(dashboard.totalExpenseAmount()).not.toContainText('999')
+    // Scoped to h1 → only h1's summary card renders; its expense figure is 500.
+    await expect(dashboard.summaryOutflow()).toContainText('500')
+    await expect(dashboard.summaryOutflow()).not.toContainText('999')
   })
 
   test('spaces management page shows all spaces regardless of active selection', async ({
