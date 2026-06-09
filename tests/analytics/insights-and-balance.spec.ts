@@ -20,9 +20,6 @@
 import { test, expect } from '../../fixtures/index'
 
 const TODAY = new Date()
-const YEAR = TODAY.getFullYear()
-const MONTH = TODAY.getMonth() + 1
-const CURRENT_PERIOD = `${YEAR}-${String(MONTH).padStart(2, '0')}`
 const TODAY_ISO = TODAY.toISOString().split('T')[0]
 
 function pad2(n: number): string {
@@ -35,10 +32,23 @@ function isoOffsetMonths(offset: number, day = 15): string {
   return d.toISOString().split('T')[0]
 }
 
-function periodOffset(offset: number): string {
-  const d = new Date(TODAY.getFullYear(), TODAY.getMonth() + offset, 1)
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
+/**
+ * Build the analytics period-pill query that anchors insights to the calendar
+ * month `offset` away (0 = current). Insights are anchored to the LAST month of
+ * the range (= the month of `date_to`), so a single-month custom range scopes
+ * the insights feed (and its localStorage dismiss hash, which keys on
+ * `period_yyyy_mm` = the anchor month) to exactly that month. This replaces the
+ * old `?period=YYYY-MM` param.
+ */
+function monthRangeQuery(offset: number): string {
+  const first = new Date(TODAY.getFullYear(), TODAY.getMonth() + offset, 1)
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0)
+  const from = `${first.getFullYear()}-${pad2(first.getMonth() + 1)}-01`
+  const to = `${last.getFullYear()}-${pad2(last.getMonth() + 1)}-${pad2(last.getDate())}`
+  return `preset=custom&date_from=${from}&date_to=${to}`
 }
+
+const CURRENT_MONTH_RANGE = monthRangeQuery(0)
 
 test.describe('Analytics insights + balance summary (Story 11.7)', () => {
   test('multi-rule scenario surfaces three insight cards', async ({ page, loggedInPage }) => {
@@ -73,7 +83,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       expense_date: isoOffsetMonths(-1),
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const feed = page.getByTestId('insights-feed')
@@ -99,7 +109,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Empty Insights Home')
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insights-feed')).toBeVisible()
@@ -131,7 +141,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       space_id: hh.id,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('balance-summary')).toBeVisible()
@@ -170,7 +180,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       space_id: hh.id,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('balance-summary')).toBeVisible()
@@ -199,7 +209,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       space_id: hh.id,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId(`balance-account-${synced.account_id}`)).toBeVisible()
@@ -228,7 +238,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       })
     }
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const card = page.getByTestId('insight-card-uncategorized_alert')
@@ -275,16 +285,16 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     }
 
     // Dismiss for the CURRENT period.
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()
     await page.getByTestId('insight-dismiss-uncategorized_alert').click()
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toHaveCount(0)
 
-    // Navigate to PREVIOUS month — the same-type insight has a different
-    // period_yyyy_mm hash, so it must NOT be auto-dismissed.
-    const prevPeriod = periodOffset(-1)
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${prevPeriod}`)
+    // Navigate to PREVIOUS month (a single-month custom range anchored on last
+    // month) — the same-type insight has a different period_yyyy_mm hash, so it
+    // must NOT be auto-dismissed.
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${monthRangeQuery(-1)}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()
@@ -303,7 +313,7 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
       })
     }
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()

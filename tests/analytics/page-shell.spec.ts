@@ -5,15 +5,38 @@
  * frontend shell only — section bodies render "Coming in next story" stubs
  * (filled in by 11.5/11.6/11.7). What we validate here:
  *   • Sidebar link → page reachable.
- *   • Page renders header + period selector + 5 section cards.
+ *   • Page renders header + period pill + 5 section cards.
  *   • Period changes round-trip via URL params (no client-side state).
  *   • Empty-space path doesn't crash.
  *   • Non-member space renders error states cleanly, no JS errors.
+ *
+ * The analytics page now mounts the SAME shared period pill the
+ * dashboard/transactions use (container testid `dashboard-period-selector`,
+ * preset chips `period-preset-*`, custom range `period-custom-*`). The old
+ * MONTH + TREND-WINDOW dropdowns (`period-selector` / `period-month-select` /
+ * `period-months-select`) and the old `?period=` / `?months=` URL params are
+ * gone — the range is driven by `?preset=` or `?preset=custom&date_from&date_to`.
  */
 import { test, expect } from '../../fixtures/index'
 
+const TODAY = new Date()
+
 function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n)
+}
+
+function iso(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** First day of the current month, ISO. */
+function firstOfThisMonth(): string {
+  return `${TODAY.getFullYear()}-${pad2(TODAY.getMonth() + 1)}-01`
+}
+
+/** Last day of the current month, ISO. */
+function lastOfThisMonth(): string {
+  return iso(new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0))
 }
 
 test.describe('Analytics page shell (Story 11.4)', () => {
@@ -32,44 +55,73 @@ test.describe('Analytics page shell (Story 11.4)', () => {
     // The redirect normalises ?space=<id> into the URL.
     expect(page.url()).toContain(`space=${hh.id}`)
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
-    await expect(page.getByTestId('period-selector')).toBeVisible()
+    // The shared period pill is mounted (replaces the old `period-selector`).
+    await expect(page.getByTestId('dashboard-period-selector')).toBeVisible()
   })
 
-  test('period selector month change updates URL and reloads data', async ({ page, loggedInPage }) => {
+  test('changing the period (preset chip) updates the URL and reloads the page data', async ({
+    page,
+    loggedInPage,
+  }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Period Home')
 
     await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    // Pick a clearly earlier month so the active value definitely changes.
-    const today = new Date()
-    let prev = new Date(today.getFullYear(), today.getMonth() - 2, 1)
-    const target = `${prev.getFullYear()}-${pad2(prev.getMonth() + 1)}`
+    // Default (no preset) → "this month" → the cashflow chart slices to the
+    // single current month. The mirror count proves the range is one month.
+    await expect(page.getByTestId('period-preset-month')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('cashflow-trend-month-count')).toHaveText('1')
 
-    await page.getByTestId('period-month-select').selectOption(target)
-
-    await page.waitForURL(new RegExp(`period=${target}`))
-    expect(page.url()).toContain(`period=${target}`)
+    // Drive the 6M preset chip → URL gains ?preset=6m AND the data reloads
+    // (the cashflow chart now spans six months). This is the new equivalent of
+    // "changing the period updates the URL + reloads data".
+    await page.getByTestId('period-preset-6m').click()
+    await page.waitForURL(/preset=6m/)
+    expect(page.url()).toContain('preset=6m')
     expect(page.url()).toContain(`space=${hh.id}`)
 
     // Page heading still rendered — server data round-trip completed cleanly.
     await expect(page.locator('h1.page-title')).toHaveText('Analytics')
-    await expect(page.getByTestId('period-selector')).toBeVisible()
+    await expect(page.getByTestId('dashboard-period-selector')).toBeVisible()
+    await expect(page.getByTestId('period-preset-6m')).toHaveAttribute('aria-pressed', 'true')
+    // The reload widened the cashflow window from 1 → 6 months — observable
+    // proof the period change re-fetched, not just rewrote the URL.
+    await expect(page.getByTestId('cashflow-trend-month-count')).toHaveText('6')
   })
 
-  test('months dropdown change updates URL', async ({ page, loggedInPage }) => {
+  test('the trend window is user-controllable via a custom range and reflected in the chart', async ({
+    page,
+    loggedInPage,
+  }) => {
     const { api } = loggedInPage
-    const hh = await api.createSpace('Months Home')
+    const hh = await api.createSpace('Window Home')
 
     await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    await page.getByTestId('period-months-select').selectOption('12')
+    // The old TREND-WINDOW dropdown is gone — the period pill's date range now
+    // defines the cashflow window. A 3-calendar-month custom range (the prior
+    // two months + this month) must produce a 3-bucket chart. This preserves
+    // the original "months dropdown controls the trend window" coverage.
+    const start = new Date(TODAY.getFullYear(), TODAY.getMonth() - 2, 1)
+    const dateFrom = iso(start)
+    const dateTo = lastOfThisMonth()
 
-    await page.waitForURL(/months=12/)
-    expect(page.url()).toContain('months=12')
+    await page.goto(
+      `/dashboard/analytics?space=${hh.id}&preset=custom&date_from=${dateFrom}&date_to=${dateTo}`,
+    )
+    await page.waitForLoadState('networkidle')
+
+    expect(page.url()).toContain('preset=custom')
+    expect(page.url()).toContain(`date_from=${dateFrom}`)
+    expect(page.url()).toContain(`date_to=${dateTo}`)
     expect(page.url()).toContain(`space=${hh.id}`)
+    await expect(page.getByTestId('period-preset-custom')).toHaveAttribute('aria-pressed', 'true')
+
+    // The cashflow chart spans exactly three calendar months.
+    await expect(page.getByTestId('cashflow-trend-month-count')).toHaveText('3')
 
     // Sections still render — no crash on rerender. The redesign consolidated
     // the former monthly-trend + income-vs-expenses cards into one cashflow

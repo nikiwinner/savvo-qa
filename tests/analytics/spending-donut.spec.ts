@@ -20,8 +20,18 @@ import { test, expect } from '../../fixtures/index'
 const TODAY = new Date()
 const YEAR = TODAY.getFullYear()
 const MONTH = TODAY.getMonth() + 1
-const PERIOD = `${YEAR}-${String(MONTH).padStart(2, '0')}`
 const TODAY_ISO = TODAY.toISOString().split('T')[0]
+
+// The analytics period is now driven by the shared pill's date range
+// (?preset=custom&date_from&date_to), not the old ?period=YYYY-MM param.
+// Scope the donut to the current calendar month — the month the seeded
+// expenses (dated TODAY_ISO) live in — via an explicit custom range.
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n)
+}
+const MONTH_FROM = `${YEAR}-${pad2(MONTH)}-01`
+const MONTH_TO = `${YEAR}-${pad2(MONTH)}-${pad2(new Date(YEAR, MONTH, 0).getDate())}`
+const THIS_MONTH_RANGE = `preset=custom&date_from=${MONTH_FROM}&date_to=${MONTH_TO}`
 
 function slug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'unnamed'
@@ -59,7 +69,7 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const donut = page.getByTestId('category-donut')
@@ -92,7 +102,7 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
     await api.createExpense({ space: hh.id, description: 'tiny a', amount: 0.5, category: tiny1.id, expense_date: TODAY_ISO })
     await api.createExpense({ space: hh.id, description: 'tiny b', amount: 0.5, category: tiny2.id, expense_date: TODAY_ISO })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const donut = page.getByTestId('category-donut')
@@ -119,27 +129,29 @@ test.describe('Analytics spending donut (Story 11.5)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=${PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     // chart.js renders the real tooltip on a canvas overlay (impossible to
-    // inspect from DOM). We mirror the same formatting onto the legend item's
-    // `title` attribute — assert there to cover the formatting contract.
+    // inspect from DOM). The legend row shows the same formatting in visible
+    // spans (name / amount / %), so we assert the visible row text to cover the
+    // formatting contract.
     const legendItem = page.getByTestId(`donut-legend-${slug('Solo-Tip')}`)
     await expect(legendItem).toBeVisible()
-    const title = await legendItem.getAttribute('title')
-    expect(title).not.toBeNull()
-    expect(title!).toContain('Solo-Tip')
-    expect(title!).toContain('123.45')
-    expect(title!).toContain('100.0%')
+    await expect(legendItem).toContainText('Solo-Tip')
+    await expect(legendItem).toContainText('123.45')
+    await expect(legendItem).toContainText('100.0%')
   })
 
   test('empty period renders no-data placeholder', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Empty Donut Home')
 
-    // No expenses seeded. Use a month far in the past where nothing exists.
-    await page.goto(`/dashboard/analytics?space=${hh.id}&period=2000-01`)
+    // No expenses seeded. Use a date range far in the past where nothing
+    // exists — an empty custom range (the new equivalent of `?period=2000-01`).
+    await page.goto(
+      `/dashboard/analytics?space=${hh.id}&preset=custom&date_from=2000-01-01&date_to=2000-01-31`,
+    )
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('category-donut')).toBeVisible()
