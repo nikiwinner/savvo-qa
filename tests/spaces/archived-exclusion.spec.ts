@@ -15,7 +15,20 @@ import { test, expect } from '../../fixtures/index'
 
 const TODAY = new Date()
 const TODAY_ISO = TODAY.toISOString().split('T')[0]
-const CURRENT_PERIOD = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}`
+
+// The analytics period is driven by the shared pill's date range
+// (?preset=custom&date_from&date_to), not the old ?period=YYYY-MM param. These
+// archived-exclusion tests don't actually depend on the period — they assert
+// the archived space is excluded regardless — so we scope to the current month
+// via an explicit custom range to keep the navigation deterministic.
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n)
+}
+const MONTH_FIRST = `${TODAY.getFullYear()}-${pad2(TODAY.getMonth() + 1)}-01`
+const MONTH_LAST = `${TODAY.getFullYear()}-${pad2(TODAY.getMonth() + 1)}-${pad2(
+  new Date(TODAY.getFullYear(), TODAY.getMonth() + 1, 0).getDate(),
+)}`
+const CURRENT_MONTH_RANGE = `preset=custom&date_from=${MONTH_FIRST}&date_to=${MONTH_LAST}`
 
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8001'
 
@@ -47,7 +60,7 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     const jsErrors: string[] = []
     page.on('pageerror', (err) => jsErrors.push(err.message))
 
-    await page.goto(`/dashboard/analytics?space=${h1.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     // Page heading still rendered — no crash.
@@ -116,7 +129,7 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
 
     // After restore: H1 is in the SpaceFilter, and analytics renders its
     // sections without error placeholders.
-    await page.goto(`/dashboard/analytics?space=${h1.id}&period=${CURRENT_PERIOD}`)
+    await page.goto(`/dashboard/analytics?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await page.getByTestId('space-filter-trigger').click()

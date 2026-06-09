@@ -235,12 +235,18 @@ test.describe('Conflict resolution — real routing engine (seed/route-unmapped)
     expect(fresh!.space).toBe(first.id)
   })
 
-  test('single-space fallback — no rule, one candidate space', async ({ loggedInPage }) => {
+  test('no single-space fallback — one candidate, no rule → stays in the Inbox (Phase 16)', async ({
+    loggedInPage,
+  }) => {
     const { api } = loggedInPage
 
-    // Exactly ONE space, NO claim rule. No rule matches, but there is only one
-    // place the txn could go → automatic single-space fallback.
-    const lone = await api.createSpace('Lone Fallback Space')
+    // Exactly ONE space, NO claim rule. Phase 16 (Story 16.1) REMOVED the
+    // lone-candidate auto-attach fallback: a Space is a deliberate project, not
+    // a default bucket. So an unmatched row stays in the Inbox (space=NULL) even
+    // when there is only one place it could go. (This test was INVERTED from the
+    // old Phase-13 fallback assertion — see phase_16.md "Tests touching the old
+    // contract".)
+    const lone = await api.createSpace('Lone No-Fallback Space')
 
     const txn = await api.createBankTransaction({
       description: 'CORNER SHOP GROCERIES',
@@ -251,10 +257,14 @@ test.describe('Conflict resolution — real routing engine (seed/route-unmapped)
     })
 
     const result = await api.routeUnmapped()
-    expect(result.routed).toBe(1)
+    expect(result.routed).toBe(0)
 
     const fresh = await api.getBankTransaction(txn.id)
-    expect(fresh!.space).toBe(lone.id)
+    expect(fresh!.space).toBeNull()
+    // The row was never auto-attached, so the manual-override lock stays false.
+    expect(fresh!.is_manually_assigned).toBe(false)
+    // Guard against an accidental attach to the lone space.
+    expect(fresh!.space).not.toBe(lone.id)
   })
 
   test('no candidate / no match (≥2 spaces, no rule) → stays unmapped', async ({

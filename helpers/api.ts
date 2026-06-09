@@ -320,6 +320,16 @@ export class ApiHelper {
     return res.json()
   }
 
+  /** DELETE /api/expenses/<id>/ — throws on non-OK (2xx). */
+  async deleteExpense(expenseId: number): Promise<void> {
+    const res = await this.ctx.delete(`${this.baseUrl}/api/expenses/${expenseId}/`, {
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`deleteExpense failed (${res.status()}): ${await res.text()}`)
+    }
+  }
+
   // ── Categories ─────────────────────────────────────────────────────────────
 
   async createCategory(name: string, icon = ''): Promise<CategoryRecord> {
@@ -853,6 +863,96 @@ export class ApiHelper {
     })
     if (!res.ok()) {
       throw new Error(`routeUnmapped failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Phase 16 — routing redesign (apply / suggestions / backfill seeds) ────
+
+  /**
+   * POST /api/claim-rules/<id>/apply/ — re-apply an existing rule to the user's
+   * matching non-manual, non-split bank txns. Raw form returns APIResponse so
+   * negative tests (non-member rule → 404) can inspect the status.
+   */
+  async applyClaimRuleRaw(ruleId: number): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/claim-rules/${ruleId}/apply/`, {
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async applyClaimRule(ruleId: number): Promise<{ matched_count: number }> {
+    const res = await this.applyClaimRuleRaw(ruleId)
+    if (!res.ok()) {
+      throw new Error(`applyClaimRule failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** GET /api/claim-rules/suggestions/ — learned merchant→space suggestions (Story 16.5). */
+  async listSpaceSuggestions(): Promise<
+    { merchant: string; space_id: number; space_name: string; occurrence_count: number }[]
+  > {
+    const res = await this.ctx.get(`${this.baseUrl}/api/claim-rules/suggestions/`)
+    if (!res.ok()) {
+      throw new Error(`listSpaceSuggestions failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** Raw POST /api/claim-rules/suggestions/accept/ — returns APIResponse for negative tests. */
+  async acceptSpaceSuggestionRaw(spaceId: number, merchant: string): Promise<APIResponse> {
+    return this.ctx.post(`${this.baseUrl}/api/claim-rules/suggestions/accept/`, {
+      data: { space_id: spaceId, merchant },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  async acceptSpaceSuggestion(
+    spaceId: number,
+    merchant: string,
+  ): Promise<{ rule: ClaimRuleRecord; matched_count: number }> {
+    const res = await this.acceptSpaceSuggestionRaw(spaceId, merchant)
+    if (!res.ok()) {
+      throw new Error(`acceptSpaceSuggestion failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * POST /api/seed/auto-attach/ — DEBUG-only: fabricate non-manual, non-split,
+   * space-attached "auto-attached" bank rows (the pre-Phase-16-backfill state).
+   * Returns the created count + transaction ids.
+   */
+  async seedAutoAttach(
+    spaceId: number,
+    opts: { count?: number; merchant?: string } = {},
+  ): Promise<{ created: number; transaction_ids: number[] }> {
+    const body: Record<string, unknown> = { space_id: spaceId }
+    if (opts.count !== undefined) body['count'] = opts.count
+    if (opts.merchant !== undefined) body['merchant'] = opts.merchant
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/auto-attach/`, {
+      data: body,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`seedAutoAttach failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * POST /api/seed/run-backfill/ — DEBUG-only: run the Phase-16 backfill for the
+   * requesting user on demand (the migration already ran at stack startup before
+   * the test's seeds, so this is how a test triggers it on fresh data).
+   * Returns the real move counts.
+   */
+  async runBackfill(): Promise<{ moved_to_inbox: number; rerouted: number; unchanged: number }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/run-backfill/`, {
+      data: {},
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`runBackfill failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
