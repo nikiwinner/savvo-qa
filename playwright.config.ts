@@ -63,7 +63,9 @@ export default defineConfig({
       // QA-only frontend on :5174, pointed at the QA backend on :8001.
       // --strictPort makes Vite fail loudly if :5174 is taken instead of
       // silently falling back to a random port (which would break baseURL).
-      command: `cd ${path.resolve(__dirname, '../frontend')} && PUBLIC_API_BASE_URL=http://localhost:8001 npm run dev -- --port 5174 --strictPort`,
+      // FRONTEND_DIR overrides the frontend checkout to test (e.g. a git
+      // worktree under frontend/.worktrees/<branch>); defaults to ../frontend.
+      command: `cd ${process.env.FRONTEND_DIR ?? path.resolve(__dirname, '../frontend')} && PUBLIC_API_BASE_URL=http://localhost:8001 npm run dev -- --port 5174 --strictPort`,
       url: 'http://localhost:5174',
       reuseExistingServer: false,
       timeout: 60_000,
