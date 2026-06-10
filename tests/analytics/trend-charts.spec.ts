@@ -1,25 +1,26 @@
 /**
- * Cashflow trend chart (consolidated from former MonthlyTrendBar +
- * IncomeExpensesChart in the analytics redesign — both surfaced identical
- * TrendPoint data with different visualisations, now rendered together as
- * income bars + expense bars + a net-balance line on one canvas).
+ * Cashflow band — ONE visual language for every period (GROWTH redesign):
+ * a coin-shine running-balance THREAD (`cashflow-thread` path, stroke only) +
+ * an event lane of per-bucket in/out bars (`cashflow-bar-in` sprout above the
+ * baseline, `cashflow-bar-out` rose below). chart.js is gone — the band is
+ * pure Svelte SVG, so we DOM-assert the thread + bars directly instead of
+ * probing a canvas via `Chart.getChart`.
  *
- * Backend endpoint `GET /api/analytics/monthly-trend/` still drives the data;
- * the `/income-vs-expenses/` endpoint is unchanged but no longer consumed by
- * the analytics page.
- *
- * The trend window is now driven by the shared period pill, NOT the old
- * `?months=N` param. The cashflow chart slices to the months inside the
- * selected date range, so `cashflow-trend-month-count` mirrors that month span:
+ * Backend endpoint `GET /api/analytics/monthly-trend/` drives the data; the
+ * trend window is driven by the shared period pill, NOT the old `?months=N`
+ * param. Finite windows ≤ 62 days request `granularity=day` — the band runs
+ * over day buckets clipped at today (`cashflow-trend-day-count` mirror,
+ * `data-granularity="day"`). Longer windows run month buckets and keep the
+ * `cashflow-trend-month-count` mirror:
  *   • the 6M preset (`period-preset-6m`) → 6 entries;
  *   • a custom range spanning 12 calendar months → 12 entries.
  * (There is no 12M preset — hence the custom range for the 12-month case.)
  *
- * What we validate:
- *   • Cashflow chart renders 6 entries under the 6M preset (per-month count
- *     mirror in hidden DOM — canvas can't be DOM-introspected by Playwright).
- *   • Income + Expenses + Net Balance datasets are all wired in.
- *   • A 12-calendar-month custom range reloads the chart to 12 entries.
+ * What we validate (mirror/granularity/clip semantics are unchanged):
+ *   • This month → daily mode, day-count == TODAY.getDate(), month-count absent.
+ *   • The running-balance thread path renders; in/out bars render for seeded
+ *     active days.
+ *   • 6M preset → 6 month buckets; a 12-calendar-month custom range → 12.
  *   • Empty space surfaces the empty placeholder.
  */
 import { test, expect } from '../../fixtures/index'
@@ -47,8 +48,62 @@ function lastOfThisMonth(): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-test.describe('Analytics cashflow trend chart', () => {
-  test('renders 6 entries under the 6M preset', async ({ page, loggedInPage }) => {
+test.describe('Analytics cashflow band', () => {
+  test('a one-month window renders the thread + in/out bars, clipped at today', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const hh = await api.createSpace('Daily Trend Home')
+
+    // Two days of real activity inside the current month (day 1 is never in
+    // the future; the second row lands on today).
+    const firstOfMonth = `${TODAY.getFullYear()}-${pad2(TODAY.getMonth() + 1)}-01`
+    const todayIso = `${TODAY.getFullYear()}-${pad2(TODAY.getMonth() + 1)}-${pad2(TODAY.getDate())}`
+    await api.createExpense({
+      space: hh.id,
+      description: 'Salary day',
+      amount: 1000,
+      type: 'income',
+      expense_date: firstOfMonth,
+    })
+    await api.createExpense({
+      space: hh.id,
+      description: 'Rent day',
+      amount: 400,
+      type: 'expense',
+      expense_date: todayIso,
+    })
+
+    // Default window = This month (≤ 62 days) → granularity=day.
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
+    await page.waitForLoadState('networkidle')
+
+    const band = page.getByTestId('cashflow-trend')
+    await expect(band).toBeVisible()
+    await expect(band).toHaveAttribute('data-granularity', 'day')
+
+    // Day-count mirror = one bucket per day from the 1st THROUGH TODAY (the
+    // band clips future days); the month-count mirror must NOT exist in daily
+    // mode.
+    await expect(page.getByTestId('cashflow-trend-day-count')).toHaveText(String(TODAY.getDate()))
+    await expect(page.getByTestId('cashflow-trend-month-count')).toHaveCount(0)
+
+    // Real DOM assertions replace the old Chart.getChart canvas probe:
+    // the running-balance thread (a single coin-shine path) is present...
+    const thread = band.getByTestId('cashflow-thread')
+    await expect(thread).toHaveCount(1)
+    // ...and it has a non-empty `d` (a real polyline, not an empty stub).
+    const d = await thread.getAttribute('d')
+    expect(d?.length ?? 0).toBeGreaterThan(0)
+
+    // The income day (Jun 1) draws an in-bar; the expense day (today) draws an
+    // out-bar. Exactly two active days → at least one of each.
+    await expect(band.getByTestId('cashflow-bar-in')).not.toHaveCount(0)
+    await expect(band.getByTestId('cashflow-bar-out')).not.toHaveCount(0)
+  })
+
+  test('renders 6 buckets under the 6M preset', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Trend Home')
 
@@ -64,24 +119,24 @@ test.describe('Analytics cashflow trend chart', () => {
     await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    const trend = page.getByTestId('cashflow-trend')
-    await expect(trend).toBeVisible()
-    await expect(trend.locator('canvas')).toBeVisible()
+    const band = page.getByTestId('cashflow-trend')
+    await expect(band).toBeVisible()
 
     // Drive the 6M preset → the cashflow window spans six calendar months.
     await page.getByTestId('period-preset-6m').click()
     await page.waitForURL(/preset=6m/)
     await page.waitForLoadState('networkidle')
 
-    // Hidden count mirror = number of bars rendered per dataset.
+    // Hidden count mirror = number of month buckets rendered.
+    await expect(page.getByTestId('cashflow-trend')).toHaveAttribute('data-granularity', 'month')
     await expect(page.getByTestId('cashflow-trend-month-count')).toHaveText('6')
   })
 
-  test('income + expenses + net-balance series all wired in', async ({ page, loggedInPage }) => {
+  test('thread + bars render on monthly buckets with income and expenses', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('IvE Home')
 
-    // Seed both income and expense rows so all three series carry real values.
+    // Seed both income and expense rows so both bar directions carry real values.
     await api.createExpense({
       space: hh.id,
       description: 'Salary 1',
@@ -111,36 +166,25 @@ test.describe('Analytics cashflow trend chart', () => {
       expense_date: isoDaysAgo(1),
     })
 
-    // 6M preset → six month entries (the window context for all three series).
+    // 6M preset → six month buckets (the window context for both bar lanes).
     await page.goto(`/dashboard/analytics?space=${hh.id}&preset=6m`)
     await page.waitForLoadState('networkidle')
 
-    const chart = page.getByTestId('cashflow-trend')
-    await expect(chart).toBeVisible()
-    await expect(chart.locator('canvas')).toBeVisible()
-
-    // 6M preset → 6 month entries.
+    const band = page.getByTestId('cashflow-trend')
+    await expect(band).toBeVisible()
+    await expect(band).toHaveAttribute('data-granularity', 'month')
     await expect(page.getByTestId('cashflow-trend-month-count')).toHaveText('6')
 
-    // The chart's legend lives on the canvas overlay — chart.js draws the
-    // dataset labels into the bitmap. We can't DOM-assert the legend text
-    // directly. Probe the live chart instance via Chart.getChart(<canvas>).
-    const labels = await chart.locator('canvas').evaluate((node) => {
-      // @ts-expect-error chart.js attaches a registry helper on the global Chart.
-      const Chart = window.Chart ?? (window as any).ChartJS
-      if (Chart && typeof Chart.getChart === 'function') {
-        const inst = Chart.getChart(node as HTMLCanvasElement)
-        return inst ? inst.data.datasets.map((d: { label?: string }) => d.label ?? '') : []
-      }
-      return []
-    })
-    // If the registry probe found the instance, assert all three datasets are present.
-    if (labels.length > 0) {
-      expect(labels).toEqual(expect.arrayContaining(['Income', 'Expenses', 'Net Balance']))
-    }
+    // Both lanes render real bars (income above the baseline, expenses below) —
+    // the GROWTH band's one visual language, asserted from the DOM instead of a
+    // chart.js canvas probe.
+    await expect(band.getByTestId('cashflow-bar-in')).not.toHaveCount(0)
+    await expect(band.getByTestId('cashflow-bar-out')).not.toHaveCount(0)
+    // The running-balance thread is present too.
+    await expect(band.getByTestId('cashflow-thread')).toHaveCount(1)
   })
 
-  test('a 12-calendar-month custom range reloads the chart to 12 entries', async ({ page, loggedInPage }) => {
+  test('a 12-calendar-month custom range reloads the band to 12 buckets', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Months12 Home')
 
@@ -155,8 +199,7 @@ test.describe('Analytics cashflow trend chart', () => {
 
     // There is no 12M preset — span exactly 12 calendar months via a custom
     // range: date_from = first day 11 months before the current month,
-    // date_to = last day of the current month. monthSpan(from, to) === 12, so
-    // the cashflow chart slices to 12 buckets.
+    // date_to = last day of the current month. monthSpan(from, to) === 12.
     const dateFrom = firstOfMonthsAgo(11)
     const dateTo = lastOfThisMonth()
     await page.goto(
@@ -165,6 +208,7 @@ test.describe('Analytics cashflow trend chart', () => {
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('cashflow-trend')).toBeVisible()
+    await expect(page.getByTestId('cashflow-trend')).toHaveAttribute('data-granularity', 'month')
     await expect(page.getByTestId('cashflow-trend-month-count')).toHaveText('12')
   })
 

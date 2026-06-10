@@ -64,7 +64,7 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     await page.waitForLoadState('networkidle')
 
     // Page heading still rendered — no crash.
-    await expect(page.locator('h1.page-title')).toHaveText('Analytics')
+    await expect(page.locator('.analytics-page h1')).toHaveText('Analytics')
     expect(jsErrors).toEqual([])
 
     // The archived id must NOT be a "live" filter. The user (archived-only)

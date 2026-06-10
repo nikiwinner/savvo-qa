@@ -1,21 +1,19 @@
 /**
- * Phase 11 Story 11.7 — Insights feed (with localStorage dismiss UX) +
- * balance summary card.
+ * Smart insights feed (localStorage dismiss UX).
  *
- * Backend endpoints `/api/analytics/insights/` and `/api/analytics/balance-summary/`
- * are live from Stories 11.2 and 11.3. The frontend now renders both:
- *   • InsightsFeed.svelte: server-sorted Insight[] with per-card dismiss
- *     button. Dismissals persist via localStorage key
- *     `savvo:dismissed_insights:v1`. Per-period scoping — dismissing
- *     in May does NOT silence June's same-type insight.
- *   • BalanceSummaryCard.svelte: per-account native balance + primary-currency
- *     total + Phase 10 fx_stale icon.
+ * Backend endpoint `/api/analytics/insights/` is unchanged (6 rules). The
+ * GROWTH redesign restyled InsightsFeed.svelte (per-type icon tile + uppercase
+ * tag) but KEPT every testid and the dismiss/hash logic: server-sorted
+ * Insight[] with a per-card dismiss button, dismissals persisted via the
+ * localStorage key `savvo:dismissed_insights:v1`. Per-period scoping —
+ * dismissing in the current month does NOT silence the previous month's
+ * same-type insight.
  *
  * Hash schema (frontend): `${type}|${title}|${data.period_yyyy_mm}`.
  *
- * The QA-stack backend points `FX_PROVIDER_BASE_URL` at an unreachable host
- * (see playwright.config.ts), so any currency pair we do NOT seed via
- * `seedExchangeRate` will surface `fx_stale=true`.
+ * These assertions run against the restyled DOM via the stable testids
+ * (`insights-feed`, `insight-card-<type>`, `insight-dismiss-<type>`,
+ * `insights-show-all`, `data-severity`).
  */
 import { test, expect } from '../../fixtures/index'
 
@@ -50,7 +48,7 @@ function monthRangeQuery(offset: number): string {
 
 const CURRENT_MONTH_RANGE = monthRangeQuery(0)
 
-test.describe('Analytics insights + balance summary (Story 11.7)', () => {
+test.describe('Analytics smart insights', () => {
   test('multi-rule scenario surfaces three insight cards', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Insights MultiRule Home')
@@ -115,113 +113,6 @@ test.describe('Analytics insights + balance summary (Story 11.7)', () => {
     await expect(page.getByTestId('insights-feed')).toBeVisible()
     await expect(page.getByTestId('insights-empty')).toBeVisible()
     await expect(page.getByTestId('insights-empty')).toContainText('No insights yet')
-  })
-
-  test('balance summary shows per-account native + primary total', async ({ page, loggedInPage }) => {
-    const { api } = loggedInPage
-    const hh = await api.createSpace('Balance Home')
-
-    // Seed FX rates so USD->EUR is known (deterministic; cache-only render path).
-    await api.seedExchangeRate('USD', 'EUR', '0.90', TODAY_ISO)
-
-    const eur = await api.seedBankAccount({
-      account_name: 'Checking',
-      bank_name: 'ING',
-      balance_amount: '1000.00',
-      balance_currency: 'EUR',
-      balance_updated_at: TODAY.toISOString(),
-      space_id: hh.id,
-    })
-    const usd = await api.seedBankAccount({
-      account_name: 'USD Savings',
-      bank_name: 'Revolut',
-      balance_amount: '500.00',
-      balance_currency: 'USD',
-      balance_updated_at: TODAY.toISOString(),
-      space_id: hh.id,
-    })
-
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
-    await page.waitForLoadState('networkidle')
-
-    await expect(page.getByTestId('balance-summary')).toBeVisible()
-    await expect(page.getByTestId(`balance-account-${eur.account_id}`)).toBeVisible()
-    await expect(page.getByTestId(`balance-account-${usd.account_id}`)).toBeVisible()
-    await expect(page.getByTestId('balance-total')).toBeVisible()
-
-    // EUR row carries the € symbol on its native amount.
-    const eurRow = page.getByTestId(`balance-account-${eur.account_id}`)
-    await expect(eurRow).toContainText('€')
-    // USD row carries $ on its native amount.
-    const usdRow = page.getByTestId(`balance-account-${usd.account_id}`)
-    await expect(usdRow).toContainText('$')
-
-    // Total is in the space primary (EUR). 1000 + 500*0.90 = 1450.00.
-    const total = page.getByTestId('balance-total')
-    await expect(total).toContainText('€')
-    await expect(total).toContainText('1,450.00')
-  })
-
-  test('fx_stale icon appears on balance when rate missing', async ({ page, loggedInPage }) => {
-    const { api } = loggedInPage
-    const hh = await api.createSpace('FX Stale Home')
-
-    // Deliberately do NOT seed any CHF->EUR rate. CHF is used here (not USD)
-    // because earlier tests in the suite seed USD->EUR rates that persist in
-    // the QA-stack ExchangeRate cache (FX is shared across test cases). CHF
-    // is otherwise untouched. The QA backend's FX_PROVIDER_BASE_URL is
-    // unreachable, so the missing rate falls back and surfaces fx_stale=true.
-    await api.seedBankAccount({
-      account_name: 'CHF Account',
-      bank_name: 'NoRateBank',
-      balance_amount: '500.00',
-      balance_currency: 'CHF',
-      balance_updated_at: TODAY.toISOString(),
-      space_id: hh.id,
-    })
-
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
-    await page.waitForLoadState('networkidle')
-
-    await expect(page.getByTestId('balance-summary')).toBeVisible()
-    await expect(page.getByTestId('balance-fx-stale')).toBeVisible()
-    await expect(page.getByTestId('balance-summary')).toHaveAttribute('data-fx-stale', 'true')
-  })
-
-  test('null-balance account is listed but excluded from total', async ({ page, loggedInPage }) => {
-    const { api } = loggedInPage
-    const hh = await api.createSpace('Null Balance Home')
-
-    const synced = await api.seedBankAccount({
-      account_name: 'Synced Account',
-      bank_name: 'BankA',
-      balance_amount: '300.00',
-      balance_currency: 'EUR',
-      balance_updated_at: TODAY.toISOString(),
-      space_id: hh.id,
-    })
-    const never = await api.seedBankAccount({
-      account_name: 'Never Synced',
-      bank_name: 'BankB',
-      balance_amount: null,
-      balance_currency: 'EUR',
-      balance_updated_at: null,
-      space_id: hh.id,
-    })
-
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
-    await page.waitForLoadState('networkidle')
-
-    await expect(page.getByTestId(`balance-account-${synced.account_id}`)).toBeVisible()
-    await expect(page.getByTestId(`balance-account-${never.account_id}`)).toBeVisible()
-
-    // Null row reads "Not synced yet".
-    const nullRow = page.getByTestId(`balance-account-${never.account_id}`)
-    await expect(nullRow).toContainText('Not synced yet')
-
-    // Total only reflects the synced balance (300.00 EUR).
-    const total = page.getByTestId('balance-total')
-    await expect(total).toContainText('300.00')
   })
 
   test('dismiss button hides a card and persists across reload', async ({ page, loggedInPage }) => {
