@@ -366,11 +366,11 @@ test.describe('Spaces lifecycle — archive / restore / delete (Phase 12)', () =
     await spaces.goto()
     await spaces.archiveSpace('Soon Archived')
 
-    // Open the analytics SpaceFilter modal — this is the canonical
-    // multi-space "switcher" surfaced in the UI. It reads `parentData.spaces`
-    // (active-only after Story 12.3 list filter), so the archived space must
-    // not show up.
-    await page.goto('/dashboard/analytics')
+    // Open the dashboard SpaceFilter modal — this is the canonical multi-space
+    // "switcher" surfaced in the UI. It reads `parentData.spaces` (active-only
+    // after Story 12.3 list filter), so the archived space must not show up.
+    // Phase 17 merged the analytics surface into the main /dashboard.
+    await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
     await page.getByTestId('space-filter-trigger').click()
     const modal = page.getByTestId('space-filter-modal')

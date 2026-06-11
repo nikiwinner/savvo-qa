@@ -1,10 +1,16 @@
 /**
- * Dashboard — Period selector (user review 2026-06-02)
+ * Period selector driving the per-space summary cards (Phase 17, Story 17.3 —
+ * the cards + period pill moved from the old `/dashboard` root to
+ * `/dashboard/spaces`).
  *
- * The dashboard is driven by a single period window (preset chips + custom day
- * range). The per-space summary cards and the period-scoped transaction count
- * reflect the chosen window, and each card figure deep-links to a feed query
- * that sums to it for that window (no-fake-numbers gate).
+ * The Spaces page is driven by a single period window (preset chips + custom day
+ * range). Each per-space summary card's Income/Expense/Net reflects the chosen
+ * window, and each card figure deep-links to a feed query that sums to it for
+ * that window (no-fake-numbers gate).
+ *
+ * NOTE the shared period pill also exists on the main `/dashboard` (where it
+ * drives the analytics KPI/cashflow — covered by analytics/dashboard specs);
+ * here we cover the pill driving the Spaces card numbers.
  *
  * Everything is seeded in EUR (default User.currency) so figures equal native
  * amounts with no FX conversion.
@@ -37,7 +43,7 @@ async function pickCustomDay(page: Page, panel: Locator, field: 'From' | 'To', d
   await picker.locator('.dp-dropdown').waitFor({ state: 'hidden' })
 }
 
-test.describe('Dashboard period selector', () => {
+test.describe('Spaces page period selector', () => {
   test('defaults to this month; the "All" preset widens the window', async ({
     page,
     loggedInPage,
@@ -48,7 +54,7 @@ test.describe('Dashboard period selector', () => {
     await api.createExpense({ space: space.id, description: 'PS-PREV', amount: 50, expense_date: PREV_MID })
 
     const dashboard = new DashboardPage(page)
-    await dashboard.goto()
+    await dashboard.gotoSpaces()
 
     // Default (no preset) → this month only → 100.
     await expect(dashboard.periodPreset('month')).toHaveAttribute('aria-pressed', 'true')
@@ -60,23 +66,6 @@ test.describe('Dashboard period selector', () => {
     await expect(dashboard.summaryOutflow()).toContainText('150.00')
   })
 
-  test('transactions count is scoped to the selected period', async ({ page, loggedInPage }) => {
-    const { api } = loggedInPage
-    const space = await api.createSpace('Count Space')
-    await api.createExpense({ space: space.id, description: 'C-THIS-1', amount: 10, expense_date: THIS_MID })
-    await api.createExpense({ space: space.id, description: 'C-THIS-2', amount: 20, expense_date: THIS_MID })
-    await api.createExpense({ space: space.id, description: 'C-PREV', amount: 30, expense_date: PREV_MID })
-
-    const dashboard = new DashboardPage(page)
-    await dashboard.goto()
-
-    await expect(dashboard.totalTransactions()).toHaveText('2') // this month
-
-    await dashboard.periodPreset('all').click()
-    await page.waitForLoadState('networkidle')
-    await expect(dashboard.totalTransactions()).toHaveText('3') // all time
-  })
-
   test('a custom day range filters the summary cards', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const space = await api.createSpace('Custom Space')
@@ -84,12 +73,12 @@ test.describe('Dashboard period selector', () => {
     await api.createExpense({ space: space.id, description: 'CR-LATE', amount: 22, expense_date: `${CURRENT_MONTH}-25` })
 
     const dashboard = new DashboardPage(page)
-    await dashboard.goto()
+    await dashboard.gotoSpaces()
     // Default this month → both days → 33.
     await expect(dashboard.summaryOutflow()).toContainText('33.00')
 
     // Custom range covering only the early day.
-    await page.goto(`/dashboard?preset=custom&date_from=${CURRENT_MONTH}-01&date_to=${CURRENT_MONTH}-10`)
+    await page.goto(`/dashboard/spaces?preset=custom&date_from=${CURRENT_MONTH}-01&date_to=${CURRENT_MONTH}-10`)
     await page.waitForLoadState('networkidle')
     await expect(dashboard.periodPreset('custom')).toHaveAttribute('aria-pressed', 'true')
     await expect(dashboard.summaryOutflow()).toContainText('11.00')
@@ -108,7 +97,7 @@ test.describe('Dashboard period selector', () => {
     const dashboard = new DashboardPage(page)
     // Custom range covering only day 10 → card outflow = 18 (day 20 excluded).
     await page.goto(
-      `/dashboard?space=${space.id}&preset=custom&date_from=${CURRENT_MONTH}-01&date_to=${CURRENT_MONTH}-15`,
+      `/dashboard/spaces?space=${space.id}&preset=custom&date_from=${CURRENT_MONTH}-01&date_to=${CURRENT_MONTH}-15`,
     )
     await page.waitForLoadState('networkidle')
     await expect(dashboard.summaryOutflow()).toContainText('18.00')
@@ -137,7 +126,7 @@ test.describe('Dashboard period selector', () => {
     await api.createExpense({ space: space.id, description: 'CC-LATE', amount: 28, expense_date: `${CURRENT_MONTH}-25` })
 
     const dashboard = new DashboardPage(page)
-    await dashboard.goto()
+    await dashboard.gotoSpaces()
     // Default this month → both days → 42.
     await expect(dashboard.summaryOutflow()).toContainText('42.00')
 
@@ -178,7 +167,7 @@ test.describe('Dashboard period selector', () => {
     // produces an identical URL — the component must still invalidate (refresh)
     // rather than silently no-op.
     await page.goto(
-      `/dashboard?space=${space.id}&preset=custom&date_from=${CURRENT_MONTH}-01&date_to=${CURRENT_MONTH}-10`,
+      `/dashboard/spaces?space=${space.id}&preset=custom&date_from=${CURRENT_MONTH}-01&date_to=${CURRENT_MONTH}-10`,
     )
     await page.waitForLoadState('networkidle')
     await expect(dashboard.summaryOutflow()).toContainText('9.00')

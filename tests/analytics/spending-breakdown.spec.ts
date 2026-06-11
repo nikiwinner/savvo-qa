@@ -76,7 +76,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const panel = page.getByTestId('breakdown-panel')
@@ -125,7 +125,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     // Full row text formatting: currency symbol + exact two-decimal amount
@@ -156,7 +156,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
     await api.createExpense({ space: hh.id, description: 'tiny a', amount: 0.5, category: tiny1.id, expense_date: TODAY_ISO })
     await api.createExpense({ space: hh.id, description: 'tiny b', amount: 0.5, category: tiny2.id, expense_date: TODAY_ISO })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const panel = page.getByTestId('breakdown-panel')
@@ -202,7 +202,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const total = page.getByTestId('breakdown-total')
@@ -213,8 +213,14 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
     await expect(page.getByTestId('breakdown-type-expense')).toHaveAttribute('aria-selected', 'true')
 
     // Flip to Income → URL gains ?donut_type=income and the page reloads.
-    await page.getByTestId('breakdown-type-income').click()
-    await page.waitForURL(/donut_type=income/)
+    // Click + URL-commit retried as ONE unit: under full-matrix load the click
+    // can land pre-hydration, so the client-side goto never starts and a bare
+    // waitForURL eats the whole test budget (diagnosed 2026-06-11 — infra-load
+    // tail, not an app bug).
+    await expect(async () => {
+      await page.getByTestId('breakdown-type-income').click()
+      await page.waitForURL(/donut_type=income/, { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
     await page.waitForLoadState('networkidle')
 
     expect(page.url()).toContain('donut_type=income')
@@ -226,9 +232,18 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
 
     // Flip back to Expenses → ?donut_type drops out of the URL. Wait on the
     // URL itself, not networkidle — the client-side goto starts async and
-    // networkidle can resolve before the navigation begins (race).
-    await page.getByTestId('breakdown-type-expense').click()
-    await page.waitForURL((u) => !u.searchParams.has('donut_type'))
+    // networkidle can resolve before the navigation begins (race). The
+    // committed-UI assertion (aria-selected) anchors the wait, because the
+    // URL predicate ("no donut_type") is also true pre-click and can't
+    // distinguish "navigated back" from "goto never fired". Click + commit
+    // retried as ONE unit (same pre-hydration tail as above).
+    await expect(async () => {
+      await page.getByTestId('breakdown-type-expense').click()
+      await expect(page.getByTestId('breakdown-type-expense')).toHaveAttribute('aria-selected', 'true', {
+        timeout: 2_000,
+      })
+      await page.waitForURL((u) => !u.searchParams.has('donut_type'), { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
     await page.waitForLoadState('networkidle')
     expect(page.url()).not.toContain('donut_type=income')
     await expect(page.getByTestId('breakdown-total')).toContainText('total spent')
@@ -255,7 +270,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}&donut_type=income`)
+    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}&donut_type=income`)
     await page.waitForLoadState('networkidle')
 
     const panel = page.getByTestId('breakdown-panel')
@@ -282,7 +297,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
 
     // No expenses seeded. Use a date range far in the past where nothing exists.
     await page.goto(
-      `/dashboard/analytics?space=${hh.id}&preset=custom&date_from=2000-01-01&date_to=2000-01-31`,
+      `/dashboard?space=${hh.id}&preset=custom&date_from=2000-01-01&date_to=2000-01-31`,
     )
     await page.waitForLoadState('networkidle')
 

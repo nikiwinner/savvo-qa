@@ -1,12 +1,16 @@
 /**
- * Phase 15 — Stories 15.3 / 15.5: per-space summary cards + in/out bar.
+ * Per-space summary numbers on the Spaces management page (Phase 17, Story 17.3
+ * — moved here from the old `/dashboard` root). Each active space card carries
+ * its real Income/Expense/Net for the chosen period, built on
+ * `GET /api/spaces/summary/`: figures as real period sums, the no-fake-numbers
+ * deep-link gate (card figure → the transactions page whose totals strip == the
+ * figure), allocation-aware split attribution across cards, foreign-space silent
+ * drop, and the InOutBar visual (proportional segments + neutral empty state).
  *
- * Covers the `/dashboard` per-space Income/Expense/Net summary cards built on
- * `GET /api/spaces/summary/` (contract B): one card per in-scope space, figures
- * as real period sums, the no-fake-numbers deep-link gate (card figure → the
- * transactions page whose totals strip == the figure), allocation-aware split
- * attribution across cards, foreign-space silent-drop, and the InOutBar visual
- * (proportional segments + neutral empty state).
+ * Phase 17: the figures live INSIDE the existing space management cards
+ * (`.space-card[data-space-id=...]`, NOT a standalone `space-summary-card`); the
+ * `summary-figure-*` / `inout-bar` figure testids are unchanged. The card TITLE
+ * links to `/dashboard?space=<id>` (the merged dashboard scoped to one space).
  *
  * The summary endpoint defaults to the CURRENT MONTH, so every seeded row is
  * dated this month. Everything is EUR (default User.currency) → no FX, sums are
@@ -19,10 +23,10 @@ const CURRENT_MONTH = `${NOW.getFullYear()}-${String(NOW.getMonth() + 1).padStar
 const MID_MONTH = `${CURRENT_MONTH}-15`
 
 const cards = (page: import('@playwright/test').Page) =>
-  page.locator('[data-testid="space-summary-card"]')
+  page.locator('.space-card')
 
 const cardFor = (page: import('@playwright/test').Page, spaceId: number) =>
-  page.locator(`[data-testid="space-summary-card"][data-space-id="${spaceId}"]`)
+  page.locator(`.space-card[data-space-id="${spaceId}"]`)
 
 /** Parse a money figure like "€1,234.56" / "-€12.00" → number. */
 function parseMoney(text: string): number {
@@ -30,7 +34,7 @@ function parseMoney(text: string): number {
   return Number(cleaned)
 }
 
-test.describe('Per-space summary cards', () => {
+test.describe('Per-space summary cards (Spaces page)', () => {
   test('one card per space in the ?space= scope', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const a = await api.createSpace('Summary Scope A')
@@ -38,13 +42,15 @@ test.describe('Per-space summary cards', () => {
     const c = await api.createSpace('Summary Scope C')
 
     // Select only A and B via ?space=.
-    await page.goto(`/dashboard?space=${a.id},${b.id}`)
+    await page.goto(`/dashboard/spaces?space=${a.id},${b.id}`)
     await page.waitForLoadState('networkidle')
 
-    await expect(cardFor(page, a.id)).toBeVisible()
-    await expect(cardFor(page, b.id)).toBeVisible()
-    await expect(cardFor(page, c.id)).toHaveCount(0)
-    await expect(cards(page)).toHaveCount(2)
+    // The summary endpoint is scoped to A and B → only their cards carry
+    // numbers. C is still a managed space (it shows as a card) but has no
+    // summary figures for this scope.
+    await expect(cardFor(page, a.id).locator('[data-testid="summary-figure-net"]')).toBeVisible()
+    await expect(cardFor(page, b.id).locator('[data-testid="summary-figure-net"]')).toBeVisible()
+    await expect(cardFor(page, c.id).locator('[data-testid="summary-figure-net"]')).toHaveCount(0)
   })
 
   test('card shows Income / Expense / Net as sums of real rows', async ({
@@ -60,7 +66,7 @@ test.describe('Per-space summary cards', () => {
     await api.createExpense({ space: space.id, description: 'exp-1', amount: 30, type: 'expense', expense_date: MID_MONTH })
     await api.createExpense({ space: space.id, description: 'exp-2', amount: 25, type: 'expense', expense_date: MID_MONTH })
 
-    await page.goto(`/dashboard?space=${space.id}`)
+    await page.goto(`/dashboard/spaces?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const card = cardFor(page, space.id)
@@ -93,7 +99,7 @@ test.describe('Per-space summary cards', () => {
     // income = 7 (must NOT be in the expense deep-link total)
     await api.createExpense({ space: space.id, description: 'dl-inc-1', amount: 7, type: 'income', expense_date: MID_MONTH })
 
-    await page.goto(`/dashboard?space=${space.id}`)
+    await page.goto(`/dashboard/spaces?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const card = cardFor(page, space.id)
@@ -138,7 +144,7 @@ test.describe('Per-space summary cards', () => {
       { space_id: b.id, amount: '30.00' },
     ])
 
-    await page.goto(`/dashboard?space=${a.id},${b.id}`)
+    await page.goto(`/dashboard/spaces?space=${a.id},${b.id}`)
     await page.waitForLoadState('networkidle')
 
     const cardA = cardFor(page, a.id)
@@ -155,7 +161,7 @@ test.describe('Per-space summary cards', () => {
     let strip = parseMoney(await page.locator('.summary-strip .stat-expense .stat-value').innerText())
     expect(strip).toBeCloseTo(70, 2)
 
-    await page.goto(`/dashboard?space=${a.id},${b.id}`)
+    await page.goto(`/dashboard/spaces?space=${a.id},${b.id}`)
     await page.waitForLoadState('networkidle')
     await cardB.locator('[data-testid="summary-figure-outflow"]').click()
     await page.waitForURL(/\/dashboard\/transactions\?/)
@@ -178,13 +184,86 @@ test.describe('Per-space summary cards', () => {
     await page.context().addCookies(cookiesA)
 
     // A asks for their own space AND user B's foreign space id.
-    await page.goto(`/dashboard?space=${a.id},${foreign.id}`)
+    await page.goto(`/dashboard/spaces?space=${a.id},${foreign.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(cardFor(page, a.id)).toBeVisible()
-    // The foreign id is silently dropped — no card for it.
+    // The foreign id is silently dropped — no card for it (A doesn't manage it).
     await expect(cardFor(page, foreign.id)).toHaveCount(0)
+    // A manages exactly one space → exactly one management card.
     await expect(cards(page)).toHaveCount(1)
+  })
+
+  test('the card title drill-links to the scoped dashboard', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const space = await api.createSpace('Drilldown Space')
+    await api.createExpense({ space: space.id, description: 'dd-exp', amount: 42, type: 'expense', expense_date: MID_MONTH })
+
+    await page.goto('/dashboard/spaces')
+    await page.waitForLoadState('networkidle')
+
+    const card = cardFor(page, space.id)
+    const title = card.locator('a.space-title')
+    // The title links to /dashboard scoped to this one space.
+    await expect(title).toHaveAttribute('href', `/dashboard?space=${space.id}`)
+
+    await title.click()
+    await page.waitForURL(new RegExp(`/dashboard\\?space=${space.id}`))
+    expect(page.url()).toContain(`space=${space.id}`)
+  })
+
+  test('the period selector re-scopes the card numbers', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    const space = await api.createSpace('Period Rescope Space')
+    // This month → 100; previous month → 50.
+    const prev = new Date(NOW.getFullYear(), NOW.getMonth() - 1, 15)
+    const PREV_MID = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-15`
+    await api.createExpense({ space: space.id, description: 'PR-THIS', amount: 100, type: 'expense', expense_date: MID_MONTH })
+    await api.createExpense({ space: space.id, description: 'PR-PREV', amount: 50, type: 'expense', expense_date: PREV_MID })
+
+    await page.goto(`/dashboard/spaces?space=${space.id}`)
+    await page.waitForLoadState('networkidle')
+
+    const card = cardFor(page, space.id)
+    // Default this month → 100.
+    await expect(card.locator('[data-testid="summary-figure-outflow"] .figure-value')).toContainText('100.00')
+
+    // Switch the period to "All" → both months fold in → 150.
+    await page.getByTestId('period-preset-all').click()
+    await page.waitForLoadState('networkidle')
+    await expect(card.locator('[data-testid="summary-figure-outflow"] .figure-value')).toContainText('150.00')
+  })
+
+  test('archived spaces show no summary figures on the active grid', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const active = await api.createSpace('Active Numbers Space')
+    const willArchive = await api.createSpace('Archived No Numbers Space')
+    await api.createExpense({ space: active.id, description: 'an-exp', amount: 20, type: 'expense', expense_date: MID_MONTH })
+    await api.createExpense({ space: willArchive.id, description: 'aw-exp', amount: 99, type: 'expense', expense_date: MID_MONTH })
+
+    // Archive the second space via the API.
+    const csrf = (await api.cookies()).find((c) => c.name === 'csrftoken')?.value ?? ''
+    const backend = process.env.BACKEND_URL ?? 'http://localhost:8001'
+    const res = await page.request.post(`${backend}/api/spaces/${willArchive.id}/archive/`, {
+      headers: { 'X-CSRFToken': csrf },
+    })
+    expect(res.ok()).toBeTruthy()
+
+    await page.goto('/dashboard/spaces')
+    await page.waitForLoadState('networkidle')
+
+    // The archived space isn't on the active grid at all (list excludes it).
+    await expect(cardFor(page, willArchive.id)).toHaveCount(0)
+    // The active space still carries its figure.
+    await expect(
+      cardFor(page, active.id).locator('[data-testid="summary-figure-outflow"] .figure-value'),
+    ).toContainText('20.00')
   })
 
   test('in/out bar segments are proportional to the card inflow/outflow', async ({
@@ -197,7 +276,7 @@ test.describe('Per-space summary cards', () => {
     await api.createExpense({ space: space.id, description: 'bar-inc', amount: 90, type: 'income', expense_date: MID_MONTH })
     await api.createExpense({ space: space.id, description: 'bar-exp', amount: 30, type: 'expense', expense_date: MID_MONTH })
 
-    await page.goto(`/dashboard?space=${space.id}`)
+    await page.goto(`/dashboard/spaces?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const card = cardFor(page, space.id)
@@ -235,7 +314,7 @@ test.describe('Per-space summary cards', () => {
     await api.createExpense({ space: space.id, description: 'bdl-inc-1', amount: 80, type: 'income', expense_date: MID_MONTH })
     await api.createExpense({ space: space.id, description: 'bdl-exp-1', amount: 20, type: 'expense', expense_date: MID_MONTH })
 
-    await page.goto(`/dashboard?space=${space.id}`)
+    await page.goto(`/dashboard/spaces?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const card = cardFor(page, space.id)
@@ -266,7 +345,7 @@ test.describe('Per-space summary cards', () => {
     const space = await api.createSpace('Empty Bar Space')
     // No transactions seeded → inflow 0, outflow 0.
 
-    await page.goto(`/dashboard?space=${space.id}`)
+    await page.goto(`/dashboard/spaces?space=${space.id}`)
     await page.waitForLoadState('networkidle')
 
     const card = cardFor(page, space.id)

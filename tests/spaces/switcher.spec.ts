@@ -66,7 +66,7 @@ test.describe('Active space context', () => {
     await expect(spaceSelect).toHaveValue(String(h2.id))
   })
 
-  test('dashboard stats reflect the active space', async ({ page, loggedInPage }) => {
+  test('per-space summary figures reflect the active space', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const h1 = await api.createSpace('Stats House A')
     const h2 = await api.createSpace('Stats House B')
@@ -76,11 +76,13 @@ test.describe('Active space context', () => {
 
     const dashboard = new DashboardPage(page)
 
-    // Navigate to dashboard with h1 active
-    await page.goto(`/dashboard?space=${h1.id}`)
+    // The per-space summary figures live on the Spaces page after Phase 17
+    // (the merged /dashboard is the analytics surface). ?space= scoping still
+    // drives the summary fetch there.
+    await page.goto(`/dashboard/spaces?space=${h1.id}`)
     await page.waitForLoadState('networkidle')
 
-    // Scoped to h1 → only h1's summary card renders; its expense figure is 500.
+    // Scoped to h1 → only h1's card carries figures; its expense figure is 500.
     await expect(dashboard.summaryOutflow()).toContainText('500')
     await expect(dashboard.summaryOutflow()).not.toContainText('999')
   })

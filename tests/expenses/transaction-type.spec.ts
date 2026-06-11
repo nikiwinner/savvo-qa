@@ -112,14 +112,15 @@ test.describe('Transaction type (income vs expense)', () => {
     await expect(editModal.locator('input[name="type"][value="expense"]')).not.toBeChecked()
   })
 
-  test('dashboard stats differentiate income and expense', async ({ page, loggedInPage }) => {
+  test('per-space summary figures differentiate income and expense', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Stats Split Home')
     await api.createExpense({ space: hh.id, description: 'Paycheck', amount: 2000, type: 'income', expense_date: TODAY })
     await api.createExpense({ space: hh.id, description: 'Groceries', amount: 150, type: 'expense', expense_date: TODAY })
 
     const dashboard = new DashboardPage(page)
-    await dashboard.goto()
+    // The per-space summary card lives on the Spaces page after Phase 17.
+    await dashboard.gotoSpaces()
 
     // The per-space summary card splits income vs expense (current-month default).
     // Figures render with thousands separators (e.g. €2,000.00).

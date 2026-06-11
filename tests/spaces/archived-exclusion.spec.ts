@@ -2,14 +2,16 @@
  * Spaces — Archived excluded from ALL active read surfaces (Phase 12 Story 12.4)
  *
  * Archive must hide the space from every default active surface — selectors,
- * analytics, expenses list, dashboard summary totals — while staying queryable
+ * analytics, expenses list, per-space summary cards — while staying queryable
  * via `?archived=true` (Story 12.3) so the dedicated Archived view + restore
  * keep working. Restore reverses all of it.
  *
- * The analytics endpoints are stricter than the expenses + dashboard-totals
- * pair: a comma list with ANY archived id returns 403 (cite the archived id)
- * rather than silently dropping it. Expenses + dashboard-totals match the
- * non-member-id rule (silent drop).
+ * The analytics endpoints are stricter than the expenses + spaces/summary pair:
+ * a comma list with ANY archived id returns 403 (cite the archived id) rather
+ * than silently dropping it. Expenses + spaces/summary match the non-member-id
+ * rule (silent drop). (The `GET /api/dashboard/totals/` endpoint was removed in
+ * Phase 17 — the per-space numbers come from `GET /api/spaces/summary/`, now
+ * rendered on the Spaces management page.)
  */
 import { test, expect } from '../../fixtures/index'
 
@@ -60,11 +62,12 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     const jsErrors: string[] = []
     page.on('pageerror', (err) => jsErrors.push(err.message))
 
-    await page.goto(`/dashboard/analytics?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
-    // Page heading still rendered — no crash.
-    await expect(page.locator('.analytics-page h1')).toHaveText('Analytics')
+    // Page heading still rendered — no crash. Phase 17: the analytics surface IS
+    // the main /dashboard, retitled "Dashboard".
+    await expect(page.locator('.analytics-page h1')).toHaveText('Dashboard')
     expect(jsErrors).toEqual([])
 
     // The archived id must NOT be a "live" filter. The user (archived-only)
@@ -76,12 +79,13 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     // Section-error placeholders only render when `hasSpace=true` AND a
     // section's `loadErrors[key]` is populated — this archived-only flow
     // doesn't reach that branch. What we care about is graceful degradation,
-    // proven by: (1) no JS crash, (2) page title rendered, (3) explicit
-    // "no space selected" empty-state copy in the context line.
+    // proven by: (1) no JS crash, (2) page title rendered, (3) the empty-space
+    // context-line copy. Phase 17 reworded the merged-dashboard no-space copy
+    // to "Set up a space to see your dashboard." (was "No space selected").
     const contextLine = page.getByTestId('analytics-context-line')
     await expect(contextLine).toBeVisible()
     const contextText = (await contextLine.textContent()) ?? ''
-    expect(contextText.toLowerCase()).toContain('no space selected')
+    expect(contextText.toLowerCase()).toContain('set up a space')
 
     // Belt-and-suspenders: NO KPI cards rendered (they only appear when
     // hasSpace=true) — guarantees there's no live "data" being shown for the
@@ -111,7 +115,7 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     expect(archiveRes.ok()).toBeTruthy()
 
     // After archive: the SpaceFilter modal must not show H1.
-    await page.goto('/dashboard/analytics')
+    await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
     await page.getByTestId('space-filter-trigger').click()
     let modal = page.getByTestId('space-filter-modal')
@@ -127,9 +131,9 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     })
     expect(restoreRes.ok()).toBeTruthy()
 
-    // After restore: H1 is in the SpaceFilter, and analytics renders its
+    // After restore: H1 is in the SpaceFilter, and the dashboard renders its
     // sections without error placeholders.
-    await page.goto(`/dashboard/analytics?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await page.getByTestId('space-filter-trigger').click()
@@ -172,23 +176,27 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     await expect(page.locator('tbody tr', { hasText: 'Drop From List' })).not.toBeVisible()
   })
 
-  test('archived space drops out of the dashboard summary cards', async ({ page, loggedInPage }) => {
+  test('archived space drops out of the Spaces summary cards', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const h1 = await api.createSpace('Totals Archive H1')
     const h2 = await api.createSpace('Totals Active H2')
 
-    // H1 → 100 income + 30 expense. H2 → 5 income + 1 expense. The dashboard's
-    // money display is the per-space summary card; archiving H1 removes its card.
+    // H1 → 100 income + 30 expense. H2 → 5 income + 1 expense. Phase 17 moved
+    // the per-space summary numbers onto the Spaces management cards
+    // (/dashboard/spaces); archiving H1 removes its card (the list endpoint
+    // default-excludes archived).
     await api.createExpense({ space: h1.id, description: 'H1 Income', amount: 100, type: 'income', expense_date: TODAY_ISO })
     await api.createExpense({ space: h1.id, description: 'H1 Expense', amount: 30, expense_date: TODAY_ISO })
     await api.createExpense({ space: h2.id, description: 'H2 Income', amount: 5, type: 'income', expense_date: TODAY_ISO })
     await api.createExpense({ space: h2.id, description: 'H2 Expense', amount: 1, expense_date: TODAY_ISO })
 
-    const h1Card = page.locator(`[data-testid="space-summary-card"][data-space-id="${h1.id}"]`)
-    const h2Card = page.locator(`[data-testid="space-summary-card"][data-space-id="${h2.id}"]`)
+    // The summary numbers live inside the management card (.space-card keyed by
+    // data-space-id); the figure testids are unchanged.
+    const h1Card = page.locator(`.space-card[data-space-id="${h1.id}"]`)
+    const h2Card = page.locator(`.space-card[data-space-id="${h2.id}"]`)
 
     // Before archive: both spaces have a card (data dated today → this-month default).
-    await page.goto('/dashboard')
+    await page.goto('/dashboard/spaces')
     await page.waitForLoadState('networkidle')
     await expect(h1Card).toBeVisible()
     await expect(h2Card).toBeVisible()
@@ -202,8 +210,8 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     })
     expect(archiveRes.ok()).toBeTruthy()
 
-    // After archive: H1's card is gone; H2's remains.
-    await page.goto('/dashboard')
+    // After archive: H1's card is gone from the active grid; H2's remains.
+    await page.goto('/dashboard/spaces')
     await page.waitForLoadState('networkidle')
     await expect(h1Card).toHaveCount(0)
     await expect(h2Card).toBeVisible()
@@ -215,7 +223,7 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     })
     expect(restoreRes.ok()).toBeTruthy()
 
-    await page.goto('/dashboard')
+    await page.goto('/dashboard/spaces')
     await page.waitForLoadState('networkidle')
     await expect(h1Card).toBeVisible()
     await expect(h1Card.locator('[data-testid="summary-figure-inflow"] .figure-value')).toContainText('100')

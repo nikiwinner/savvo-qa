@@ -1,19 +1,24 @@
 /**
- * Dashboard — Totals FX (Phase 10, Story 10.6)
+ * Per-space summary FX rendering (Phase 10 Story 10.6, re-homed by Phase 17).
  *
- * Covers `/dashboard` rendering of the FX-aware summary cards backed by
- * `GET /api/dashboard/totals/`. The QA backend points `FX_PROVIDER_BASE_URL`
- * at an unreachable host (see playwright.config.ts), so FX behaviour is
- * deterministic — required rates are pre-seeded via `POST /api/seed/exchange-rate/`,
- * any pair without a seeded rate produces `fx_stale=true`.
+ * The FX-aware per-space figures used to live on the old `/dashboard` root
+ * backed by `GET /api/dashboard/totals/`. Phase 17 REMOVED that endpoint and
+ * moved the per-space Income/Expense/Net numbers onto the Spaces management page
+ * (`/dashboard/spaces`), fed by the existing `GET /api/spaces/summary/`. FX
+ * rendering + the FX-stale indicator survive — this spec re-points them.
+ *
+ * The QA backend points `FX_PROVIDER_BASE_URL` at an unreachable host (see
+ * playwright.config.ts), so FX behaviour is deterministic — required rates are
+ * pre-seeded via `POST /api/seed/exchange-rate/`, and any pair without a seeded
+ * rate produces `fx_stale=true`.
  */
 import { test, expect } from '../../fixtures/index'
 import { DashboardPage } from '../../pages/DashboardPage'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
-test.describe('Dashboard totals FX', () => {
-  test('mixed-currency dashboard renders totals in user currency', async ({ page, loggedInPage }) => {
+test.describe('Per-space summary FX', () => {
+  test('mixed-currency space summary renders totals in the user currency', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
 
     // User is EUR by default; explicitly set to be safe.
@@ -41,10 +46,10 @@ test.describe('Dashboard totals FX', () => {
     })
 
     const dashboard = new DashboardPage(page)
-    await dashboard.goto()
+    await dashboard.gotoSpaces()
 
-    // The dashboard's money display is now the per-space summary card (FX-aware,
-    // current-month default). Expense: 100 EUR + 100 EUR (= USD 200 * 0.50) = 200.00 EUR
+    // The per-space summary card (FX-aware, current-month default) now lives on
+    // the Spaces page. Expense: 100 EUR + 100 EUR (= USD 200 * 0.50) = 200.00 EUR
     await expect(dashboard.summaryOutflow()).toContainText('€')
     await expect(dashboard.summaryOutflow()).toContainText('200.00')
 
@@ -53,7 +58,7 @@ test.describe('Dashboard totals FX', () => {
     await expect(indicator).toHaveCount(0)
   })
 
-  test('fx-stale flag surfaces a soft indicator', async ({ page, loggedInPage }) => {
+  test('a missing FX rate surfaces the stale indicator', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
 
     // Use SEK->EUR for this test. The other test in this file seeds USD->EUR
@@ -76,10 +81,17 @@ test.describe('Dashboard totals FX', () => {
     })
 
     const dashboard = new DashboardPage(page)
-    await dashboard.goto()
+    await dashboard.gotoSpaces()
 
     const indicator = page.getByTestId('fx-stale-indicator')
     await expect(indicator).toBeVisible()
     await expect(indicator).toContainText(/stale|unavailable/i)
+
+    // The affected card also carries the per-row "rate unavailable" chip
+    // (gotcha #27e — per-row staleness display), so the user can tell WHICH
+    // space's numbers are approximate.
+    await expect(
+      page.locator(`.space-card[data-space-id="${hh.id}"]`).getByTestId('summary-fx-stale'),
+    ).toBeVisible()
   })
 })

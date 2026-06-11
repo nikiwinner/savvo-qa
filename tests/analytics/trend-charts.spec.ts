@@ -76,7 +76,7 @@ test.describe('Analytics cashflow band', () => {
     })
 
     // Default window = This month (≤ 62 days) → granularity=day.
-    await page.goto(`/dashboard/analytics?space=${hh.id}`)
+    await page.goto(`/dashboard?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const band = page.getByTestId('cashflow-trend')
@@ -116,15 +116,21 @@ test.describe('Analytics cashflow band', () => {
       })
     }
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}`)
+    await page.goto(`/dashboard?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const band = page.getByTestId('cashflow-trend')
     await expect(band).toBeVisible()
 
     // Drive the 6M preset → the cashflow window spans six calendar months.
-    await page.getByTestId('period-preset-6m').click()
-    await page.waitForURL(/preset=6m/)
+    // Click + URL-commit retried as ONE unit: under full-matrix load the click
+    // can land on the SSR DOM before hydration attaches the handler, so the
+    // client-side goto never starts and a bare waitForURL eats the whole test
+    // budget (diagnosed 2026-06-11 — infra-load tail, not an app bug).
+    await expect(async () => {
+      await page.getByTestId('period-preset-6m').click()
+      await page.waitForURL(/preset=6m/, { timeout: 2_000 })
+    }).toPass({ timeout: 20_000 })
     await page.waitForLoadState('networkidle')
 
     // Hidden count mirror = number of month buckets rendered.
@@ -167,7 +173,7 @@ test.describe('Analytics cashflow band', () => {
     })
 
     // 6M preset → six month buckets (the window context for both bar lanes).
-    await page.goto(`/dashboard/analytics?space=${hh.id}&preset=6m`)
+    await page.goto(`/dashboard?space=${hh.id}&preset=6m`)
     await page.waitForLoadState('networkidle')
 
     const band = page.getByTestId('cashflow-trend')
@@ -203,7 +209,7 @@ test.describe('Analytics cashflow band', () => {
     const dateFrom = firstOfMonthsAgo(11)
     const dateTo = lastOfThisMonth()
     await page.goto(
-      `/dashboard/analytics?space=${hh.id}&preset=custom&date_from=${dateFrom}&date_to=${dateTo}`,
+      `/dashboard?space=${hh.id}&preset=custom&date_from=${dateFrom}&date_to=${dateTo}`,
     )
     await page.waitForLoadState('networkidle')
 
@@ -216,7 +222,7 @@ test.describe('Analytics cashflow band', () => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Empty Trend Home')
 
-    await page.goto(`/dashboard/analytics?space=${hh.id}`)
+    await page.goto(`/dashboard?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('cashflow-trend')).toBeVisible()
