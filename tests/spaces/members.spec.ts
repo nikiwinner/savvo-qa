@@ -6,7 +6,7 @@
  *
  * Verifies:
  * - assign_user adds a second user as member
- * - unassign_user removes a member
+ * - a member can leave (remove self) but cannot evict another member (A7)
  * - removing the last member returns 400
  * - a non-member cannot access another user's space
  */
@@ -31,26 +31,24 @@ test.describe('Space member management (API)', () => {
     expect(spacesB.map((h) => h.id)).toContain(space.id)
   })
 
-  test('unassign_user removes a member from the space', async ({ twoActors }) => {
+  test('a member can leave but cannot evict another member', async ({ twoActors }) => {
     const { apiA, apiB } = twoActors
 
     const space = await apiA.createSpace('Temp Shared')
-    const userBInfo = await apiB.me()
-    const userBId = userBInfo!.id
+    const userBId = (await apiB.me())!.id
 
     await apiA.assignUser(space.id, userBId)
+    expect((await apiB.listSpaces()).map((h) => h.id)).toContain(space.id)
 
-    // Verify B is now a member
-    const beforeUnassign = await apiB.listSpaces()
-    expect(beforeUnassign.map((h) => h.id)).toContain(space.id)
+    // A7: A cannot evict B — only self-removal is allowed.
+    const evict = await apiA.unassignUser(space.id, userBId)
+    expect(evict.status()).toBe(403)
+    expect((await apiB.listSpaces()).map((h) => h.id)).toContain(space.id)
 
-    // User A removes user B
-    const unassignRes = await apiA.unassignUser(space.id, userBId)
-    expect(unassignRes.status()).toBe(200)
-
-    // User B should no longer see the space
-    const afterUnassign = await apiB.listSpaces()
-    expect(afterUnassign.map((h) => h.id)).not.toContain(space.id)
+    // But B can leave the space (remove themselves).
+    const leave = await apiB.unassignUser(space.id, userBId)
+    expect(leave.status()).toBe(200)
+    expect((await apiB.listSpaces()).map((h) => h.id)).not.toContain(space.id)
   })
 
   test('removing the last member returns 400 with error message', async ({ twoActors }) => {
