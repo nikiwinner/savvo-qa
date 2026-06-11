@@ -7,8 +7,11 @@
  *      Google's authorize URL with a CSRF `state`.
  *   2. The OAuth callback creates a brand-new user (and session) when the
  *      stub code maps to an unseen email.
- *   3. The OAuth callback logs in the existing user (no duplicate created)
- *      when the stub code maps to an email that already has an account.
+ *   3. The OAuth callback REFUSES to auto-login when the stub email already
+ *      belongs to a password account (account pre-hijack defence, security
+ *      Batch 2 / A3): it redirects to /login?error=oauth_account_exists and
+ *      starts no session. (A Google-owned account — no usable password — is
+ *      still auto-logged-in; that path is covered by Test 2 across re-runs.)
  *
  * The QA backend is started with OAUTH_TEST_MODE=True (see
  * playwright.config.ts), which short-circuits the live Google call and
@@ -136,16 +139,14 @@ test.describe('Google Sign-In', () => {
     await reqCtx.dispose()
   })
 
-  test('mocked Google callback for an existing email logs that user in', async ({
+  test('mocked Google callback refuses to auto-login an existing password account', async ({
     playwright,
   }) => {
-    // 1. Pre-seed a user with the email the stub will return.
+    // 1. Pre-seed a PASSWORD account with the email the stub will return.
     //    The stub 'test-existing-user-code' resolves to existing@example.com.
-    //    We can't know if a previous test in the same run already created
-    //    that user (the global flush happens once per run, not per test),
-    //    so we sign it up only if it's not already there. We do this by
-    //    attempting signup and accepting either success or a "duplicate"
-    //    400 response — both leave the DB in the state we want.
+    //    The global flush happens once per run (not per test), so signup may
+    //    400 on re-runs across projects — both outcomes leave the DB as we want
+    //    (a password account exists for that email).
     const seedCtx = await playwright.request.newContext()
     const seedApi = new ApiHelper(seedCtx)
     const seedUser = {
@@ -156,26 +157,12 @@ test.describe('Google Sign-In', () => {
     try {
       await seedApi.signup(seedUser)
     } catch (err) {
-      // Already-exists is fine — we just need *some* user with that email.
       const message = err instanceof Error ? err.message : String(err)
       if (!/400/.test(message)) throw err
     }
     await seedCtx.dispose()
 
-    // 2. Snapshot the user count for that email BEFORE the OAuth round-trip.
-    //    Because we don't have admin API, fetch /api/auth/me/ via a logged-in
-    //    session and assert the same id post-callback. The cleaner check is:
-    //    log in as the seeded user, capture id; then run OAuth; then query
-    //    /me on the OAuth context and expect the SAME id.
-    const checkCtx = await playwright.request.newContext()
-    const checkApi = new ApiHelper(checkCtx)
-    await checkApi.login(seedUser.email, seedUser.password)
-    const before = await checkApi.me()
-    expect(before).toBeTruthy()
-    const seededId = before!.id
-    await checkCtx.dispose()
-
-    // 3. Run the OAuth dance in a fresh context (no prior session).
+    // 2. Run the OAuth dance in a fresh context (no prior session).
     const oauthCtx = await playwright.request.newContext()
     const startRes = await oauthCtx.get(`${BACKEND_URL}/api/auth/google/start/`, {
       maxRedirects: 0,
@@ -187,16 +174,16 @@ test.describe('Google Sign-In', () => {
       `${BACKEND_URL}/api/auth/google/callback/?code=test-existing-user-code&state=${encodeURIComponent(state)}`,
       { maxRedirects: 0 },
     )
+    // Pre-hijack defence: a verified Google login must NOT silently take over an
+    // existing password account; it redirects to login with a distinct error.
     expect(callbackRes.status()).toBe(302)
-    expect(callbackRes.headers()['location']).toBe(`${FRONTEND_URL}/dashboard`)
+    expect(callbackRes.headers()['location']).toBe(`${FRONTEND_URL}/login?error=oauth_account_exists`)
 
-    // 4. The OAuth-context's /me must return the SAME user id as the seeded
-    //    login — proving no duplicate was created and the email match worked.
-    const oauthApi = new ApiHelper(oauthCtx)
-    const after = await oauthApi.me()
-    expect(after).toBeTruthy()
-    expect(after!.id).toBe(seededId)
-    expect(after!.email.toLowerCase()).toBe('existing@example.com')
+    // 3. The OAuth context started no session — /me reports no user.
+    const meRes = await oauthCtx.get(`${BACKEND_URL}/api/auth/me/`)
+    expect(meRes.ok()).toBe(true)
+    const meBody = await meRes.json()
+    expect(meBody.user).toBeNull()
 
     await oauthCtx.dispose()
   })
