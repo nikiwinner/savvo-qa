@@ -75,7 +75,7 @@ test.describe('Google Sign-In', () => {
     await reqCtx.dispose()
   })
 
-  test('mocked Google callback creates a new session and lands on /dashboard', async ({
+  test('mocked Google callback creates a new session and lands on /dashboard/today', async ({
     playwright,
     browser,
   }) => {
@@ -112,7 +112,9 @@ test.describe('Google Sign-In', () => {
     )
     expect(callbackRes.status()).toBe(302)
     const callbackLocation = callbackRes.headers()['location']
-    expect(callbackLocation).toBe(`${FRONTEND_URL}/dashboard`)
+    // Phase 18: the Google-success redirect (oauth.py:219) moved
+    // {FRONTEND_URL}/dashboard → {FRONTEND_URL}/dashboard/today.
+    expect(callbackLocation).toBe(`${FRONTEND_URL}/dashboard/today`)
 
     // 3. The session cookie must now be set on the context's cookie jar.
     const cookies = (await reqCtx.storageState()).cookies

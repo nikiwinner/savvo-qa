@@ -16,7 +16,7 @@ test.describe('Login', () => {
     // Each test creates its own user to avoid state coupling
   })
 
-  test('logs in with valid credentials and lands on dashboard', async ({ page, playwright }) => {
+  test('logs in with valid credentials and lands on Today', async ({ page, playwright }) => {
     const user = uniqueUser()
     const reqCtx = await playwright.request.newContext()
     const api = new ApiHelper(reqCtx)
@@ -30,7 +30,8 @@ test.describe('Login', () => {
     // Cold-start latency: on a fresh test DB, the first /api/auth/login/ +
     // subsequent /api/auth/me/ from hooks.server.ts can take several seconds
     // (Django StatReloader + first DB connection). Bump from the 5s default.
-    await expect(page).toHaveURL('/dashboard', { timeout: 15_000 })
+    // Phase 18: the post-login landing moved /dashboard → /dashboard/today.
+    await expect(page).toHaveURL('/dashboard/today', { timeout: 15_000 })
   })
 
   test('shows error with wrong password', async ({ page, playwright }) => {

@@ -3,7 +3,7 @@
  *
  * hooks.server.ts enforces:
  * - Unauthenticated → /dashboard/* redirects to /login
- * - Authenticated → /login and /signup redirect to /dashboard
+ * - Authenticated → /login and /signup redirect to /dashboard/today (Phase 18)
  */
 import { test, expect } from '@playwright/test'
 import { test as appTest } from '../../fixtures/index'
@@ -34,12 +34,14 @@ appTest.describe('Authenticated route access', () => {
 
   appTest('authenticated user is redirected away from /login', async ({ page, loggedInPage: _ }) => {
     await page.goto('/login')
-    await expect(page).toHaveURL('/dashboard')
+    // Phase 18: the authed-bounce target moved /dashboard → /dashboard/today.
+    await expect(page).toHaveURL('/dashboard/today')
   })
 
   appTest('authenticated user is redirected away from /signup', async ({ page, loggedInPage: _ }) => {
     await page.goto('/signup')
-    await expect(page).toHaveURL('/dashboard')
+    // Phase 18: the authed-bounce target moved /dashboard → /dashboard/today.
+    await expect(page).toHaveURL('/dashboard/today')
   })
 
   appTest('sidebar shows the logged-in user name', async ({ page, loggedInPage }) => {

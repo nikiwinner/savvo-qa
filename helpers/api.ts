@@ -162,6 +162,36 @@ export function uniqueUser(prefix = 'user'): UserRecord {
   }
 }
 
+// ── Coaching date math (UTC-only — never the runner's local tz) ─────────────
+//
+// Phase 18 streak/recovery fixtures pin `UserProgram.timezone='UTC'`, so EVERY
+// seeded date must be computed in UTC. Mixing in the runner machine's local zone
+// (e.g. via `new Date().toISOString().slice(0,10)` after a local-tz offset, or
+// `Date` getters that read local fields) flakes near midnight. These helpers do
+// all arithmetic with the UTC-* getters/`Date.UTC` so the result is tz-stable.
+
+/** Today's date in UTC as `YYYY-MM-DD`. */
+export function utcToday(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** A date `n` whole days before UTC-today, as `YYYY-MM-DD`. */
+export function utcDateDaysAgo(n: number): string {
+  const now = new Date()
+  const utc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  utc.setUTCDate(utc.getUTCDate() - n)
+  return utc.toISOString().slice(0, 10)
+}
+
+/**
+ * An ISO-8601 UTC instant `n` whole days before now, fixed at 12:00:00Z so the
+ * LOCAL (UTC) calendar date is unambiguous regardless of the hour. Feeds
+ * `seed/completion/`'s `completed_at`.
+ */
+export function utcInstantDaysAgo(n: number): string {
+  return `${utcDateDaysAgo(n)}T12:00:00Z`
+}
+
 /**
  * Wraps a single APIRequestContext as one authenticated actor.
  * Auth endpoints are @csrf_exempt so they need no CSRF header.
@@ -1052,6 +1082,71 @@ export class ApiHelper {
     const res = await this.ctx.get(url)
     if (!res.ok()) {
       throw new Error(`getSpacesSummary failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Coaching: program state + completions (DEBUG-only seed, Phase 18) ──────
+
+  /**
+   * POST /api/seed/program-state/ — DEBUG-only: upsert the requesting user's
+   * `UserProgram` to a forced state (`start_date` / `current_day` / `timezone`).
+   * Used by recovery/landing/streak fixtures to pin the program deterministically.
+   *
+   * **Timezone pitfall (HARD):** always pass `timezone: 'UTC'` and compute every
+   * seeded `completed_at` in UTC (see {@link utcDateDaysAgo}) — never let the
+   * runner machine's local tz leak into the date math, or the suite flakes near
+   * midnight. An invalid tz is a 400 (the seed must be deterministic).
+   */
+  async seedProgramState(state: {
+    start_date?: string
+    current_day?: number
+    timezone?: string
+  }): Promise<{ start_date: string; current_day: number; timezone: string }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/program-state/`, {
+      data: state,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`seedProgramState failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * POST /api/seed/completion/ — DEBUG-only: backdate a `MissionCompletion` for
+   * the requesting user. Idempotent on `(user, day_number)` (update_or_create —
+   * re-POST safe). `completed_at` MUST be ISO-8601 UTC (e.g. `2026-06-12T08:00:00Z`).
+   */
+  async seedCompletion(data: {
+    day_number: number
+    completed_at: string
+    is_recovery?: boolean
+  }): Promise<{
+    id: number
+    day_number: number
+    completed_at: string
+    is_recovery: boolean
+    created: boolean
+  }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/completion/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`seedCompletion failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** GET /api/missions/today/ — direct API read of the resolved mission payload. */
+  async getMissionToday(tz?: string): Promise<Record<string, unknown>> {
+    const url = tz
+      ? `${this.baseUrl}/api/missions/today/?tz=${encodeURIComponent(tz)}`
+      : `${this.baseUrl}/api/missions/today/`
+    const res = await this.ctx.get(url)
+    if (!res.ok()) {
+      throw new Error(`getMissionToday failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }

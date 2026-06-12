@@ -303,7 +303,7 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
 })
 
 test.describe('Dashboard sidebar (post-merge nav)', () => {
-  test('the sidebar has Dashboard / Spaces / Transactions / Settings and no Analytics', async ({
+  test('the sidebar has Today / Dashboard / Spaces / Transactions / Settings and no Analytics', async ({
     page,
     loggedInPage,
   }) => {
@@ -313,8 +313,9 @@ test.describe('Dashboard sidebar (post-merge nav)', () => {
     await page.goto('/dashboard')
     await page.waitForLoadState('networkidle')
 
-    // The four nav items are present (match by visible label inside the menu).
+    // The five nav items are present (match by visible label inside the menu).
     const nav = page.locator('.nav-menu')
+    await expect(nav.locator('a', { hasText: 'Today' })).toBeVisible()
     await expect(nav.locator('a', { hasText: 'Dashboard' })).toBeVisible()
     await expect(nav.locator('a', { hasText: 'Spaces' })).toBeVisible()
     await expect(nav.locator('a', { hasText: 'Transactions' })).toBeVisible()
@@ -322,8 +323,8 @@ test.describe('Dashboard sidebar (post-merge nav)', () => {
 
     // No "Analytics" nav link exists anymore (the surface IS the dashboard).
     await expect(nav.locator('a', { hasText: 'Analytics' })).toHaveCount(0)
-    // Exactly four items in the menu.
-    await expect(nav.locator('a')).toHaveCount(4)
+    // Exactly five items in the menu (Today first since Phase 18).
+    await expect(nav.locator('a')).toHaveCount(5)
   })
 
   test('the Dashboard nav link preserves ?space after a client-side switch', async ({

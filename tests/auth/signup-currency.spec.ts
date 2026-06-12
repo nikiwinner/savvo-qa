@@ -27,7 +27,8 @@ test.describe('Signup — currency preference', () => {
     await signup.confirmPasswordInput.fill(user.password)
     await signup.submitButton.click()
 
-    await expect(page).toHaveURL('/dashboard')
+    // Phase 18: the post-signup landing moved /dashboard → /dashboard/today.
+    await expect(page).toHaveURL('/dashboard/today', { timeout: 15_000 })
 
     // Verify via API that currency is EUR
     const reqCtx = await page.context().request
@@ -52,7 +53,8 @@ test.describe('Signup — currency preference', () => {
     await signup.confirmPasswordInput.fill(user.password)
     await signup.submitButton.click()
 
-    await expect(page).toHaveURL('/dashboard')
+    // Phase 18: the post-signup landing moved /dashboard → /dashboard/today.
+    await expect(page).toHaveURL('/dashboard/today', { timeout: 15_000 })
 
     // Verify currency persisted
     const reqCtx = await page.context().request
