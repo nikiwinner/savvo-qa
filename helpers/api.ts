@@ -151,6 +151,55 @@ export interface CreateExpenseData {
   currency?: string
 }
 
+// ── Curriculum unit-map payload (Phase 21) — GET /api/curriculum/map/ ───────
+
+/** Derived level status ∈ locked | current | completed | coming_soon (leak-safe). */
+export interface MapLevel {
+  slug: string
+  title: string
+  order: number
+  is_checkpoint: boolean
+  status: 'locked' | 'current' | 'completed' | 'coming_soon'
+  step_count: number
+  steps_completed: number
+}
+
+/** Derived topic status ∈ locked | available | in_progress | completed. */
+export interface MapTopic {
+  slug: string
+  title: string
+  nature: string
+  order: number
+  status: 'locked' | 'available' | 'in_progress' | 'completed'
+  prerequisites: string[]
+  crest: { levels_completed: number; levels_total_playable: number }
+  levels: MapLevel[]
+}
+
+export interface MapSection {
+  slug: string
+  title: string
+  subtitle: string
+  order: number
+  crest: {
+    levels_completed: number
+    levels_total_playable: number
+    topics_completed: number
+    topics_total: number
+  }
+  topics: MapTopic[]
+}
+
+/** The whole map + both bars + streak. `bars.doing` is literally null this phase. */
+export interface CurriculumMapPayload {
+  sections: MapSection[]
+  bars: {
+    knowledge: { xp_total: number; crest_count: number }
+    doing: null
+  }
+  streak: { current: number; best: number; last_completed_date: string | null }
+}
+
 /** Unique email to avoid conflicts between parallel tests */
 export function uniqueUser(prefix = 'user'): UserRecord {
   const ts = Date.now()
@@ -162,13 +211,16 @@ export function uniqueUser(prefix = 'user'): UserRecord {
   }
 }
 
-// ── Coaching date math (UTC-only — never the runner's local tz) ─────────────
+// ── Curriculum streak date math (UTC-only — never the runner's local tz) ────
 //
-// Phase 18 streak/recovery fixtures pin `UserProgram.timezone='UTC'`, so EVERY
-// seeded date must be computed in UTC. Mixing in the runner machine's local zone
-// (e.g. via `new Date().toISOString().slice(0,10)` after a local-tz offset, or
-// `Date` getters that read local fields) flakes near midnight. These helpers do
-// all arithmetic with the UTC-* getters/`Date.UTC` so the result is tz-stable.
+// Curriculum streak fixtures pin the user's `UserProgram.timezone` to `'UTC'`
+// (capture-once, via `getCurriculumMap('UTC')` BEFORE seeding — the retired
+// flat-loop program seed no longer exists), so EVERY seeded `completed_at` must be
+// computed in UTC. Mixing in
+// the runner machine's local zone (e.g. via `new Date().toISOString().slice(0,10)`
+// after a local-tz offset, or `Date` getters that read local fields) flakes near
+// midnight. These helpers do all arithmetic with the UTC-* getters/`Date.UTC` so
+// the result is tz-stable.
 
 /** Today's date in UTC as `YYYY-MM-DD`. */
 export function utcToday(): string {
@@ -185,8 +237,8 @@ export function utcDateDaysAgo(n: number): string {
 
 /**
  * An ISO-8601 UTC instant `n` whole days before now, fixed at 12:00:00Z so the
- * LOCAL (UTC) calendar date is unambiguous regardless of the hour. Feeds
- * `seed/completion/`'s `completed_at`.
+ * LOCAL (UTC) calendar date is unambiguous regardless of the hour. Feeds the
+ * `completed_at` of `seed/step-completion/` + `seed/level-state/`.
  */
 export function utcInstantDaysAgo(n: number): string {
   return `${utcDateDaysAgo(n)}T12:00:00Z`
@@ -1086,67 +1138,100 @@ export class ApiHelper {
     return res.json()
   }
 
-  // ── Coaching: program state + completions (DEBUG-only seed, Phase 18) ──────
+  // ── Curriculum: map read + progress/XP seeding (Phase 21) ──────────────────
 
   /**
-   * POST /api/seed/program-state/ — DEBUG-only: upsert the requesting user's
-   * `UserProgram` to a forced state (`start_date` / `current_day` / `timezone`).
-   * Used by recovery/landing/streak fixtures to pin the program deterministically.
+   * GET /api/curriculum/map/ — the whole unit-map + per-user derived progress.
    *
-   * **Timezone pitfall (HARD):** always pass `timezone: 'UTC'` and compute every
-   * seeded `completed_at` in UTC (see {@link utcDateDaysAgo}) — never let the
-   * runner machine's local tz leak into the date math, or the suite flakes near
-   * midnight. An invalid tz is a 400 (the seed must be deterministic).
+   * Doubles as the tree's lazy-seed trigger AND the tz capture-once anchor: the
+   * FIRST call self-heals the curriculum content on an empty DB and (on cold-start
+   * `UserProgram` creation) pins the program timezone from `?tz`. Streak fixtures
+   * therefore call `getCurriculumMap('UTC')` BEFORE seeding so every backdated
+   * `completed_at` is interpreted in UTC (the retired flat-loop program seed no
+   * longer pins tz). The tz is ignored once the program exists (byte-identical to
+   * the old daily-mission tz contract).
    */
-  async seedProgramState(state: {
-    start_date?: string
-    current_day?: number
-    timezone?: string
-  }): Promise<{ start_date: string; current_day: number; timezone: string }> {
-    const res = await this.ctx.post(`${this.baseUrl}/api/seed/program-state/`, {
-      data: state,
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
+  async getCurriculumMap(tz?: string): Promise<CurriculumMapPayload> {
+    const url = tz
+      ? `${this.baseUrl}/api/curriculum/map/?tz=${encodeURIComponent(tz)}`
+      : `${this.baseUrl}/api/curriculum/map/`
+    const res = await this.ctx.get(url)
     if (!res.ok()) {
-      throw new Error(`seedProgramState failed (${res.status()}): ${await res.text()}`)
+      throw new Error(`getCurriculumMap failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
 
   /**
-   * POST /api/seed/completion/ — DEBUG-only: backdate a `MissionCompletion` for
-   * the requesting user. Idempotent on `(user, day_number)` (update_or_create —
-   * re-POST safe). `completed_at` MUST be ISO-8601 UTC (e.g. `2026-06-12T08:00:00Z`).
+   * POST /api/seed/step-completion/ — DEBUG-only: upsert one `StepCompletion` for
+   * the requesting user. Resolve the step by `{step_id}` OR `{level_slug, step_slug}`.
+   * Idempotent on `(user, step)` (update_or_create — re-POST safe). Optional
+   * backdated `completed_at` MUST be ISO-8601 UTC (e.g. `2026-06-12T08:00:00Z`;
+   * default now); optional `is_recovery` (default false).
    */
-  async seedCompletion(data: {
-    day_number: number
-    completed_at: string
+  async seedStepCompletion(data: {
+    step_id?: number
+    level_slug?: string
+    step_slug?: string
+    completed_at?: string
     is_recovery?: boolean
   }): Promise<{
     id: number
-    day_number: number
+    step_id: number
     completed_at: string
     is_recovery: boolean
     created: boolean
   }> {
-    const res = await this.ctx.post(`${this.baseUrl}/api/seed/completion/`, {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/step-completion/`, {
       data,
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
     if (!res.ok()) {
-      throw new Error(`seedCompletion failed (${res.status()}): ${await res.text()}`)
+      throw new Error(`seedStepCompletion failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
 
-  /** GET /api/missions/today/ — direct API read of the resolved mission payload. */
-  async getMissionToday(tz?: string): Promise<Record<string, unknown>> {
-    const url = tz
-      ? `${this.baseUrl}/api/missions/today/?tz=${encodeURIComponent(tz)}`
-      : `${this.baseUrl}/api/missions/today/`
-    const res = await this.ctx.get(url)
+  /**
+   * POST /api/seed/level-state/ — DEBUG-only: mark EVERY step in a level complete
+   * for the requesting user (idempotent per step). Resolve the level by
+   * `{level_id}` OR `{topic_slug, level_slug}`. Optional backdated `completed_at`
+   * (ISO-8601 UTC) applies to all rows. Drives the map's "level complete" node
+   * state + the topic/section crests.
+   */
+  async seedLevelState(data: {
+    level_id?: number
+    topic_slug?: string
+    level_slug?: string
+    completed_at?: string
+  }): Promise<{ level_id: number; steps_completed: number }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/level-state/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
     if (!res.ok()) {
-      throw new Error(`getMissionToday failed (${res.status()}): ${await res.text()}`)
+      throw new Error(`seedLevelState failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * POST /api/seed/xp/ — DEBUG-only: append one `XPLedgerEntry` for the requesting
+   * user (append-only — a re-POST appends a NEW row). `amount` > 0, `reason`
+   * required (≤40 chars), `step_id` optional. Feeds Bar #1 `xp_total` (a real,
+   * traceable count — NEVER a money figure).
+   */
+  async seedXp(data: {
+    amount: number
+    reason: string
+    step_id?: number
+  }): Promise<{ id: number; amount: number; reason: string; step_id: number | null; created_at: string }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/seed/xp/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`seedXp failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
