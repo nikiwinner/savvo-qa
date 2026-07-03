@@ -10,7 +10,8 @@
  * Phase 17: the figures live INSIDE the existing space management cards
  * (`.space-card[data-space-id=...]`, NOT a standalone `space-summary-card`); the
  * `summary-figure-*` / `inout-bar` figure testids are unchanged. The card TITLE
- * links to `/dashboard?space=<id>` (the merged dashboard scoped to one space).
+ * links to `/dashboard/analytics?space=<id>` (the analytics surface scoped to
+ * one space).
  *
  * The summary endpoint defaults to the CURRENT MONTH, so every seeded row is
  * dated this month. Everything is EUR (default User.currency) → no FX, sums are
@@ -207,11 +208,11 @@ test.describe('Per-space summary cards (Spaces page)', () => {
 
     const card = cardFor(page, space.id)
     const title = card.locator('a.space-title')
-    // The title links to /dashboard scoped to this one space.
-    await expect(title).toHaveAttribute('href', `/dashboard?space=${space.id}`)
+    // The title links to the analytics surface scoped to this one space.
+    await expect(title).toHaveAttribute('href', `/dashboard/analytics?space=${space.id}`)
 
     await title.click()
-    await page.waitForURL(new RegExp(`/dashboard\\?space=${space.id}`))
+    await page.waitForURL(new RegExp(`/dashboard/analytics\\?space=${space.id}`))
     expect(page.url()).toContain(`space=${space.id}`)
   })
 

@@ -11,15 +11,15 @@ import { uniqueUser } from '../../helpers/api'
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8001'
 
 test.describe('Signup', () => {
-  test('signs up with valid credentials and lands on Today', async ({ page }) => {
+  test('signs up with valid credentials and lands on Learn', async ({ page }) => {
     const user = uniqueUser()
 
     const signup = new SignupPage(page)
     await signup.goto()
     await signup.signup(user.name, user.email, user.password, user.password)
 
-    // Phase 18: the post-signup landing moved /dashboard → /dashboard/today.
-    await expect(page).toHaveURL('/dashboard/today', { timeout: 15_000 })
+    // The post-signup landing is /dashboard/learn.
+    await expect(page).toHaveURL('/dashboard/learn', { timeout: 15_000 })
   })
 
   test('shows error when passwords do not match (client-side check)', async ({ page }) => {

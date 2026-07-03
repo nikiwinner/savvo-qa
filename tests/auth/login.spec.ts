@@ -30,8 +30,8 @@ test.describe('Login', () => {
     // Cold-start latency: on a fresh test DB, the first /api/auth/login/ +
     // subsequent /api/auth/me/ from hooks.server.ts can take several seconds
     // (Django StatReloader + first DB connection). Bump from the 5s default.
-    // Phase 18: the post-login landing moved /dashboard → /dashboard/today.
-    await expect(page).toHaveURL('/dashboard/today', { timeout: 15_000 })
+    // The post-login landing is /dashboard/learn.
+    await expect(page).toHaveURL('/dashboard/learn', { timeout: 15_000 })
   })
 
   test('shows error with wrong password', async ({ page, playwright }) => {

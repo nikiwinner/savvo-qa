@@ -1,7 +1,7 @@
 /**
  * Curriculum — unit-map renders the journey (Phase 21, Stories 21.1 / 21.3)
  *
- * `/dashboard/today` is now the Duolingo-style unit-map fed by ONE call,
+ * `/dashboard/learn` is the Duolingo-style unit-map fed by ONE call,
  * `GET /api/curriculum/map/`. These specs cover the fresh-user journey render,
  * the two-bar topbar (Bar #1 real XP + streak, Bar #2 a locked placeholder), the
  * zero-money tripwire, the Auri PNG-vs-glyph fallback (migrated from the retired
@@ -10,7 +10,7 @@
  *
  * The `loggedInPage` fixture creates + logs in the user via the API and copies
  * the session cookies into the browser context (no UI landing), so navigating to
- * `/dashboard/today` exercises the real cold-start tz-cookie path.
+ * `/dashboard/learn` exercises the real cold-start tz-cookie path.
  */
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
@@ -75,7 +75,7 @@ test.describe('Curriculum — unit-map', () => {
 
     // No currency symbol / formatted amount / ISO code anywhere on the surface
     // (behavior-rules: XPLedgerEntry never feeds a money figure).
-    const pageText = await map.todayPage.innerText()
+    const pageText = await map.learnPage.innerText()
     expect(pageText).not.toMatch(MONEY_PATTERN)
   })
 
@@ -122,7 +122,7 @@ test.describe('Curriculum — unit-map', () => {
       return route.continue()
     })
 
-    await page.goto('/dashboard/today')
+    await page.goto('/dashboard/learn')
 
     const map = new CurriculumMapPage(page)
     // Graceful degraded card with a retry affordance — never a 500/blank.

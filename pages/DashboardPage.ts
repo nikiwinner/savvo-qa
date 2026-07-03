@@ -1,16 +1,18 @@
 import { Page, Locator } from '@playwright/test'
 
 /**
- * Page object for the main `/dashboard` surface.
+ * Page object for the analytics surface.
  *
- * Phase 17 merge (2026-06-11): the GROWTH analytics surface IS the main
- * `/dashboard` now (retitled "Dashboard"). `goto()` lands on it and exposes the
- * KPI hero + section locators + the shared period pill. The per-space
- * Income/Expense/Net summary cards MOVED to `/dashboard/spaces` — use
- * `gotoSpaces()` and the `summary*` helpers (the markers keep their old
- * `summary-figure-*` testids, only the page changed). The two legacy stat cards
- * (Total Spaces / Transactions count) and the Quick Actions block were DELETED,
- * so `totalSpaces`/`totalTransactions`/`statValues` no longer exist.
+ * Nav redesign (2026-07-03): the GROWTH analytics surface moved off bare
+ * `/dashboard` back onto its own route `/dashboard/analytics` (bare `/dashboard`
+ * now 307-redirects to `/dashboard/learn`). The heading reads "Analytics" and
+ * ALL `analytics-*` / `hero-*` / `dashboard-*` testids are unchanged. `goto()`
+ * lands on `/dashboard/analytics` and exposes the KPI hero + section locators +
+ * the shared period pill. The per-space Income/Expense/Net summary cards live on
+ * `/dashboard/spaces` — use `gotoSpaces()` and the `summary*` helpers (the
+ * markers keep their old `summary-figure-*` testids). Logout moved from the
+ * removed top bar into the sidebar account block (still `aria-label="Logout"`,
+ * still a POST /logout form); the user name is the sidebar `.account-name`.
  */
 export class DashboardPage {
   readonly logoutButton: Locator
@@ -25,16 +27,18 @@ export class DashboardPage {
   readonly emptyState: Locator
 
   constructor(private readonly page: Page) {
-    this.logoutButton = page.locator('.logout-topbar-btn')
-    this.userName = page.locator('.user-name')
+    // The top bar was removed in the nav redesign — logout lives in the sidebar
+    // account block (bottom), keeping its `aria-label="Logout"`.
+    this.logoutButton = page.locator('button[aria-label="Logout"]')
+    this.userName = page.locator('.account-name')
     this.spacesLink = page.locator('a[href="/dashboard/spaces"]')
     // The "Transactions" sidebar entry points at /dashboard/transactions
     // (Phase 15, Story 15.2). navHref may append ?space=, so match by prefix.
     this.expensesLink = page.locator('a[href^="/dashboard/transactions"]')
 
-    // The analytics-* testids persist on /dashboard (Phase 17 kept the marker
-    // names to avoid a needless QA-contract churn; only the visible copy reads
-    // "Dashboard").
+    // The analytics-* testids persist on /dashboard/analytics (the nav redesign
+    // kept the marker names to avoid a needless QA-contract churn; the visible
+    // copy reads "Analytics").
     this.hero = page.getByTestId('analytics-hero')
     this.heroNet = page.getByTestId('hero-net')
     this.periodSelector = page.getByTestId('dashboard-period-selector')
@@ -42,11 +46,11 @@ export class DashboardPage {
   }
 
   async goto(): Promise<void> {
-    await this.page.goto('/dashboard')
+    await this.page.goto('/dashboard/analytics')
     await this.page.waitForLoadState('networkidle')
   }
 
-  /** The per-space summary cards moved to /dashboard/spaces in Phase 17. */
+  /** The per-space summary cards live on /dashboard/spaces. */
   async gotoSpaces(): Promise<void> {
     await this.page.goto('/dashboard/spaces')
     await this.page.waitForLoadState('networkidle')

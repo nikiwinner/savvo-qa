@@ -1,7 +1,7 @@
 import { Page, Locator } from '@playwright/test'
 
 /**
- * Page object for the Phase 21 curriculum **unit-map** (`/dashboard/today`).
+ * Page object for the Phase 21 curriculum **unit-map** (`/dashboard/learn`).
  *
  * The page keeps the Phase-18 `savvo_tz` cold-start contract (see
  * `+page.server.ts`): the VERY FIRST visit without a `savvo_tz` cookie returns
@@ -19,7 +19,7 @@ export class CurriculumMapPage {
   readonly page: Page
 
   // Containers / degraded state
-  readonly todayPage: Locator
+  readonly learnPage: Locator
   readonly map: Locator
   readonly error: Locator
   readonly retryButton: Locator
@@ -49,10 +49,10 @@ export class CurriculumMapPage {
   constructor(page: Page) {
     this.page = page
 
-    this.todayPage = page.getByTestId('today-page')
+    this.learnPage = page.getByTestId('learn-page')
     this.map = page.getByTestId('curriculum-map')
-    this.error = page.getByTestId('today-error')
-    this.retryButton = page.getByTestId('today-retry')
+    this.error = page.getByTestId('learn-error')
+    this.retryButton = page.getByTestId('learn-retry')
 
     this.sections = page.getByTestId('map-section')
     this.sectionCrests = page.getByTestId('section-crest')
@@ -81,12 +81,12 @@ export class CurriculumMapPage {
   }
 
   /**
-   * Navigate to `/dashboard/today` and wait for the map (or the degraded card)
+   * Navigate to `/dashboard/learn` and wait for the map (or the degraded card)
    * to settle. The cold start (client tz fetch) resolves into one of these —
    * never assume SSR HTML.
    */
   async goto(settleTimeout = 30_000): Promise<void> {
-    await this.page.goto('/dashboard/today')
+    await this.page.goto('/dashboard/learn')
     await this.waitForSettled(settleTimeout)
   }
 

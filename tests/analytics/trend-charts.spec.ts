@@ -76,7 +76,7 @@ test.describe('Analytics cashflow band', () => {
     })
 
     // Default window = This month (≤ 62 days) → granularity=day.
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const band = page.getByTestId('cashflow-trend')
@@ -116,7 +116,7 @@ test.describe('Analytics cashflow band', () => {
       })
     }
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const band = page.getByTestId('cashflow-trend')
@@ -173,7 +173,7 @@ test.describe('Analytics cashflow band', () => {
     })
 
     // 6M preset → six month buckets (the window context for both bar lanes).
-    await page.goto(`/dashboard?space=${hh.id}&preset=6m`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&preset=6m`)
     await page.waitForLoadState('networkidle')
 
     const band = page.getByTestId('cashflow-trend')
@@ -209,7 +209,7 @@ test.describe('Analytics cashflow band', () => {
     const dateFrom = firstOfMonthsAgo(11)
     const dateTo = lastOfThisMonth()
     await page.goto(
-      `/dashboard?space=${hh.id}&preset=custom&date_from=${dateFrom}&date_to=${dateTo}`,
+      `/dashboard/analytics?space=${hh.id}&preset=custom&date_from=${dateFrom}&date_to=${dateTo}`,
     )
     await page.waitForLoadState('networkidle')
 
@@ -222,7 +222,7 @@ test.describe('Analytics cashflow band', () => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Empty Trend Home')
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('cashflow-trend')).toBeVisible()

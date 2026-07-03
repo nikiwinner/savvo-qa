@@ -62,12 +62,12 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     const jsErrors: string[] = []
     page.on('pageerror', (err) => jsErrors.push(err.message))
 
-    await page.goto(`/dashboard?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
-    // Page heading still rendered — no crash. Phase 17: the analytics surface IS
-    // the main /dashboard, retitled "Dashboard".
-    await expect(page.locator('.analytics-page h1')).toHaveText('Dashboard')
+    // Page heading still rendered — no crash. The analytics surface lives at
+    // /dashboard/analytics, titled "Analytics".
+    await expect(page.locator('.analytics-page h1')).toHaveText('Analytics')
     expect(jsErrors).toEqual([])
 
     // The archived id must NOT be a "live" filter. The user (archived-only)
@@ -115,7 +115,7 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     expect(archiveRes.ok()).toBeTruthy()
 
     // After archive: the SpaceFilter modal must not show H1.
-    await page.goto('/dashboard')
+    await page.goto('/dashboard/analytics')
     await page.waitForLoadState('networkidle')
     await page.getByTestId('space-filter-trigger').click()
     let modal = page.getByTestId('space-filter-modal')
@@ -133,7 +133,7 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
 
     // After restore: H1 is in the SpaceFilter, and the dashboard renders its
     // sections without error placeholders.
-    await page.goto(`/dashboard?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${h1.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await page.getByTestId('space-filter-trigger').click()

@@ -3,7 +3,7 @@
  *
  * hooks.server.ts enforces:
  * - Unauthenticated → /dashboard/* redirects to /login
- * - Authenticated → /login and /signup redirect to /dashboard/today (Phase 18)
+ * - Authenticated → /login and /signup redirect to /dashboard/learn
  */
 import { test, expect } from '@playwright/test'
 import { test as appTest } from '../../fixtures/index'
@@ -27,26 +27,28 @@ test.describe('Unauthenticated route protection', () => {
 
 appTest.describe('Authenticated route access', () => {
   appTest('authenticated user can access /dashboard', async ({ page, loggedInPage: _ }) => {
+    // Bare /dashboard 307-redirects to the Learn unit-map (the post-auth landing).
     await page.goto('/dashboard')
-    await expect(page).toHaveURL('/dashboard')
-    await expect(page.locator('h1', { hasText: 'Dashboard' })).toBeVisible()
+    await expect(page).toHaveURL('/dashboard/learn')
+    await expect(page.getByTestId('learn-page')).toBeVisible()
   })
 
   appTest('authenticated user is redirected away from /login', async ({ page, loggedInPage: _ }) => {
     await page.goto('/login')
-    // Phase 18: the authed-bounce target moved /dashboard → /dashboard/today.
-    await expect(page).toHaveURL('/dashboard/today')
+    // The authed-bounce target is /dashboard/learn.
+    await expect(page).toHaveURL('/dashboard/learn')
   })
 
   appTest('authenticated user is redirected away from /signup', async ({ page, loggedInPage: _ }) => {
     await page.goto('/signup')
-    // Phase 18: the authed-bounce target moved /dashboard → /dashboard/today.
-    await expect(page).toHaveURL('/dashboard/today')
+    // The authed-bounce target is /dashboard/learn.
+    await expect(page).toHaveURL('/dashboard/learn')
   })
 
   appTest('sidebar shows the logged-in user name', async ({ page, loggedInPage }) => {
     await page.goto('/dashboard')
     const { user } = loggedInPage
-    await expect(page.locator('.user-name')).toContainText(user.name)
+    // The user name lives in the sidebar account block (bottom).
+    await expect(page.locator('.account-name')).toContainText(user.name)
   })
 })

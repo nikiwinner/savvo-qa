@@ -11,7 +11,7 @@
  * `helpers/curriculumFixtures.ts`), so the map/progress crest counts stay stable.
  *
  * `test.slow()` + 45s waits absorb the QA stack's cold-start window (single-
- * threaded Django + first-hit Vite compile of `/dashboard/today`).
+ * threaded Django + first-hit Vite compile of `/dashboard/learn`).
  */
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
@@ -96,7 +96,7 @@ test.describe('Curriculum — lesson player', () => {
 
 test.describe('Curriculum — lesson player (auth guard)', () => {
   test('an unauthenticated user is redirected from the map', async ({ page }) => {
-    await page.goto('/dashboard/today')
+    await page.goto('/dashboard/learn')
     await expect(page).toHaveURL('/login')
   })
 })

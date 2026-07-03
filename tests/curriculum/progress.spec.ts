@@ -135,7 +135,7 @@ test.describe('Curriculum — derived progress', () => {
 
     // Leak-safe: no step-content string anywhere on the surface (the map payload
     // carries level titles only — never step content).
-    const pageText = await map.todayPage.innerText()
+    const pageText = await map.learnPage.innerText()
     for (const canary of STEP_CONTENT_CANARIES) {
       expect(pageText).not.toContain(canary)
     }

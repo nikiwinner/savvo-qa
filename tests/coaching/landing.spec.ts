@@ -1,11 +1,13 @@
 /**
- * Coaching — Landing + sidebar (Phase 18, Story 18.5)
+ * Coaching — Landing + sidebar
  *
- * The post-auth landing contract moved: every post-auth entry lands on
- * `/dashboard/today` (not `/dashboard`). The sidebar gains "Today" as its FIRST
- * item (Dashboard follows; nothing removed). Unauth `/dashboard/today` still
- * bounces to `/login`. The Today nav link preserves `?space=` after a client-side
- * space selection (the `$: navHref` reactive guard, gotcha #34).
+ * The post-auth landing contract: every post-auth entry lands on
+ * `/dashboard/learn` (the Money Mastery unit-map). Bare `/dashboard` and the
+ * legacy `/dashboard/today` both 307-redirect to `/dashboard/learn`. The sidebar
+ * has Learn as its FIRST item (Analytics / Spaces / Transactions / Settings
+ * follow). Unauth `/dashboard/learn` bounces to `/login`. The Learn nav link
+ * preserves `?space=` after a client-side space selection (the `$: navHref`
+ * reactive guard, gotcha #34).
  */
 import { test, expect } from '@playwright/test'
 import { test as appTest } from '../../fixtures/index'
@@ -14,7 +16,7 @@ import { LoginPage } from '../../pages/LoginPage'
 import { SignupPage } from '../../pages/SignupPage'
 
 test.describe('Coaching — landing', () => {
-  test('email login lands on /dashboard/today', async ({ page, playwright }) => {
+  test('email login lands on /dashboard/learn', async ({ page, playwright }) => {
     const user = uniqueUser('coach-login')
     const reqCtx = await playwright.request.newContext()
     const api = new ApiHelper(reqCtx)
@@ -26,76 +28,79 @@ test.describe('Coaching — landing', () => {
     await login.login(user.email, user.password)
 
     // Cold-start + parallel-load latency on the single-threaded QA dev server —
-    // the post-login redirect chain (login → me → today loader) can take well
+    // the post-login redirect chain (login → me → learn loader) can take well
     // over 15s under the suite's parallel load. Generous ceiling.
-    await expect(page).toHaveURL('/dashboard/today', { timeout: 30_000 })
+    await expect(page).toHaveURL('/dashboard/learn', { timeout: 30_000 })
   })
 
-  test('signup lands on /dashboard/today', async ({ page }) => {
+  test('signup lands on /dashboard/learn', async ({ page }) => {
     const user = uniqueUser('coach-signup')
 
     const signup = new SignupPage(page)
     await signup.goto()
     await signup.signup(user.name, user.email, user.password, user.password)
 
-    await expect(page).toHaveURL('/dashboard/today', { timeout: 30_000 })
+    await expect(page).toHaveURL('/dashboard/learn', { timeout: 30_000 })
   })
 
-  test('unauthenticated /dashboard/today bounces to /login', async ({ page }) => {
-    await page.goto('/dashboard/today')
+  test('unauthenticated /dashboard/learn bounces to /login', async ({ page }) => {
+    await page.goto('/dashboard/learn')
     await expect(page).toHaveURL('/login')
   })
 })
 
 appTest.describe('Coaching — authed marketing root', () => {
-  // The 5th post-auth entry point (found in the Phase-18 review): an already
-  // authenticated user hitting the marketing root `/` must land on Today like
-  // every other entry, not on the analytics dashboard.
-  appTest('an authenticated user on / is redirected to /dashboard/today', async ({
+  // The 5th post-auth entry point: an already authenticated user hitting the
+  // marketing root `/` must land on Learn like every other entry, not on the
+  // analytics surface.
+  appTest('an authenticated user on / is redirected to /dashboard/learn', async ({
     page,
     loggedInPage,
   }) => {
     void loggedInPage // fixture authenticates the page's context via API
     await page.goto('/')
-    await expect(page).toHaveURL('/dashboard/today', { timeout: 30_000 })
+    await expect(page).toHaveURL('/dashboard/learn', { timeout: 30_000 })
   })
 })
 
 appTest.describe('Coaching — sidebar', () => {
-  appTest("the sidebar's first item is Today, Dashboard follows", async ({ page, loggedInPage }) => {
+  appTest("the sidebar's first item is Learn, then Analytics / Spaces / Transactions / Settings", async ({
+    page,
+    loggedInPage,
+  }) => {
     const { api } = loggedInPage
     await api.createSpace('Nav Home')
 
-    await page.goto('/dashboard/today')
+    await page.goto('/dashboard/learn')
     await page.waitForLoadState('networkidle')
 
     const navLinks = page.locator('.nav-menu a')
-    // First nav item is Today → /dashboard/today.
+    // First nav item is Learn → /dashboard/learn.
     const first = navLinks.first()
-    await expect(first).toContainText('Today')
-    await expect(first).toHaveAttribute('href', /\/dashboard\/today/)
+    await expect(first).toContainText('Learn')
+    await expect(first).toHaveAttribute('href', /\/dashboard\/learn/)
 
-    // Dashboard is the SECOND item (no item removed).
+    // Analytics is the SECOND item.
     const second = navLinks.nth(1)
-    await expect(second).toContainText('Dashboard')
-    await expect(second).toHaveAttribute('href', /\/dashboard(\?|$)/)
+    await expect(second).toContainText('Analytics')
+    await expect(second).toHaveAttribute('href', /\/dashboard\/analytics/)
 
-    // The full order is Today / Dashboard / Spaces / Transactions / Settings.
+    // The full order is Learn / Analytics / Spaces / Transactions / Settings.
     await expect(navLinks.nth(2)).toContainText('Spaces')
     await expect(navLinks.nth(3)).toContainText('Transactions')
     await expect(navLinks.nth(4)).toContainText('Settings')
     await expect(navLinks).toHaveCount(5)
   })
 
-  appTest('the Today nav link preserves ?space after a client-side switch', async ({
+  appTest('the Learn nav link preserves ?space after a client-side switch', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
-    const a = await api.createSpace('Today Switch A')
-    const b = await api.createSpace('Today Switch B')
+    const a = await api.createSpace('Learn Switch A')
+    const b = await api.createSpace('Learn Switch B')
 
-    // One full load, then ONLY client-side navigations — the Today href stays
+    // One full load, then ONLY client-side navigations — the Learn href stays
     // correct only if `$: navHref` is reactive (gotcha #34); a plain-function
     // navHref would keep serving the stale closed-over ?space=.
     await page.goto('/dashboard/spaces')
@@ -105,18 +110,18 @@ appTest.describe('Coaching — sidebar', () => {
     await expect(page.locator(`.space-card[data-space-id="${a.id}"]`)).toBeVisible({ timeout: 30_000 })
     await expect(page.locator(`.space-card[data-space-id="${b.id}"]`)).toBeVisible()
 
-    const todayLink = page.locator('.nav-menu a', { hasText: 'Today' })
+    const learnLink = page.locator('.nav-menu a', { hasText: 'Learn' })
 
-    // Client-side drill into space A (card title → /dashboard?space=A).
+    // Client-side drill into space A (card title → /dashboard/analytics?space=A).
     await page.locator(`.space-card[data-space-id="${a.id}"] a.space-title`).click()
-    await page.waitForURL(new RegExp(`/dashboard\\?space=${a.id}`))
-    await expect(todayLink).toHaveAttribute('href', new RegExp(`space=${a.id}`))
+    await page.waitForURL(new RegExp(`/dashboard/analytics\\?space=${a.id}`))
+    await expect(learnLink).toHaveAttribute('href', new RegExp(`space=${a.id}`))
 
-    // Client-side back to Spaces, drill into B — the Today link re-points to B.
+    // Client-side back to Spaces, drill into B — the Learn link re-points to B.
     await page.locator('.nav-menu a', { hasText: 'Spaces' }).click()
     await page.waitForURL(/\/dashboard\/spaces/)
     await page.locator(`.space-card[data-space-id="${b.id}"] a.space-title`).click()
-    await page.waitForURL(new RegExp(`/dashboard\\?space=${b.id}`))
-    await expect(todayLink).toHaveAttribute('href', new RegExp(`space=${b.id}`))
+    await page.waitForURL(new RegExp(`/dashboard/analytics\\?space=${b.id}`))
+    await expect(learnLink).toHaveAttribute('href', new RegExp(`space=${b.id}`))
   })
 })

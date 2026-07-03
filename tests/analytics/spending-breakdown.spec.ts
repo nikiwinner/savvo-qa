@@ -76,7 +76,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const panel = page.getByTestId('breakdown-panel')
@@ -125,7 +125,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     // Full row text formatting: currency symbol + exact two-decimal amount
@@ -156,7 +156,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
     await api.createExpense({ space: hh.id, description: 'tiny a', amount: 0.5, category: tiny1.id, expense_date: TODAY_ISO })
     await api.createExpense({ space: hh.id, description: 'tiny b', amount: 0.5, category: tiny2.id, expense_date: TODAY_ISO })
 
-    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const panel = page.getByTestId('breakdown-panel')
@@ -202,7 +202,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const total = page.getByTestId('breakdown-total')
@@ -270,7 +270,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
       expense_date: TODAY_ISO,
     })
 
-    await page.goto(`/dashboard?space=${hh.id}&${THIS_MONTH_RANGE}&donut_type=income`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${THIS_MONTH_RANGE}&donut_type=income`)
     await page.waitForLoadState('networkidle')
 
     const panel = page.getByTestId('breakdown-panel')
@@ -297,7 +297,7 @@ test.describe('Analytics spending breakdown (segbar + rows)', () => {
 
     // No expenses seeded. Use a date range far in the past where nothing exists.
     await page.goto(
-      `/dashboard?space=${hh.id}&preset=custom&date_from=2000-01-01&date_to=2000-01-31`,
+      `/dashboard/analytics?space=${hh.id}&preset=custom&date_from=2000-01-01&date_to=2000-01-31`,
     )
     await page.waitForLoadState('networkidle')
 

@@ -1,20 +1,19 @@
 /**
- * Main `/dashboard` shell — the GROWTH analytics surface, merged in as the
- * application's main dashboard (Phase 17, Stories 17.1 / 17.4 / 17.5 / 17.6).
+ * Analytics `/dashboard/analytics` shell — the GROWTH analytics surface.
  *
- * This file FOLDS IN the old `analytics/page-shell.spec.ts` coverage, re-pointed
- * to `/dashboard`: the editorial HERO block (`analytics-hero`) whose net figure
+ * The nav redesign (2026-07-03) moved this surface off bare `/dashboard` back
+ * onto its own route `/dashboard/analytics` (bare `/dashboard` now 307-redirects
+ * to `/dashboard/learn`). The marker testids are UNCHANGED (`analytics-*` /
+ * `hero-*` / `dashboard-*`); the visible heading reads "Analytics". This file
+ * covers: the editorial HERO block (`analytics-hero`) whose net figure
  * (`hero-net`) and three hstat values (`hero-stat-income|-expenses|-savings`)
  * come from the day-precise `range_totals` (exact server sums), the four section
  * cards (cashflow / spending / rhythm / insights), and the shared period pill
- * (`dashboard-period-selector`). The marker testids stay `analytics-*` (Phase 17
- * kept them to avoid a needless QA-contract churn); only the visible copy reads
- * "Dashboard".
+ * (`dashboard-period-selector`).
  *
- * Phase 17 also DELETED the old dashboard root (Quick Actions block + the two
- * stat cards: Total Spaces / Transactions) and DROPPED the sidebar "Analytics"
- * nav item, so this file asserts their absence too, plus the zero-space empty
- * state (`dashboard-empty-state`).
+ * It also asserts the absence of the old dashboard-root cruft (Quick Actions
+ * block + the two stat cards: Total Spaces / Transactions), plus the zero-space
+ * empty state (`dashboard-empty-state`).
  */
 import { test, expect } from '../../fixtures/index'
 import { DashboardPage } from '../../pages/DashboardPage'
@@ -30,8 +29,8 @@ function thisMonth(day: number): string {
   return `${TODAY.getFullYear()}-${pad2(TODAY.getMonth() + 1)}-${pad2(day)}`
 }
 
-test.describe('Dashboard shell (merged analytics surface)', () => {
-  test('the main /dashboard renders the KPI hero + the four sections', async ({
+test.describe('Analytics shell (/dashboard/analytics)', () => {
+  test('the analytics page renders the KPI hero + the four sections', async ({
     page,
     loggedInPage,
   }) => {
@@ -55,11 +54,11 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
       expense_date: thisMonth(Math.min(TODAY.getDate(), 28)),
     })
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    // The page heading reads "Dashboard" (was "Analytics" pre-merge).
-    await expect(page.locator('.analytics-page h1')).toHaveText('Dashboard')
+    // The page heading reads "Analytics".
+    await expect(page.locator('.analytics-page h1')).toHaveText('Analytics')
 
     // HERO replaces the old KPI card row.
     await expect(page.getByTestId('analytics-hero')).toBeVisible()
@@ -78,25 +77,22 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
     await expect(page.getByTestId('analytics-section-rhythm')).toBeVisible()
     await expect(page.getByTestId('analytics-section-insights')).toBeVisible()
 
-    // Context line + disabled Export survive the merge (ported from the old
-    // analytics/page-shell coverage — both still ship on the merged page).
+    // Context line + disabled Export survive on the analytics page.
     await expect(page.getByTestId('analytics-context-line')).toBeVisible()
     const exportBtn = page.getByTestId('export-report-btn')
     await expect(exportBtn).toBeVisible()
     await expect(exportBtn).toBeDisabled()
   })
 
-  test('the dashboard shows no "Analytics" copy', async ({ page, loggedInPage }) => {
+  test('the analytics page header reads "Analytics"', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
-    const hh = await api.createSpace('No Analytics Copy Home')
+    const hh = await api.createSpace('Analytics Header Home')
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    // The visible header reads "Dashboard" — not "Analytics".
-    await expect(page.locator('.analytics-page h1')).toHaveText('Dashboard')
-    // No element text equals "Analytics" anywhere on the page.
-    await expect(page.getByText('Analytics', { exact: true })).toHaveCount(0)
+    // The visible header reads "Analytics".
+    await expect(page.locator('.analytics-page h1')).toHaveText('Analytics')
   })
 
   test('hero delta pills appear with a prior period and are absent without one', async ({
@@ -141,7 +137,7 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
 
     // "This month" preset → the prior calendar month feeds previous_totals, so
     // the hero shows delta pills next to the net figure and each hstat.
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     const hero = page.getByTestId('analytics-hero')
@@ -151,13 +147,13 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
     await expect(netPill).toBeVisible()
 
     // range=all has NO previous period → no delta pills anywhere in the hero.
-    await page.goto(`/dashboard?space=${hh.id}&preset=all`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&preset=all`)
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('analytics-hero')).toBeVisible()
     await expect(page.getByTestId('analytics-hero').locator('.delta')).toHaveCount(0)
   })
 
-  test('the dashboard has no Quick Actions block and no stat-card grid', async ({
+  test('the analytics page has no Quick Actions block and no stat-card grid', async ({
     page,
     loggedInPage,
   }) => {
@@ -168,14 +164,14 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
     await api.createExpense({ space: hh.id, description: 'QA-1', amount: 10, expense_date: thisMonth(1) })
     await api.createExpense({ space: hh.id, description: 'QA-2', amount: 20, expense_date: thisMonth(1) })
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    // The Quick Actions heading is gone (deleted, not relocated — Story 17.4).
+    // The Quick Actions heading is gone (deleted, not relocated).
     await expect(page.getByText('Quick Actions', { exact: true })).toHaveCount(0)
     // The "Transactions count" stat card is gone.
     await expect(page.getByTestId('period-transactions-count')).toHaveCount(0)
-    // The legacy `.stat-card` / `.stat-value` grid is gone from the dashboard.
+    // The legacy `.stat-card` / `.stat-value` grid is gone from the page.
     await expect(page.locator('.stat-card')).toHaveCount(0)
   })
 
@@ -201,28 +197,28 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
     await expect(page.getByTestId('analytics-hero')).toHaveCount(0)
   })
 
-  test('a user with a space sees the dashboard, not the empty state', async ({
+  test('a user with a space sees the analytics surface, not the empty state', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Has Space Home')
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('analytics-hero')).toBeVisible()
     await expect(page.getByTestId('dashboard-empty-state')).toHaveCount(0)
   })
 
-  test('the shared period pill is mounted on the dashboard and drives ?preset', async ({
+  test('the shared period pill is mounted on the analytics page and drives ?preset', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Period Pill Home')
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('dashboard-period-selector')).toBeVisible()
@@ -233,8 +229,8 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
     await page.getByTestId('period-preset-6m').click()
     await page.waitForURL(/preset=6m/)
     expect(page.url()).toContain('preset=6m')
-    // The active ?space= scope survives the preset switch (ported from the old
-    // analytics/page-shell coverage — the pill must never drop the scope).
+    // The active ?space= scope survives the preset switch — the pill must never
+    // drop the scope.
     expect(page.url()).toContain(`space=${hh.id}`)
     await expect(page.getByTestId('period-preset-6m')).toHaveAttribute('aria-pressed', 'true')
   })
@@ -246,10 +242,10 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
     const errors: string[] = []
     page.on('pageerror', (err) => errors.push(err.message))
 
-    await page.goto(`/dashboard?space=${hh.id}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}`)
     await page.waitForLoadState('networkidle')
 
-    await expect(page.locator('.analytics-page h1')).toHaveText('Dashboard')
+    await expect(page.locator('.analytics-page h1')).toHaveText('Analytics')
     // Hero still renders (no prior period, no delta pills, net "—" or 0).
     await expect(page.getByTestId('analytics-hero')).toBeVisible()
     // All four section cards render.
@@ -280,13 +276,13 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
     page.on('pageerror', (err) => errors.push(err.message))
 
     // Force-feed B's space id while logged in as A. `resolveActiveSpaces`
-    // strips the unknown id from the URL and 302s back to /dashboard, where A's
-    // own spaces are used. The page renders normally — no crash.
-    await page.goto(`/dashboard?space=${hhB.id}`)
+    // strips the unknown id from the URL and 302s back to /dashboard/analytics,
+    // where A's own spaces are used. The page renders normally — no crash.
+    await page.goto(`/dashboard/analytics?space=${hhB.id}`)
     await page.waitForLoadState('networkidle')
 
     // Page heading still rendered.
-    await expect(page.locator('.analytics-page h1')).toHaveText('Dashboard')
+    await expect(page.locator('.analytics-page h1')).toHaveText('Analytics')
 
     // Acceptable outcomes (any of):
     //   1. The unknown id was stripped from the URL (redirect path).
@@ -302,32 +298,33 @@ test.describe('Dashboard shell (merged analytics surface)', () => {
   })
 })
 
-test.describe('Dashboard sidebar (post-merge nav)', () => {
-  test('the sidebar has Today / Dashboard / Spaces / Transactions / Settings and no Analytics', async ({
+test.describe('Sidebar nav', () => {
+  test('the sidebar has Learn / Analytics / Spaces / Transactions / Settings', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
     await api.createSpace('Nav Home')
 
-    await page.goto('/dashboard')
+    await page.goto('/dashboard/learn')
     await page.waitForLoadState('networkidle')
 
     // The five nav items are present (match by visible label inside the menu).
     const nav = page.locator('.nav-menu')
-    await expect(nav.locator('a', { hasText: 'Today' })).toBeVisible()
-    await expect(nav.locator('a', { hasText: 'Dashboard' })).toBeVisible()
+    await expect(nav.locator('a', { hasText: 'Learn' })).toBeVisible()
+    await expect(nav.locator('a', { hasText: 'Analytics' })).toBeVisible()
     await expect(nav.locator('a', { hasText: 'Spaces' })).toBeVisible()
     await expect(nav.locator('a', { hasText: 'Transactions' })).toBeVisible()
     await expect(nav.locator('a', { hasText: 'Settings' })).toBeVisible()
 
-    // No "Analytics" nav link exists anymore (the surface IS the dashboard).
-    await expect(nav.locator('a', { hasText: 'Analytics' })).toHaveCount(0)
-    // Exactly five items in the menu (Today first since Phase 18).
+    // No "Today" or "Dashboard" nav link exists anymore.
+    await expect(nav.locator('a', { hasText: 'Today' })).toHaveCount(0)
+    await expect(nav.locator('a', { hasText: 'Dashboard' })).toHaveCount(0)
+    // Exactly five items in the menu (Learn first).
     await expect(nav.locator('a')).toHaveCount(5)
   })
 
-  test('the Dashboard nav link preserves ?space after a client-side switch', async ({
+  test('the Analytics nav link preserves ?space after a client-side switch', async ({
     page,
     loggedInPage,
   }) => {
@@ -343,19 +340,19 @@ test.describe('Dashboard sidebar (post-merge nav)', () => {
     await page.goto('/dashboard/spaces')
     await page.waitForLoadState('networkidle')
 
-    const dashLink = page.locator('.nav-menu a', { hasText: 'Dashboard' })
+    const analyticsLink = page.locator('.nav-menu a', { hasText: 'Analytics' })
 
-    // Client-side drill-down into space A (card title → /dashboard?space=A).
+    // Client-side drill into space A (card title → /dashboard/analytics?space=A).
     await page.locator(`.space-card[data-space-id="${a.id}"] a.space-title`).click()
-    await page.waitForURL(new RegExp(`/dashboard\\?space=${a.id}`))
-    await expect(dashLink).toHaveAttribute('href', new RegExp(`space=${a.id}`))
+    await page.waitForURL(new RegExp(`/dashboard/analytics\\?space=${a.id}`))
+    await expect(analyticsLink).toHaveAttribute('href', new RegExp(`space=${a.id}`))
 
     // Client-side back to Spaces, then drill into space B — the link must
     // re-point to B, not keep A's stale value.
     await page.locator('.nav-menu a', { hasText: 'Spaces' }).click()
     await page.waitForURL(/\/dashboard\/spaces/)
     await page.locator(`.space-card[data-space-id="${b.id}"] a.space-title`).click()
-    await page.waitForURL(new RegExp(`/dashboard\\?space=${b.id}`))
-    await expect(dashLink).toHaveAttribute('href', new RegExp(`space=${b.id}`))
+    await page.waitForURL(new RegExp(`/dashboard/analytics\\?space=${b.id}`))
+    await expect(analyticsLink).toHaveAttribute('href', new RegExp(`space=${b.id}`))
   })
 })

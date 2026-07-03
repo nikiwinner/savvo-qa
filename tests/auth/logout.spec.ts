@@ -11,7 +11,7 @@ test.describe('Logout', () => {
   test('redirects to /login after logout', async ({ page, loggedInPage: _ }) => {
     const dashboard = new DashboardPage(page)
     await dashboard.goto()
-    await expect(page).toHaveURL('/dashboard')
+    await expect(page).toHaveURL('/dashboard/analytics')
 
     await dashboard.logout()
 

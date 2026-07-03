@@ -81,7 +81,7 @@ test.describe('Analytics smart insights', () => {
       expense_date: isoOffsetMonths(-1),
     })
 
-    await page.goto(`/dashboard?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const feed = page.getByTestId('insights-feed')
@@ -107,7 +107,7 @@ test.describe('Analytics smart insights', () => {
     const { api } = loggedInPage
     const hh = await api.createSpace('Empty Insights Home')
 
-    await page.goto(`/dashboard?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insights-feed')).toBeVisible()
@@ -129,7 +129,7 @@ test.describe('Analytics smart insights', () => {
       })
     }
 
-    await page.goto(`/dashboard?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     const card = page.getByTestId('insight-card-uncategorized_alert')
@@ -176,7 +176,7 @@ test.describe('Analytics smart insights', () => {
     }
 
     // Dismiss for the CURRENT period.
-    await page.goto(`/dashboard?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()
     await page.getByTestId('insight-dismiss-uncategorized_alert').click()
@@ -185,7 +185,7 @@ test.describe('Analytics smart insights', () => {
     // Navigate to PREVIOUS month (a single-month custom range anchored on last
     // month) — the same-type insight has a different period_yyyy_mm hash, so it
     // must NOT be auto-dismissed.
-    await page.goto(`/dashboard?space=${hh.id}&${monthRangeQuery(-1)}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${monthRangeQuery(-1)}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()
@@ -204,7 +204,7 @@ test.describe('Analytics smart insights', () => {
       })
     }
 
-    await page.goto(`/dashboard?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
+    await page.goto(`/dashboard/analytics?space=${hh.id}&${CURRENT_MONTH_RANGE}`)
     await page.waitForLoadState('networkidle')
 
     await expect(page.getByTestId('insight-card-uncategorized_alert')).toBeVisible()
