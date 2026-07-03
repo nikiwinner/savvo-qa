@@ -87,4 +87,26 @@ export default async function globalSetup(): Promise<void> {
     console.error('\n❌ seed_categorization failed.')
     throw err
   }
+
+  // 5. Warm the curriculum content tree (Section→Topic→Level→Step) up-front.
+  // The map/step endpoints lazily self-heal the seed on the FIRST hit, but on the
+  // single-threaded QA dev server that first hit re-seeds ~30 topics / ~140
+  // levels / 30 missions inside one request while every parallel worker queues
+  // behind it — a cold-start thundering herd that can push the earliest
+  // map/login tests past their 30s ceiling. Seeding it here (idempotent,
+  // create-only — gotcha #40a) makes the first hit a no-op, so the curriculum +
+  // coaching specs start against a warm tree.
+  console.log('🌱 Seeding curriculum content tree (sections / topics / levels / missions)...')
+  try {
+    execSync('uv run python manage.py seed_curriculum', {
+      cwd: backendDir,
+      env: { ...process.env, ...testDbEnv },
+      stdio: 'inherit',
+      timeout: 30_000,
+    })
+    console.log('✅ Curriculum seed complete.\n')
+  } catch (err) {
+    console.error('\n❌ seed_curriculum failed.')
+    throw err
+  }
 }

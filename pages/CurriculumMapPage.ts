@@ -42,6 +42,10 @@ export class CurriculumMapPage {
   readonly stepPlayerHost: Locator
   readonly stepHostClose: Locator
 
+  // Step players (Phase 22)
+  readonly stepPlayer: Locator
+  readonly crestReveal: Locator
+
   constructor(page: Page) {
     this.page = page
 
@@ -64,6 +68,16 @@ export class CurriculumMapPage {
     this.auriCharacter = page.getByTestId('auri-character')
     this.stepPlayerHost = page.getByTestId('step-player-host')
     this.stepHostClose = page.getByTestId('step-host-close')
+
+    this.stepPlayer = page.getByTestId('step-player')
+    this.crestReveal = page.getByTestId('crest-reveal')
+  }
+
+  /** The current-XP integer parsed out of the `xp-total` readout (e.g. "15 XP" → 15). */
+  async xpValue(): Promise<number> {
+    const text = (await this.xpTotal.innerText()).trim()
+    const match = text.match(/(\d+)/)
+    return match ? Number(match[1]) : NaN
   }
 
   /**
@@ -71,9 +85,9 @@ export class CurriculumMapPage {
    * to settle. The cold start (client tz fetch) resolves into one of these —
    * never assume SSR HTML.
    */
-  async goto(): Promise<void> {
+  async goto(settleTimeout = 30_000): Promise<void> {
     await this.page.goto('/dashboard/today')
-    await this.waitForSettled()
+    await this.waitForSettled(settleTimeout)
   }
 
   /**
@@ -83,8 +97,8 @@ export class CurriculumMapPage {
    * can take well over 15s — hence the generous ceiling (the page itself renders
    * correctly; this only absorbs server contention).
    */
-  async waitForSettled(): Promise<void> {
-    await this.map.or(this.error).first().waitFor({ state: 'visible', timeout: 30_000 })
+  async waitForSettled(timeout = 30_000): Promise<void> {
+    await this.map.or(this.error).first().waitFor({ state: 'visible', timeout })
   }
 
   /** The `map-topic` element for a specific topic slug. */

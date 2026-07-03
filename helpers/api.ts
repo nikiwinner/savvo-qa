@@ -200,6 +200,77 @@ export interface CurriculumMapPayload {
   streak: { current: number; best: number; last_completed_date: string | null }
 }
 
+// ── Curriculum step players (Phase 22) ─────────────────────────────────────
+
+/** Body for the DEBUG `POST /api/curriculum/seed/step/` fixture endpoint. */
+export interface SeedStepData {
+  topic_slug: string
+  level_slug: string
+  slug: string
+  kind: 'lesson' | 'quiz' | 'mission'
+  title: string
+  order: number
+  xp: number
+  content: Record<string, unknown>
+  verifier?: Record<string, unknown>
+}
+
+/** `POST /api/curriculum/seed/step/` result (idempotent on `(level, slug)`). */
+export interface SeedStepResult {
+  step_id: number
+  kind: string
+  level_id: number
+  created: boolean
+}
+
+/** One playable step in the leak-safe level manifest (quiz `answer` stripped). */
+export interface ManifestStep {
+  id: number
+  slug: string
+  kind: string
+  title: string
+  order: number
+  xp: number
+  completed: boolean
+  /** Mission steps only — derived, NOT the raw verifier. */
+  is_self_attest?: boolean
+  content: unknown
+}
+
+/** `GET /api/curriculum/levels/<topic>/<level>/` 200 body. */
+export interface LevelManifest {
+  topic_slug: string
+  level_slug: string
+  title: string
+  is_checkpoint: boolean
+  status: string
+  steps: ManifestStep[]
+}
+
+/** `POST /api/steps/<id>/complete/` 200 body (lesson / server-graded quiz). */
+export interface CompleteStepResponse {
+  passed: boolean
+  completed: boolean
+  xp_awarded: number | null
+  already?: boolean
+  results?: boolean[]
+  correct?: number
+  total?: number
+  level_completed?: boolean
+  topic_completed?: boolean
+}
+
+/** `POST /api/steps/<id>/verify/` 200 body (mission verification). */
+export interface VerifyStepResponse {
+  passed: boolean
+  self_attested: boolean
+  snapshot: Record<string, unknown>
+  completed: boolean
+  xp_awarded: number | null
+  level_completed?: boolean
+  topic_completed?: boolean
+}
+
 /** Unique email to avoid conflicts between parallel tests */
 export function uniqueUser(prefix = 'user'): UserRecord {
   const ts = Date.now()
@@ -1232,6 +1303,73 @@ export class ApiHelper {
     })
     if (!res.ok()) {
       throw new Error(`seedXp failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  // ── Curriculum step players (Phase 22) ─────────────────────────────────────
+
+  /**
+   * POST /api/curriculum/seed/step/ — DEBUG-only: create/upsert a fixture `Step`
+   * (lesson / quiz / mission) so the Lesson/Quiz/Mission players have real
+   * content to render (no real lesson/quiz content ships until Phase 23).
+   * Idempotent on `(level, slug)`; re-seeding returns `created:false`.
+   */
+  async seedStep(data: SeedStepData): Promise<SeedStepResult> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/curriculum/seed/step/`, {
+      data,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`seedStep failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * GET /api/curriculum/levels/<topic>/<level>/ — the leak-safe playable-step
+   * manifest a player renders (quiz `answer` keys stripped, `Step.verifier`
+   * never present, mission steps carry a derived `is_self_attest`). 403 if the
+   * topic/level is not playable for the caller; 404 if unknown.
+   */
+  async fetchLevel(topicSlug: string, levelSlug: string): Promise<LevelManifest> {
+    const url = `${this.baseUrl}/api/curriculum/levels/${encodeURIComponent(topicSlug)}/${encodeURIComponent(levelSlug)}/`
+    const res = await this.ctx.get(url)
+    if (!res.ok()) {
+      throw new Error(`fetchLevel failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * POST /api/steps/<id>/complete/ — knowledge completion (lesson mark-read /
+   * server-graded quiz). Lesson body is `{}`; quiz body is `{ answers: [...] }`.
+   * A failing quiz still returns 200 (`passed:false` + per-question `results`) —
+   * only a non-2xx (locked / unknown) throws.
+   */
+  async completeStep(stepId: number, body: Record<string, unknown> = {}): Promise<CompleteStepResponse> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/steps/${stepId}/complete/`, {
+      data: body,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`completeStep failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * POST /api/steps/<id>/verify/ — mission verification against the user's REAL
+   * rows. A FAIL returns 200 (`passed:false` + an honest snapshot, writes
+   * nothing); only a non-2xx (non-mission / locked / unknown) throws.
+   */
+  async verifyStep(stepId: number): Promise<VerifyStepResponse> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/steps/${stepId}/verify/`, {
+      data: {},
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    if (!res.ok()) {
+      throw new Error(`verifyStep failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
