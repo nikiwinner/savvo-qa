@@ -82,10 +82,13 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     expect(xpBefore).toBe(0)
 
     // L1 `pay-yourself-first` is saving's current node → the host mounts the
-    // lesson (order 1), then auto-advances to the quiz (order 2).
+    // lesson (order 1), then auto-advances to the quiz (order 2). The v2 deck now
+    // carries an interactive card, so playing it must tap ≥1 option to advance
+    // (Phase 24 — the applied happy-path still reaches the crest).
     await map.openCurrentNode('saving')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson')
-    await map.playLessonDeck()
+    const interactiveTapped = await map.playLessonDeck()
+    expect(interactiveTapped).toBeGreaterThan(0)
 
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz', { timeout: 45_000 })
     // `guarantee-the-gap` — three MCQs, correct option index 1 each.

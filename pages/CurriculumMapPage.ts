@@ -51,6 +51,13 @@ export class CurriculumMapPage {
   readonly lessonNext: Locator
   readonly lessonDone: Locator
 
+  // Lesson player — interactive (tap) cards (Phase 24, Lesson Format v2)
+  readonly lessonOption: Locator
+  readonly lessonCardFeedback: Locator
+  readonly lessonCardChoice: Locator
+  readonly lessonCardThisOrThat: Locator
+  readonly lessonCardSpotError: Locator
+
   // Quiz player
   readonly quizQuestion: Locator
   readonly quizOption: Locator
@@ -105,6 +112,12 @@ export class CurriculumMapPage {
     this.lessonNext = page.getByTestId('lesson-next')
     this.lessonDone = page.getByTestId('lesson-done')
 
+    this.lessonOption = page.getByTestId('lesson-option')
+    this.lessonCardFeedback = page.getByTestId('lesson-card-feedback')
+    this.lessonCardChoice = page.getByTestId('lesson-card-choice')
+    this.lessonCardThisOrThat = page.getByTestId('lesson-card-this-or-that')
+    this.lessonCardSpotError = page.getByTestId('lesson-card-spot-error')
+
     this.quizQuestion = page.getByTestId('quiz-question')
     this.quizOption = page.getByTestId('quiz-option')
     this.quizSubmit = page.getByTestId('quiz-submit')
@@ -139,17 +152,33 @@ export class CurriculumMapPage {
   }
 
   /**
-   * Advance a Lesson deck to the end and mark it done. Clicks "Next" until the
-   * last card, then "Done" — card-count-agnostic (works for a 2- or 4-card deck).
+   * Advance a Lesson deck to the end and mark it done. Card-count-agnostic
+   * (works for a 2- or 4-card deck) AND interactive-card-aware (Phase 24, Lesson
+   * Format v2): a `choice` / `this_or_that` / `spot_error` card keeps the advance
+   * control DISABLED until an option is tapped, so on each card we detect the
+   * disabled control and tap the first option (any answer proceeds — formative,
+   * no XP, no fail) before advancing. Returns the number of interactive cards
+   * that had to be answered (0 for an all-text deck).
    */
-  async playLessonDeck(): Promise<void> {
+  async playLessonDeck(): Promise<number> {
     await this.lessonCard.waitFor({ state: 'visible', timeout: 45_000 })
-    // Advance card-by-card; the cap is a safety net against a stuck deck (a
-    // real deck is a handful of cards).
-    for (let i = 0; i < 20 && (await this.lessonNext.isVisible()); i++) {
-      await this.lessonNext.click()
+    let interactiveTapped = 0
+    // The cap is a safety net against a stuck deck (a real deck is a handful of
+    // cards). Exactly one of lesson-next / lesson-done is rendered per card.
+    for (let i = 0; i < 30; i++) {
+      const onLast = (await this.lessonDone.count()) > 0
+      const advance = onLast ? this.lessonDone : this.lessonNext
+      await advance.waitFor({ state: 'visible', timeout: 45_000 })
+      // A disabled advance control at deck-walk time means an unanswered
+      // interactive card — tap an option to unlock it (any answer proceeds).
+      if (await advance.isDisabled()) {
+        await this.lessonOption.first().click()
+        interactiveTapped++
+      }
+      await advance.click()
+      if (onLast) return interactiveTapped
     }
-    await this.lessonDone.click()
+    return interactiveTapped
   }
 
   /**

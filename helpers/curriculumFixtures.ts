@@ -17,11 +17,15 @@
  *   - Its ONLY prerequisite level is `catch-every-spend`, which carries NO
  *     fixture, so unlocking it is race-free.
  *
- * Determinism across the parallel player specs: EVERY spec seeds ALL THREE
+ * Determinism across the parallel player specs: EVERY spec seeds ALL FOUR
  * fixtures (idempotent on `(level, slug)`) before making the level playable, then
  * completes every OTHER step for its own fresh user — so the single fixture it
  * targets is the ONLY incomplete step and the host mounts it deterministically,
- * regardless of what a concurrent spec is doing.
+ * regardless of what a concurrent spec is doing. (Phase 24 added the interactive
+ * lesson as the 4th fixture INSIDE `seedPlayerFixtures` — not a separate seed —
+ * precisely so every UI-completion spec also completes it via
+ * `makeFixtureLevelPlayable`, keeping the level's "complete on the last step"
+ * close race-free.)
  */
 import type { ApiHelper, ManifestStep, SeedStepResult } from './api'
 
@@ -34,11 +38,30 @@ export const FIXTURE_PREREQ_LEVEL = 'catch-every-spend'
 export const LESSON_SLUG = 'qa-fixture-lesson'
 export const QUIZ_SLUG = 'qa-fixture-quiz'
 export const MISSION_SLUG = 'qa-fixture-mission'
+/** Phase 24 — a lesson deck carrying a v2 interactive (tap) `choice` card. */
+export const INTERACTIVE_LESSON_SLUG = 'qa-fixture-lesson-v2'
 
 /** XP awarded on completion of each fixture (drives the "xp-total increments" checks). */
 export const LESSON_XP = 15
 export const QUIZ_XP = 15
 export const MISSION_XP = 20
+export const INTERACTIVE_LESSON_XP = 15
+
+// ── Phase 24 — the seeded interactive `choice` card the specs interact with ──
+// The card sits at index 1 of the deck (a text card before + after it), so a
+// text card advancing without a tap (index 0) AND an interactive card gating
+// the advance (index 1) are both exercised. `correct`/`feedback` ship verbatim
+// in the leak-safe manifest (acceptable — inline checks award zero XP).
+export const INTERACTIVE_CORRECT_OPTION = 1
+export const INTERACTIVE_WRONG_OPTION = 0
+export const INTERACTIVE_OPTIONS = [
+  'A spontaneous coffee',
+  'Your monthly rent',
+  'A one-off birthday gift',
+  'A holiday you booked once',
+]
+export const INTERACTIVE_FEEDBACK =
+  'Rent is a fixed need you pay every month — the others are flexible or one-off.'
 
 /**
  * The correct option index of the seeded quiz fixture's single MCQ. The DOM
@@ -59,6 +82,8 @@ export interface SeededFixtures {
   lesson: SeedStepResult
   quiz: SeedStepResult
   mission: SeedStepResult
+  /** Phase 24 — a v2 lesson deck with an interactive `choice` card (text → choice → text). */
+  interactive: SeedStepResult
 }
 
 /**
@@ -121,7 +146,35 @@ export async function seedPlayerFixtures(api: ApiHelper): Promise<SeededFixtures
     verifier: { predicate: 'space_exists' },
   })
 
-  return { lesson, quiz, mission }
+  // Phase 24 — a v2 lesson deck: text → interactive `choice` → text. Seeded as
+  // the 4th fixture so every UI-completion spec's `makeFixtureLevelPlayable`
+  // completes it too (race-free level close). Its `correct`/`feedback` ship in
+  // the leak-safe manifest verbatim — acceptable because inline checks award
+  // ZERO XP (nothing to cheat).
+  const interactive = await api.seedStep({
+    topic_slug: FIXTURE_TOPIC,
+    level_slug: FIXTURE_LEVEL,
+    slug: INTERACTIVE_LESSON_SLUG,
+    kind: 'lesson',
+    title: 'QA fixture interactive lesson',
+    order: 54,
+    xp: INTERACTIVE_LESSON_XP,
+    content: {
+      cards: [
+        { title: 'Warm up', body: 'Money you can name is money you can steer.' },
+        {
+          kind: 'choice',
+          prompt: 'Which of these is a fixed monthly need?',
+          options: INTERACTIVE_OPTIONS,
+          correct: INTERACTIVE_CORRECT_OPTION,
+          feedback: INTERACTIVE_FEEDBACK,
+        },
+        { title: 'Nice work', body: 'You spotted the fixed cost. Onward.' },
+      ],
+    },
+  })
+
+  return { lesson, quiz, mission, interactive }
 }
 
 /**

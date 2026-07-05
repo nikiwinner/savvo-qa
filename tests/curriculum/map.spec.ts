@@ -59,7 +59,7 @@ test.describe('Curriculum — unit-map', () => {
     // API parity — the number on screen traces to the ledger.
     const payload = await api.getCurriculumMap()
     expect(payload.bars.knowledge.xp_total).toBe(40)
-    // Bar #2 is literally null this phase (Net Wealth = Phase 24, Score = Phase 49).
+    // Bar #2 is literally null this phase (Net Wealth = Phase 25, Score = Phase 50).
     expect(payload.bars.doing).toBeNull()
 
     // Bar #2 renders a LOCKED placeholder — and never a number.
