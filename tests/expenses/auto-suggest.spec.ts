@@ -16,22 +16,24 @@
  */
 import { test, expect } from '../../fixtures/index'
 import { ExpensesPage } from '../../pages/ExpensesPage'
+import { tokenFreeMerchant } from '../../helpers/merchantSeed'
 
 const TODAY = new Date().toISOString().split('T')[0]
 
-// No real brand here → guaranteed not to hit a MERCHANT_SEED token (seed tokens
-// are brand names: lidl, netflix, …). The shown merchant = this, lower-cased.
+// A UNIQUE merchant per test invocation, GUARANTEED to hit no MERCHANT_SEED
+// token (backend rung-3 categorization, gotcha #37 — matches `token in
+// description.lower()` as a SUBSTRING). `tokenFreeMerchant` filter-regenerates
+// against the LIVE seed-token list, so the backend cascade never categorizes
+// these rows on its own — the 2-repeat suggestion path is the ONLY way they get
+// a category. Previously a plain random string could coincidentally contain a
+// short token (e.g. `dia`, `kfc`, `hbo`) and flip the assertion ~1/run.
 //
-// The savvo_test DB persists across projects (chromium → mobile-safari →
-// tablet) and across parallel workers, and merchant identity (= description
-// lower-cased) is what drives repeat-detection AND the dismiss-hash. A shared
-// constant therefore cross-contaminates: another worker's same-merchant
-// categorizations can create a suppressing is_auto rule, and one worker's
-// localStorage dismiss can't bleed across browser contexts but the SERVER-side
-// suggestion can. So mint a UNIQUE token per test invocation.
+// Uniqueness also matters because the savvo_test DB persists across projects
+// (chromium → mobile-safari → tablet) and parallel workers, and merchant
+// identity (= description lower-cased) drives repeat-detection AND the
+// dismiss-hash — a shared constant would cross-contaminate.
 function uniqueMerchant(): string {
-  const rand = Math.random().toString(36).slice(2, 8).toUpperCase()
-  return `QZX${rand} VNDR`
+  return tokenFreeMerchant('QZX')
 }
 
 test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
@@ -94,7 +96,9 @@ test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
     expect(dining).not.toBeNull()
 
     const merchant = uniqueMerchant()
-    const unrelatedMerchant = `ZZZ${Math.random().toString(36).slice(2, 8).toUpperCase()} OTHER`
+    // Also seed-token-free: this row is asserted to STAY uncategorized (null),
+    // so a coincidental token substring here would fail the scope check too.
+    const unrelatedMerchant = tokenFreeMerchant('ZZO')
 
     // Two trigger rows (categorized by hand via the API — same lock-stamping
     // path as the modal — for deterministic ids), one MORE uncategorized
@@ -270,9 +274,10 @@ test.describe('Auto-suggest (rung-2) + first-time hint + manual lock', () => {
     const space = await api.createSpace('Suggest Hint Home')
 
     // No seed token, no provider category, no rule → the cascade leaves it
-    // uncategorized (badge-none), which surfaces the first-time hint. Unique
-    // suffix keeps it parallel-safe (and still matches no MERCHANT_SEED token).
-    const unknownDesc = `POS ${Math.random().toString(36).slice(2, 8).toUpperCase()} ZZVND`
+    // uncategorized (badge-none), which surfaces the first-time hint.
+    // `tokenFreeMerchant` guarantees no MERCHANT_SEED substring match AND stays
+    // parallel-safe (unique random per invocation).
+    const unknownDesc = tokenFreeMerchant('PSX')
     await api.createBankTransaction({
       description: unknownDesc,
       amount: '7.40',

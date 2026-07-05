@@ -17,6 +17,12 @@ import { SignupPage } from '../../pages/SignupPage'
 
 test.describe('Coaching — landing', () => {
   test('email login lands on /dashboard/learn', async ({ page, playwright }) => {
+    // Cold-start of the single-threaded QA server + Vite SSR compile of the
+    // /dashboard/learn route can push the login→me→learn redirect chain past the
+    // default 30s TEST budget under concentrated parallel load. Triple it (→90s)
+    // so the explicit 30s URL wait below can actually run to completion instead
+    // of being cut short by the test wrapper. No assertion is weakened.
+    test.slow()
     const user = uniqueUser('coach-login')
     const reqCtx = await playwright.request.newContext()
     const api = new ApiHelper(reqCtx)
@@ -34,6 +40,8 @@ test.describe('Coaching — landing', () => {
   })
 
   test('signup lands on /dashboard/learn', async ({ page }) => {
+    // Cold-start latency headroom (see the email-login test above).
+    test.slow()
     const user = uniqueUser('coach-signup')
 
     const signup = new SignupPage(page)
@@ -57,6 +65,7 @@ appTest.describe('Coaching — authed marketing root', () => {
     page,
     loggedInPage,
   }) => {
+    appTest.slow() // cold-start latency headroom (see the email-login test)
     void loggedInPage // fixture authenticates the page's context via API
     await page.goto('/')
     await expect(page).toHaveURL('/dashboard/learn', { timeout: 30_000 })
@@ -68,15 +77,21 @@ appTest.describe('Coaching — sidebar', () => {
     page,
     loggedInPage,
   }) => {
+    appTest.slow() // cold-start latency headroom (see the email-login test)
     const { api } = loggedInPage
     await api.createSpace('Nav Home')
 
     await page.goto('/dashboard/learn')
-    await page.waitForLoadState('networkidle')
 
+    // Wait on the actual element under assertion (the rendered sidebar), NOT
+    // `networkidle`: the learn page runs SSR polling that can keep the network
+    // busy indefinitely, so networkidle burns its full default timeout and
+    // times out under cold-start load. A concrete visibility wait is honest and
+    // fast, and doesn't weaken the assertions below.
     const navLinks = page.locator('.nav-menu a')
-    // First nav item is Learn → /dashboard/learn.
     const first = navLinks.first()
+    await expect(first).toBeVisible({ timeout: 30_000 })
+    // First nav item is Learn → /dashboard/learn.
     await expect(first).toContainText('Learn')
     await expect(first).toHaveAttribute('href', /\/dashboard\/learn/)
 
@@ -96,6 +111,7 @@ appTest.describe('Coaching — sidebar', () => {
     page,
     loggedInPage,
   }) => {
+    appTest.slow() // cold-start latency headroom (see the email-login test)
     const { api } = loggedInPage
     const a = await api.createSpace('Learn Switch A')
     const b = await api.createSpace('Learn Switch B')

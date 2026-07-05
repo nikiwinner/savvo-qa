@@ -66,14 +66,21 @@ export default defineConfig({
     },
     {
       // QA-only frontend on :5174, pointed at the QA backend on :8001.
+      // Serves a PRODUCTION build (`vite build && vite preview`), NOT the dev
+      // server: vite dev re-optimizes dependencies mid-run and force-reloads
+      // every open page ("optimized dependencies changed"), which killed open
+      // dialogs / aborted in-flight navigations at random (the long-standing
+      // "infra flake" — rotating chromium timeouts, net::ERR_ABORTED).
+      // PUBLIC_API_BASE_URL must be set on the BUILD step — $env/static/public
+      // is inlined at build time.
       // --strictPort makes Vite fail loudly if :5174 is taken instead of
       // silently falling back to a random port (which would break baseURL).
       // FRONTEND_DIR overrides the frontend checkout to test (e.g. a git
       // worktree under frontend/.worktrees/<branch>); defaults to ../frontend.
-      command: `cd ${process.env.FRONTEND_DIR ?? path.resolve(__dirname, '../frontend')} && PUBLIC_API_BASE_URL=http://localhost:8001 npm run dev -- --port 5174 --strictPort`,
+      command: `cd ${process.env.FRONTEND_DIR ?? path.resolve(__dirname, '../frontend')} && PUBLIC_API_BASE_URL=http://localhost:8001 npm run build && PUBLIC_API_BASE_URL=http://localhost:8001 npm run preview -- --port 5174 --strictPort`,
       url: 'http://localhost:5174',
       reuseExistingServer: false,
-      timeout: 60_000,
+      timeout: 180_000,
     },
   ],
 })
