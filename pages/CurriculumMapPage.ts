@@ -46,6 +46,35 @@ export class CurriculumMapPage {
   readonly stepPlayer: Locator
   readonly crestReveal: Locator
 
+  // Lesson player
+  readonly lessonCard: Locator
+  readonly lessonNext: Locator
+  readonly lessonDone: Locator
+
+  // Quiz player
+  readonly quizQuestion: Locator
+  readonly quizOption: Locator
+  readonly quizSubmit: Locator
+  readonly quizResult: Locator
+  readonly quizRetry: Locator
+  readonly quizNext: Locator
+
+  // Mission player + verify snapshot (Phase 22/23)
+  readonly missionVerify: Locator
+  readonly missionDeeplink: Locator
+  readonly missionSelfAttest: Locator
+  readonly missionFailNote: Locator
+  readonly verifierSnapshot: Locator
+  readonly snapshotFigure: Locator
+  readonly missionContinue: Locator
+
+  // Space picker (Phase 23 — binds_space missions only)
+  readonly spacePicker: Locator
+  readonly spacePickerEmpty: Locator
+  readonly spacePickerError: Locator
+  readonly spacePickerCreate: Locator
+  readonly pickerRadios: Locator
+
   constructor(page: Page) {
     this.page = page
 
@@ -71,6 +100,81 @@ export class CurriculumMapPage {
 
     this.stepPlayer = page.getByTestId('step-player')
     this.crestReveal = page.getByTestId('crest-reveal')
+
+    this.lessonCard = page.getByTestId('lesson-card')
+    this.lessonNext = page.getByTestId('lesson-next')
+    this.lessonDone = page.getByTestId('lesson-done')
+
+    this.quizQuestion = page.getByTestId('quiz-question')
+    this.quizOption = page.getByTestId('quiz-option')
+    this.quizSubmit = page.getByTestId('quiz-submit')
+    this.quizResult = page.getByTestId('quiz-result')
+    this.quizRetry = page.getByTestId('quiz-retry')
+    // The quiz "Next" affordance carries no testid (only the last-question
+    // "Submit" does), so it is addressed by its accessible name.
+    this.quizNext = page.getByRole('button', { name: /Next/ })
+
+    this.missionVerify = page.getByTestId('mission-verify')
+    this.missionDeeplink = page.getByTestId('mission-deeplink')
+    this.missionSelfAttest = page.getByTestId('mission-self-attest')
+    this.missionFailNote = page.getByTestId('mission-fail-note')
+    this.verifierSnapshot = page.getByTestId('verifier-snapshot')
+    this.snapshotFigure = page.getByTestId('snapshot-figure')
+    // The row-verified PASS "Continue" button (advances/closes the host) has no
+    // testid — addressed by its accessible name.
+    this.missionContinue = page.getByRole('button', { name: /Continue/ })
+
+    this.spacePicker = page.getByTestId('space-picker')
+    this.spacePickerEmpty = page.getByTestId('space-picker-empty')
+    this.spacePickerError = page.getByTestId('space-picker-error')
+    this.spacePickerCreate = page.getByTestId('space-picker-create')
+    this.pickerRadios = this.spacePicker.getByRole('radio')
+  }
+
+  /** Open a topic's sole `current` node and wait for the step player to mount. */
+  async openCurrentNode(topicSlug: string, timeout = 45_000): Promise<void> {
+    await this.nodesInTopic(topicSlug, 'current').first().click()
+    await this.stepPlayerHost.waitFor({ state: 'visible', timeout })
+    await this.stepPlayer.waitFor({ state: 'visible', timeout })
+  }
+
+  /**
+   * Advance a Lesson deck to the end and mark it done. Clicks "Next" until the
+   * last card, then "Done" — card-count-agnostic (works for a 2- or 4-card deck).
+   */
+  async playLessonDeck(): Promise<void> {
+    await this.lessonCard.waitFor({ state: 'visible', timeout: 45_000 })
+    // Advance card-by-card; the cap is a safety net against a stuck deck (a
+    // real deck is a handful of cards).
+    for (let i = 0; i < 20 && (await this.lessonNext.isVisible()); i++) {
+      await this.lessonNext.click()
+    }
+    await this.lessonDone.click()
+  }
+
+  /**
+   * Answer a one-question-at-a-time MCQ / true-false quiz. `correctIndices` is
+   * one option index per question (in order); the last click submits, every
+   * earlier one advances. The answer key never reaches the DOM — the caller
+   * knows the indices only because it (or the seed content) authored them.
+   */
+  async answerMcqQuiz(correctIndices: number[]): Promise<void> {
+    await this.quizQuestion.waitFor({ state: 'visible', timeout: 45_000 })
+    for (let i = 0; i < correctIndices.length; i++) {
+      await this.quizOption.nth(correctIndices[i]).click()
+      if (i < correctIndices.length - 1) {
+        await this.quizNext.click()
+      } else {
+        await this.quizSubmit.click()
+      }
+    }
+  }
+
+  /** The crest count integer shown inside Bar #1 (the `.figure.crest` readout). */
+  async crestCountValue(): Promise<number> {
+    const text = (await this.barKnowledge.locator('.figure.crest').innerText()).trim()
+    const match = text.match(/(\d+)/)
+    return match ? Number(match[1]) : NaN
   }
 
   /** The current-XP integer parsed out of the `xp-total` readout (e.g. "15 XP" → 15). */

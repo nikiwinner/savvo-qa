@@ -1362,10 +1362,15 @@ export class ApiHelper {
    * POST /api/steps/<id>/verify/ — mission verification against the user's REAL
    * rows. A FAIL returns 200 (`passed:false` + an honest snapshot, writes
    * nothing); only a non-2xx (non-mission / locked / unknown) throws.
+   *
+   * `spaceId` (Phase 23) is sent as `{space_id}` ONLY when provided — it
+   * designates the savings Space for a `binds_space` mission (the same body the
+   * Space picker posts). When omitted the body is `{}` (byte-identical to the
+   * Phase-22 contract), so non-binding missions post exactly `{}`.
    */
-  async verifyStep(stepId: number): Promise<VerifyStepResponse> {
+  async verifyStep(stepId: number, spaceId?: number): Promise<VerifyStepResponse> {
     const res = await this.ctx.post(`${this.baseUrl}/api/steps/${stepId}/verify/`, {
-      data: {},
+      data: spaceId === undefined ? {} : { space_id: spaceId },
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
     if (!res.ok()) {
