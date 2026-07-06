@@ -27,7 +27,7 @@ const TODAY_ISO = TODAY.toISOString().split('T')[0]
 // The income-semantic sprout green (SPROUT in $lib/theme.ts). The ONE pinned
 // color literal: "income = sprout" is a product semantic, not decoration.
 // Category palette hues are asserted via seg↔row agreement, never by value.
-const SPROUT_RGB = 'rgb(108, 212, 154)' // SPROUT #6CD49A
+const SPROUT_RGB = 'rgb(70, 224, 140)' // SPROUT #46E08C (Dark v2 "Deep Ink", 2026-07-06)
 
 // The analytics period is driven by the shared pill's date range. Scope the
 // breakdown to the current calendar month — the month the seeded rows live in.
