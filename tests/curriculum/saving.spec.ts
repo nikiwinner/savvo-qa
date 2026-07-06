@@ -49,8 +49,9 @@ import {
 } from '../../helpers/savingFixtures'
 
 // Money/currency tripwire (same shape as map.spec): any currency symbol, a
-// currency-formatted decimal, or an ISO code. The topic MAP surface must show
-// ZERO money — only XP / crest / streak (behavior-rules: no fake numbers).
+// currency-formatted decimal, or an ISO code. The learn surface shows exactly
+// ONE legal money figure — Bar #2 (Net Wealth), Phase 25 — and nothing else
+// money; XP / crest / streak stay money-free (behavior-rules: no fake numbers).
 const MONEY_PATTERN = /[€$£¥]|\b\d+[.,]\d{2}\b|\bEUR\b|\bUSD\b|\bGBP\b/
 
 test.describe('Curriculum — Saving topic (applied happy path)', () => {
@@ -326,7 +327,7 @@ test.describe('Curriculum — Saving topic (data-less honesty)', () => {
     expect((await api.getCurriculumMap()).bars.knowledge.xp_total).toBeGreaterThan(0)
   })
 
-  test('the Saving surface shows zero money figures', async ({ page, loggedInPage }) => {
+  test('the Saving surface shows only the Bar #2 money figure', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     await unlockSaving(api) // make the whole saving topic visible on the map
@@ -335,9 +336,17 @@ test.describe('Curriculum — Saving topic (data-less honesty)', () => {
     await map.goto(45_000)
     await expect(map.map).toBeVisible()
     await expect(map.topic('saving')).toHaveAttribute('data-topic-status', 'available')
+    // Bar #2 (Net Wealth) is the ONE legal money figure since Phase 25 — subtract
+    // its text and assert the rest of the topic surface is money-free.
+    await expect(map.barDoing).toHaveAttribute('data-bar-doing', 'live')
 
-    // XP / crest / streak only — the topic surface never renders a money figure.
     const pageText = await map.learnPage.innerText()
-    expect(pageText).not.toMatch(MONEY_PATTERN)
+    const barDoingText = await map.barDoing.innerText()
+    const outsideBarDoing = pageText.split(barDoingText).join('')
+    // XP / crest / streak only — the topic surface never renders money elsewhere.
+    expect(outsideBarDoing).not.toMatch(MONEY_PATTERN)
+    // Positive control: Bar #2 IS a money figure, so the subtraction above removed
+    // something real (a silently-empty Bar #2 would otherwise pass vacuously).
+    expect(barDoingText).toMatch(MONEY_PATTERN)
   })
 })

@@ -33,8 +33,9 @@ import {
 } from '../../helpers/startHereFixtures'
 
 // Money/currency tripwire (same shape as map.spec / saving.spec): any currency
-// symbol, a currency-formatted decimal, or an ISO code. The Topic 0 surface must
-// show ZERO money — only XP / crest / streak (behavior-rules: no fake numbers).
+// symbol, a currency-formatted decimal, or an ISO code. The learn surface shows
+// exactly ONE legal money figure — Bar #2 (Net Wealth), Phase 25 — and NOTHING
+// else money (behavior-rules: no fake numbers; XP/crest/streak stay money-free).
 const MONEY_PATTERN = /[€$£¥]|\b\d+[.,]\d{2}\b|\bEUR\b|\bUSD\b|\bGBP\b/
 
 test.describe('Curriculum — Start here (Topic 0)', () => {
@@ -256,14 +257,22 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     await expect.poll(() => map.crestCountValue(), { timeout: 15_000 }).toBe(crestAfter)
   })
 
-  test('the Start here surface shows zero money figures', async ({ page, loggedInPage: _ }) => {
+  test('the Start here surface shows only the Bar #2 money figure', async ({ page, loggedInPage: _ }) => {
     const map = new CurriculumMapPage(page)
     await map.goto()
     await expect(map.map).toBeVisible()
     await expect(map.topic('start-here')).toHaveAttribute('data-topic-status', 'available')
+    // Bar #2 (Net Wealth) is the ONE legal money figure since Phase 25 — wait for
+    // it, then subtract its text and assert the rest of the surface is money-free.
+    await expect(map.barDoing).toHaveAttribute('data-bar-doing', 'live')
 
-    // XP / crest / streak only — the Topic 0 surface never renders a money figure.
     const pageText = await map.learnPage.innerText()
-    expect(pageText).not.toMatch(MONEY_PATTERN)
+    const barDoingText = await map.barDoing.innerText()
+    const outsideBarDoing = pageText.split(barDoingText).join('')
+    // XP / crest / streak / topic scaffold — none of it renders a money figure.
+    expect(outsideBarDoing).not.toMatch(MONEY_PATTERN)
+    // Positive control: Bar #2 IS a money figure, so the subtraction above removed
+    // something real (a silently-empty Bar #2 would otherwise pass vacuously).
+    expect(barDoingText).toMatch(MONEY_PATTERN)
   })
 })

@@ -37,6 +37,16 @@ export class CurriculumMapPage {
   readonly barDoing: Locator
   readonly mapStreak: Locator
 
+  // Bar #2 (Net Wealth) live readout + tap-through breakdown (Phase 25)
+  readonly netWealthFigure: Locator
+  readonly netWealthCompletenessHint: Locator
+  readonly netWealthScoreNote: Locator
+  readonly netWealthBreakdown: Locator
+  readonly netWealthTotal: Locator
+  readonly netWealthCompleteness: Locator
+  readonly netWealthAccountList: Locator
+  readonly netWealthAccountRows: Locator
+
   // Auri + step-player host
   readonly auriCharacter: Locator
   readonly stepPlayerHost: Locator
@@ -100,6 +110,15 @@ export class CurriculumMapPage {
     this.xpTotal = page.getByTestId('xp-total')
     this.barDoing = page.getByTestId('bar-doing')
     this.mapStreak = page.getByTestId('map-streak')
+
+    this.netWealthFigure = page.getByTestId('net-wealth-figure')
+    this.netWealthCompletenessHint = page.getByTestId('net-wealth-completeness-hint')
+    this.netWealthScoreNote = page.getByTestId('net-wealth-score-note')
+    this.netWealthBreakdown = page.getByTestId('net-wealth-breakdown')
+    this.netWealthTotal = page.getByTestId('net-wealth-total')
+    this.netWealthCompleteness = page.getByTestId('net-wealth-completeness')
+    this.netWealthAccountList = page.getByTestId('net-wealth-account-list')
+    this.netWealthAccountRows = page.getByTestId('net-wealth-account-row')
 
     this.auriCharacter = page.getByTestId('auri-character')
     this.stepPlayerHost = page.getByTestId('step-player-host')
@@ -211,6 +230,15 @@ export class CurriculumMapPage {
     const text = (await this.xpTotal.innerText()).trim()
     const match = text.match(/(\d+)/)
     return match ? Number(match[1]) : NaN
+  }
+
+  /**
+   * Tap the live Bar #2 (Net Wealth) figure and wait for the per-account
+   * breakdown modal to open (Phase 25). Only valid when `bar-doing` is `live`.
+   */
+  async openNetWealthBreakdown(timeout = 45_000): Promise<void> {
+    await this.barDoing.click()
+    await this.netWealthBreakdown.waitFor({ state: 'visible', timeout })
   }
 
   /**

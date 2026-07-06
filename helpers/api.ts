@@ -190,14 +190,80 @@ export interface MapSection {
   topics: MapTopic[]
 }
 
-/** The whole map + both bars + streak. `bars.doing` is literally null this phase. */
+/**
+ * Bar #2 Net Wealth summary carried inline on the map payload (Phase 25). Every
+ * euro traces to a real `BankAccount`; `accounts_known < accounts_total` signals
+ * an incomplete (honest) number. `total`/`total_currency` fold into the viewer's
+ * `User.currency`.
+ */
+export interface MapNetWealth {
+  total: string
+  total_currency: string
+  fx_stale: boolean
+  accounts_total: number
+  accounts_known: number
+}
+
+/**
+ * Bar #2 — "what you're DOING" (Phase 25). Net Wealth is real; `score` stays
+ * `null` ("Financial Score coming soon" — Phase 50), NEVER a fake 0/100 and
+ * NEVER fed by XP. `bars.doing` is `null` only in a data-less / degraded case
+ * where even the empty figure can't be computed.
+ */
+export interface MapDoingBar {
+  net_wealth: MapNetWealth
+  score: null
+}
+
+/** The whole map + both bars + streak. `bars.doing` is a Net-Wealth object (Phase 25). */
 export interface CurriculumMapPayload {
   sections: MapSection[]
   bars: {
     knowledge: { xp_total: number; crest_count: number }
-    doing: null
+    doing: MapDoingBar | null
   }
   streak: { current: number; best: number; last_completed_date: string | null }
+}
+
+// ── Net Wealth read endpoint (Phase 25) — GET /api/analytics/net-wealth/ ────
+
+/**
+ * One row in the Net Wealth per-account breakdown. Each row is one real
+ * `BankAccount`; a `null` `balance` is an unknown-balance account (listed,
+ * excluded from `total`).
+ */
+export interface NetWealthAccount {
+  account_id: number
+  account_name: string
+  bank_name: string
+  balance: string | null
+  balance_currency: string
+  balance_updated_at: string | null
+  /** Phase 25 — additive: the balance folded into the total currency (null when unknown / same-currency). */
+  converted_balance?: string | null
+  converted_currency?: string | null
+}
+
+/** `GET /api/analytics/net-wealth/` 200 body — the tap-through behind Bar #2. */
+export interface NetWealthDetail {
+  total: string
+  total_currency: string
+  fx_stale: boolean
+  accounts_total: number
+  accounts_known: number
+  accounts: NetWealthAccount[]
+}
+
+/** One account row from `GET /api/bank-accounts/` (real bank OR cash). */
+export interface BankAccountRecord {
+  id: number
+  connection: number | null
+  account_name: string
+  is_cash: boolean
+  balance_amount: string | null
+  balance_currency: string
+  balance_updated_at: string | null
+  owner?: number | null
 }
 
 // ── Curriculum step players (Phase 22) ─────────────────────────────────────
@@ -838,6 +904,73 @@ export class ApiHelper {
     })
     if (!res.ok()) {
       throw new Error(`seedBankAccount failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * GET /api/bank-accounts/ — the user's accounts (real bank + cash). Every user
+   * has ONE auto-provisioned cash account (`is_cash=true`, null balance) from
+   * signup, so this is how a spec resolves the cash account id it PATCHes.
+   */
+  async listBankAccounts(): Promise<BankAccountRecord[]> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/bank-accounts/`)
+    if (!res.ok()) {
+      throw new Error(`listBankAccounts failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /** The user's sole auto-provisioned cash account. Throws if none is found. */
+  async cashAccount(): Promise<BankAccountRecord> {
+    const account = (await this.listBankAccounts()).find((a) => a.is_cash)
+    if (!account) throw new Error('no cash account found for the current user')
+    return account
+  }
+
+  /**
+   * PATCH /api/bank-accounts/<id>/balance/ (Phase 25) — raw form returns
+   * APIResponse so negative tests (foreign/non-cash/bad-currency/<0) can inspect
+   * the status. `balanceCurrency` omitted → the account's current currency is
+   * kept (the key is absent from the body).
+   */
+  async updateCashBalanceRaw(
+    accountId: number,
+    balanceAmount: string,
+    balanceCurrency?: string,
+  ): Promise<APIResponse> {
+    const body: Record<string, unknown> = { balance_amount: balanceAmount }
+    if (balanceCurrency !== undefined) {
+      body['balance_currency'] = balanceCurrency
+    }
+    return this.ctx.patch(`${this.baseUrl}/api/bank-accounts/${accountId}/balance/`, {
+      data: body,
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+  }
+
+  /** Throws on non-OK; returns the updated account record. */
+  async updateCashBalance(
+    accountId: number,
+    balanceAmount: string,
+    balanceCurrency?: string,
+  ): Promise<BankAccountRecord> {
+    const res = await this.updateCashBalanceRaw(accountId, balanceAmount, balanceCurrency)
+    if (!res.ok()) {
+      throw new Error(`updateCashBalance failed (${res.status()}): ${await res.text()}`)
+    }
+    return res.json()
+  }
+
+  /**
+   * GET /api/analytics/net-wealth/ (Phase 25) — the FX-folded total + per-account
+   * breakdown behind Bar #2. Every euro in `total` traces to a real `BankAccount`
+   * row in `accounts` (no-fake-numbers).
+   */
+  async getNetWealth(): Promise<NetWealthDetail> {
+    const res = await this.ctx.get(`${this.baseUrl}/api/analytics/net-wealth/`)
+    if (!res.ok()) {
+      throw new Error(`getNetWealth failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }

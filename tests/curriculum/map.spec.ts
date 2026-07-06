@@ -3,10 +3,11 @@
  *
  * `/dashboard/learn` is the Duolingo-style unit-map fed by ONE call,
  * `GET /api/curriculum/map/`. These specs cover the fresh-user journey render,
- * the two-bar topbar (Bar #1 real XP + streak, Bar #2 a locked placeholder), the
- * zero-money tripwire, the Auri PNG-vs-glyph fallback (migrated from the retired
- * `coaching/today.spec.ts`), and the graceful map-load-failure degraded card with
- * a working Retry (also migrated).
+ * the two-bar topbar (Bar #1 real XP + streak; Bar #2 = the honest Net Wealth
+ * figure since Phase 25 — the ONE legal money figure on the surface), the
+ * scoped money tripwire (money lives ONLY inside Bar #2), the Auri PNG-vs-glyph
+ * fallback (migrated from the retired `coaching/today.spec.ts`), and the
+ * graceful map-load-failure degraded card with a working Retry (also migrated).
  *
  * The `loggedInPage` fixture creates + logs in the user via the API and copies
  * the session cookies into the browser context (no UI landing), so navigating to
@@ -41,7 +42,10 @@ test.describe('Curriculum — unit-map', () => {
     expect(locked + comingSoon).toBeGreaterThan(0)
   })
 
-  test('Bar #1 shows real XP + streak; Bar #2 is a locked placeholder', async ({ page, loggedInPage }) => {
+  test('Bar #1 shows real XP + streak; Bar #2 shows the honest empty Net Wealth', async ({
+    page,
+    loggedInPage,
+  }) => {
     const { api } = loggedInPage
 
     // Seed a real, traceable XP total — Bar #1 xp_total = Sum(XPLedgerEntry.amount).
@@ -59,24 +63,44 @@ test.describe('Curriculum — unit-map', () => {
     // API parity — the number on screen traces to the ledger.
     const payload = await api.getCurriculumMap()
     expect(payload.bars.knowledge.xp_total).toBe(40)
-    // Bar #2 is literally null this phase (Net Wealth = Phase 25, Score = Phase 50).
-    expect(payload.bars.doing).toBeNull()
 
-    // Bar #2 renders a LOCKED placeholder — and never a number.
-    await expect(map.barDoing).toHaveAttribute('data-bar-doing', 'locked')
-    const doingText = (await map.barDoing.innerText()).trim()
-    expect(doingText).not.toMatch(/\d/)
+    // Bar #2 (Net Wealth) flipped null → object in Phase 25 — the SANCTIONED
+    // contract change (phase_25.md "Tests touching the old contract"). A fresh
+    // user has one auto-provisioned cash account with a NULL balance, so the
+    // honest figure is "0.00" with accounts_known=0 — never a fake 0/100 and
+    // NEVER fed by XP (the 40 XP above does not touch this number).
+    expect(payload.bars.doing).not.toBeNull()
+    expect(payload.bars.doing?.score).toBeNull()
+    expect(payload.bars.doing?.net_wealth.total).toBe('0.00')
+    expect(payload.bars.doing?.net_wealth.accounts_known).toBe(0)
+
+    // Bar #2 renders LIVE (a real figure now), not the locked placeholder; the
+    // figure is the honest 0.00 and "Score coming soon" is present.
+    await expect(map.barDoing).toHaveAttribute('data-bar-doing', 'live')
+    await expect(map.netWealthFigure).toContainText('0.00')
+    await expect(map.netWealthScoreNote).toContainText('Score coming soon')
   })
 
-  test('the map surface shows zero money figures', async ({ page, loggedInPage: _ }) => {
+  test('the only money figure on the map is Bar #2 (Net Wealth)', async ({ page, loggedInPage: _ }) => {
     const map = new CurriculumMapPage(page)
     await map.goto()
     await expect(map.map).toBeVisible()
+    // Bar #2 is live for a fresh user (honest 0.00) — it is the ONE legal money
+    // figure on the learn surface now (Phase 25). Wait for it before subtracting.
+    await expect(map.barDoing).toHaveAttribute('data-bar-doing', 'live')
 
-    // No currency symbol / formatted amount / ISO code anywhere on the surface
-    // (behavior-rules: XPLedgerEntry never feeds a money figure).
+    // Every money figure must live INSIDE the bar-doing island — subtract its
+    // text from the page text and assert the remainder is money-free. The
+    // tripwire keeps its teeth: XP / crest / streak still never render money,
+    // and any NEW money figure outside Bar #2 fails here (behavior-rules).
     const pageText = await map.learnPage.innerText()
-    expect(pageText).not.toMatch(MONEY_PATTERN)
+    const barDoingText = await map.barDoing.innerText()
+    const outsideBarDoing = pageText.split(barDoingText).join('')
+    expect(outsideBarDoing).not.toMatch(MONEY_PATTERN)
+
+    // …and the Bar #2 figure IS a money figure (the intended exception), so the
+    // subtraction above actually removed something real.
+    expect(barDoingText).toMatch(MONEY_PATTERN)
   })
 
   test('Auri renders the PNG by default and falls back to the glyph', async ({ page, loggedInPage: _ }) => {
