@@ -76,6 +76,18 @@ export class CurriculumMapPage {
   readonly quizRetry: Locator
   readonly quizNext: Locator
 
+  // Scenario player (Phase 26 — 🎭 branching decision sim)
+  readonly scenarioNode: Locator
+  readonly scenarioOption: Locator
+  readonly scenarioFeedback: Locator
+  readonly scenarioContinue: Locator
+  readonly scenarioDone: Locator
+
+  // Sandbox player (Phase 26 — 🧮 labeled-hypothetical calculator)
+  readonly sandboxBanner: Locator
+  readonly sandboxCalculator: Locator
+  readonly sandboxDone: Locator
+
   // Mission player + verify snapshot (Phase 22/23)
   readonly missionVerify: Locator
   readonly missionDeeplink: Locator
@@ -145,6 +157,16 @@ export class CurriculumMapPage {
     // The quiz "Next" affordance carries no testid (only the last-question
     // "Submit" does), so it is addressed by its accessible name.
     this.quizNext = page.getByRole('button', { name: /Next/ })
+
+    this.scenarioNode = page.getByTestId('scenario-node')
+    this.scenarioOption = page.getByTestId('scenario-option')
+    this.scenarioFeedback = page.getByTestId('scenario-feedback')
+    this.scenarioContinue = page.getByTestId('scenario-continue')
+    this.scenarioDone = page.getByTestId('scenario-done')
+
+    this.sandboxBanner = page.getByTestId('sandbox-banner')
+    this.sandboxCalculator = page.getByTestId('sandbox-calculator')
+    this.sandboxDone = page.getByTestId('sandbox-done')
 
     this.missionVerify = page.getByTestId('mission-verify')
     this.missionDeeplink = page.getByTestId('mission-deeplink')
@@ -216,6 +238,40 @@ export class CurriculumMapPage {
         await this.quizSubmit.click()
       }
     }
+  }
+
+  /**
+   * Walk a 🎭 Scenario from its entry node to a terminal and mark it done. At
+   * each node it taps the FIRST option (any choice advances — a scenario has no
+   * fail state), waits for that option's formative `scenario-feedback`, then
+   * either clicks `scenario-done` (a terminal option → completes the step) or
+   * `scenario-continue` to advance to the next node. Depth-agnostic (works for a
+   * 2-node fixture or the 5-node term-deposits boss). The `scenario-option` click
+   * auto-waits until the freshly-rendered node's options are enabled, so no
+   * explicit inter-node wait is needed.
+   */
+  async playScenarioToEnd(): Promise<void> {
+    await this.scenarioNode.first().waitFor({ state: 'visible', timeout: 45_000 })
+    for (let i = 0; i < 25; i++) {
+      await this.scenarioOption.first().click()
+      await this.scenarioFeedback.first().waitFor({ state: 'visible', timeout: 45_000 })
+      if ((await this.scenarioDone.count()) > 0) {
+        await this.scenarioDone.click()
+        return
+      }
+      await this.scenarioContinue.click()
+    }
+    throw new Error('scenario never reached a terminal node within 25 hops')
+  }
+
+  /**
+   * Complete a 🧮 Sandbox step: assert the mandatory hypothetical banner is
+   * present (it must render before any interaction), then click "Done". Returns
+   * nothing — the caller asserts the resulting XP / host close.
+   */
+  async completeSandbox(): Promise<void> {
+    await this.sandboxBanner.waitFor({ state: 'visible', timeout: 45_000 })
+    await this.sandboxDone.click()
   }
 
   /** The crest count integer shown inside Bar #1 (the `.figure.crest` readout). */

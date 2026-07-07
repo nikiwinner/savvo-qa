@@ -273,7 +273,9 @@ export interface SeedStepData {
   topic_slug: string
   level_slug: string
   slug: string
-  kind: 'lesson' | 'quiz' | 'mission'
+  // Phase 26 widened the seed to accept the two new knowledge kinds (the backend
+  // `validate_fixture_content` now validates `scenario`/`sandbox` shapes).
+  kind: 'lesson' | 'quiz' | 'mission' | 'scenario' | 'sandbox'
   title: string
   order: number
   xp: number
@@ -1444,8 +1446,8 @@ export class ApiHelper {
 
   /**
    * POST /api/curriculum/seed/step/ — DEBUG-only: create/upsert a fixture `Step`
-   * (lesson / quiz / mission) so the Lesson/Quiz/Mission players have real
-   * content to render (no real lesson/quiz content ships until Phase 23).
+   * (lesson / quiz / mission / scenario / sandbox — Phase 26 widened the accepted
+   * kinds) so the matching registry player has real content to render.
    * Idempotent on `(level, slug)`; re-seeding returns `created:false`.
    */
   async seedStep(data: SeedStepData): Promise<SeedStepResult> {

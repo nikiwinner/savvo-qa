@@ -95,8 +95,13 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     // `guarantee-the-gap` — three MCQs, correct option index 1 each.
     await map.answerMcqQuiz([1, 1, 1])
 
-    // L1 completes → host closes → real XP lands (lesson + quiz), traceable to
-    // the ledger.
+    // L1 now ends on the `payday-order` SCENARIO (Story 26.5 backfill) — walk it to
+    // a terminal before the level can close.
+    await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'scenario', { timeout: 45_000 })
+    await map.playScenarioToEnd()
+
+    // L1 completes → host closes → real XP lands (lesson + quiz + scenario),
+    // traceable to the ledger.
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
     const payload = await api.getCurriculumMap()
@@ -321,6 +326,11 @@ test.describe('Curriculum — Saving topic (data-less honesty)', () => {
     await map.playLessonDeck()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz', { timeout: 45_000 })
     await map.answerMcqQuiz([1, 1, 1])
+
+    // L1 ends on the `payday-order` SCENARIO (Story 26.5 backfill) — a data-less
+    // user still plays it (knowledge, not rows) before the level closes.
+    await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'scenario', { timeout: 45_000 })
+    await map.playScenarioToEnd()
 
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)

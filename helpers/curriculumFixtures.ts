@@ -40,12 +40,75 @@ export const QUIZ_SLUG = 'qa-fixture-quiz'
 export const MISSION_SLUG = 'qa-fixture-mission'
 /** Phase 24 — a lesson deck carrying a v2 interactive (tap) `choice` card. */
 export const INTERACTIVE_LESSON_SLUG = 'qa-fixture-lesson-v2'
+/** Phase 26 — a 🧮 Sandbox (labeled-hypothetical calculator) + a 🎭 Scenario. */
+export const SANDBOX_SLUG = 'qa-fixture-sandbox'
+export const SCENARIO_SLUG = 'qa-fixture-scenario'
 
 /** XP awarded on completion of each fixture (drives the "xp-total increments" checks). */
 export const LESSON_XP = 15
 export const QUIZ_XP = 15
 export const MISSION_XP = 20
 export const INTERACTIVE_LESSON_XP = 15
+export const SANDBOX_XP = 12
+export const SCENARIO_XP = 14
+
+// ── Phase 26 — the seeded Sandbox fixture (a labeled-hypothetical calculator) ──
+// A `compound_interest` calculator: the mandatory banner labels EVERY figure a
+// hypothetical, and the calculator renders only rounded whole amounts (`fmt`) +
+// one-decimal rates — so NO number here reads as a `\d+[.,]\d{2}` real money
+// figure and the copy carries no currency symbol (the sandbox-player no-money
+// tripwire depends on this being real-money-free).
+export const SANDBOX_BANNER = 'Hypothetical — not your real balance.'
+export const SANDBOX_CONTENT = {
+  banner: SANDBOX_BANNER,
+  calculator: 'compound_interest',
+  intro: 'Slide the inputs to see how a made-up starting amount could grow. None of these numbers is your money.',
+  defaults: { start: 1000, monthly: 100, rate: 6, years: 20 },
+  caption: 'Every figure here is a labeled example, never a real balance.',
+} as const
+
+// ── Phase 26 — the seeded Scenario fixture (a branching decision sim) ─────────
+// Two nodes; both entry options fan into `why`, whose options terminate. Every
+// option carries formative `feedback` and NO right/wrong verdict — the copy
+// deliberately avoids the words "correct"/"incorrect"/"score" so the
+// scenario-player leak assertion (no answer key, no score UI) stays honest.
+export const SCENARIO_CONTENT = {
+  intro: 'A two-step choice to show the branching.',
+  nodes: [
+    {
+      id: 'start',
+      prompt: 'Payday lands. What do you do first?',
+      options: [
+        {
+          label: 'Move some to savings first',
+          feedback: 'Paying yourself first means the saving actually happens.',
+          next: 'why',
+        },
+        {
+          label: 'Spend first, save whatever is left',
+          feedback: 'Leftover saving tends to be thin — the month eats it.',
+          next: 'why',
+        },
+      ],
+    },
+    {
+      id: 'why',
+      prompt: 'What made the difference here?',
+      options: [
+        {
+          label: 'The order you handled the money',
+          feedback: 'Exactly — the order decides what actually reaches savings.',
+          next: null,
+        },
+        {
+          label: 'Pure chance',
+          feedback: 'Not chance — the order is the part you control.',
+          next: null,
+        },
+      ],
+    },
+  ],
+} as const
 
 // ── Phase 24 — the seeded interactive `choice` card the specs interact with ──
 // The card sits at index 1 of the deck (a text card before + after it), so a
@@ -84,6 +147,10 @@ export interface SeededFixtures {
   mission: SeedStepResult
   /** Phase 24 — a v2 lesson deck with an interactive `choice` card (text → choice → text). */
   interactive: SeedStepResult
+  /** Phase 26 — a 🧮 Sandbox calculator (mandatory hypothetical banner). */
+  sandbox: SeedStepResult
+  /** Phase 26 — a 🎭 branching Scenario (formative per-node feedback). */
+  scenario: SeedStepResult
 }
 
 /**
@@ -174,7 +241,34 @@ export async function seedPlayerFixtures(api: ApiHelper): Promise<SeededFixtures
     },
   })
 
-  return { lesson, quiz, mission, interactive }
+  // Phase 26 — a 🧮 Sandbox + a 🎭 Scenario, seeded as the 5th/6th fixtures so
+  // EVERY UI-completion spec also completes them via `makeFixtureLevelPlayable`
+  // (same race-free reasoning as the Phase-24 interactive lesson): the level only
+  // "completes on the last step" once every seeded fixture is done, so all specs
+  // must seed the IDENTICAL set before making the level playable.
+  const sandbox = await api.seedStep({
+    topic_slug: FIXTURE_TOPIC,
+    level_slug: FIXTURE_LEVEL,
+    slug: SANDBOX_SLUG,
+    kind: 'sandbox',
+    title: 'QA fixture sandbox',
+    order: 55,
+    xp: SANDBOX_XP,
+    content: { ...SANDBOX_CONTENT, defaults: { ...SANDBOX_CONTENT.defaults } },
+  })
+
+  const scenario = await api.seedStep({
+    topic_slug: FIXTURE_TOPIC,
+    level_slug: FIXTURE_LEVEL,
+    slug: SCENARIO_SLUG,
+    kind: 'scenario',
+    title: 'QA fixture scenario',
+    order: 56,
+    xp: SCENARIO_XP,
+    content: { intro: SCENARIO_CONTENT.intro, nodes: SCENARIO_CONTENT.nodes.map((n) => ({ ...n })) },
+  })
+
+  return { lesson, quiz, mission, interactive, sandbox, scenario }
 }
 
 /**
