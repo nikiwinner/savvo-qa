@@ -25,16 +25,30 @@ export default defineConfig({
 
   projects: [
     {
+      // Pre-seeds the curriculum tree + the shared qa-fixture-* Steps ONCE
+      // before the parallel browser projects: the QA DB is flushed every run,
+      // and a fixture Step inserted mid-run into smart-spending (the prereq
+      // chain's root) re-locks every chain-completing spec — see
+      // tests/setup/seed-fixtures.setup.ts. Dependency projects ignore CLI
+      // file filters, so subset runs (e.g. `test:auth`) get the pre-seed too.
+      name: 'setup',
+      testMatch: /tests\/setup\/.*\.setup\.ts/,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
     },
     {
       name: 'mobile-safari',
       use: { ...devices['iPhone 13'] },
+      dependencies: ['setup'],
     },
     {
       name: 'tablet',
       use: { ...devices['iPad Pro 11'] },
+      dependencies: ['setup'],
     },
   ],
 
