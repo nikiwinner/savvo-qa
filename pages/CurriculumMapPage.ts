@@ -1,7 +1,24 @@
 import { Page, Locator } from '@playwright/test'
 
 /**
- * Page object for the Phase 21 curriculum **unit-map** (`/dashboard/learn`).
+ * Page object for the curriculum **island-hub** map (`/dashboard/learn`).
+ *
+ * Phase 27 rebuilt the map into an island hub: 9 section-islands in an adaptive
+ * collapsed grid with a single-open accordion. The active island (the one holding
+ * the canonical current node) is expanded by default; every OTHER island's body
+ * stays in the DOM but `hidden` (`display:none`) — so attribute/count reads still
+ * work, but a node inside a collapsed island must be EXPANDED before it can be
+ * interacted with. Node-open helpers here expand the containing island first
+ * (`expandIslandFor` / `openCurrentNode`).
+ *
+ * Phase 27 also interposed a completion / reward screen (`step-completion`) inside
+ * the host after a lesson / quiz / scenario / sandbox step or a self-attest
+ * mission finishes a level — BEFORE the host closes. Its `completion-continue`
+ * button emits the terminal close. The terminal player helpers here ABSORB that
+ * screen (click Continue when it appears) so the legacy `host-hidden` / `xpValue`
+ * assertions keep working; a NON-terminal step (the level has more steps) shows
+ * the next player instead and the absorb is a no-op. Row-verified missions keep
+ * their own enriched `verifier-snapshot` phase and never reach this screen.
  *
  * The page keeps the Phase-18 `savvo_tz` cold-start contract (see
  * `+page.server.ts`): the VERY FIRST visit without a `savvo_tz` cookie returns
@@ -10,10 +27,9 @@ import { Page, Locator } from '@playwright/test'
  * here waits for the final rendered state (`curriculum-map` visible) rather than
  * assuming SSR HTML.
  *
- * Testids mirror the map surface pinned in `mas/roadmap/phase_21.md`
- * (§"Layer Mapping → New / changed frontend") +
- * `frontend/src/lib/components/AuriCharacter.svelte`. `data-auri-mode="png|glyph"`
- * lives on the inner `.auri-character` (testid `auri-character`).
+ * The map hero keeps the DOM-unique `auri-character` testid; the mini-Auri inside
+ * a player is `player-auri`, and the celebration Auri on the reward screen is
+ * `completion-auri`.
  */
 export class CurriculumMapPage {
   readonly page: Page
@@ -31,6 +47,12 @@ export class CurriculumMapPage {
   readonly topicCrests: Locator
   readonly levelNodes: Locator
 
+  // Island hub (Phase 27) — Continue CTA + per-island accordion chrome
+  readonly continueCta: Locator
+  readonly islandToggle: Locator
+  readonly islandState: Locator
+  readonly islandNext: Locator
+
   // Two-bar topbar + streak
   readonly barKnowledge: Locator
   readonly xpTotal: Locator
@@ -47,7 +69,7 @@ export class CurriculumMapPage {
   readonly netWealthAccountList: Locator
   readonly netWealthAccountRows: Locator
 
-  // Auri + step-player host
+  // Auri (map hero) + step-player host
   readonly auriCharacter: Locator
   readonly stepPlayerHost: Locator
   readonly stepHostClose: Locator
@@ -55,6 +77,16 @@ export class CurriculumMapPage {
   // Step players (Phase 22)
   readonly stepPlayer: Locator
   readonly crestReveal: Locator
+
+  // Player-Auri + reaction line (Phase 27) — DOM-distinct from the map hero
+  readonly playerAuri: Locator
+  readonly playerReaction: Locator
+
+  // Completion / reward screen (Phase 27)
+  readonly stepCompletion: Locator
+  readonly completionXp: Locator
+  readonly completionContinue: Locator
+  readonly completionAuri: Locator
 
   // Lesson player
   readonly lessonCard: Locator
@@ -75,6 +107,7 @@ export class CurriculumMapPage {
   readonly quizResult: Locator
   readonly quizRetry: Locator
   readonly quizNext: Locator
+  readonly quizBack: Locator
 
   // Scenario player (Phase 26 — 🎭 branching decision sim)
   readonly scenarioNode: Locator
@@ -118,6 +151,11 @@ export class CurriculumMapPage {
     this.topicCrests = page.getByTestId('topic-crest')
     this.levelNodes = page.getByTestId('map-level-node')
 
+    this.continueCta = page.getByTestId('continue-cta')
+    this.islandToggle = page.getByTestId('island-toggle')
+    this.islandState = page.getByTestId('island-state')
+    this.islandNext = page.getByTestId('island-next')
+
     this.barKnowledge = page.getByTestId('bar-knowledge')
     this.xpTotal = page.getByTestId('xp-total')
     this.barDoing = page.getByTestId('bar-doing')
@@ -139,6 +177,14 @@ export class CurriculumMapPage {
     this.stepPlayer = page.getByTestId('step-player')
     this.crestReveal = page.getByTestId('crest-reveal')
 
+    this.playerAuri = page.getByTestId('player-auri')
+    this.playerReaction = page.getByTestId('player-reaction')
+
+    this.stepCompletion = page.getByTestId('step-completion')
+    this.completionXp = page.getByTestId('completion-xp')
+    this.completionContinue = page.getByTestId('completion-continue')
+    this.completionAuri = page.getByTestId('completion-auri')
+
     this.lessonCard = page.getByTestId('lesson-card')
     this.lessonNext = page.getByTestId('lesson-next')
     this.lessonDone = page.getByTestId('lesson-done')
@@ -154,9 +200,10 @@ export class CurriculumMapPage {
     this.quizSubmit = page.getByTestId('quiz-submit')
     this.quizResult = page.getByTestId('quiz-result')
     this.quizRetry = page.getByTestId('quiz-retry')
-    // The quiz "Next" affordance carries no testid (only the last-question
-    // "Submit" does), so it is addressed by its accessible name.
+    // The quiz "Next" / "Back" affordances carry no testid (only the last-question
+    // "Submit" does), so they are addressed by their accessible names.
     this.quizNext = page.getByRole('button', { name: /Next/ })
+    this.quizBack = page.getByRole('button', { name: 'Previous question' })
 
     this.scenarioNode = page.getByTestId('scenario-node')
     this.scenarioOption = page.getByTestId('scenario-option')
@@ -175,8 +222,9 @@ export class CurriculumMapPage {
     this.verifierSnapshot = page.getByTestId('verifier-snapshot')
     this.snapshotFigure = page.getByTestId('snapshot-figure')
     // The row-verified PASS "Continue" button (advances/closes the host) has no
-    // testid — addressed by its accessible name.
-    this.missionContinue = page.getByRole('button', { name: /Continue/ })
+    // testid — addressed by its accessible name, SCOPED to the host so it never
+    // collides with the map's `continue-cta` hero (whose name also has "Continue").
+    this.missionContinue = this.stepPlayerHost.getByRole('button', { name: /Continue/ })
 
     this.spacePicker = page.getByTestId('space-picker')
     this.spacePickerEmpty = page.getByTestId('space-picker-empty')
@@ -185,11 +233,98 @@ export class CurriculumMapPage {
     this.pickerRadios = this.spacePicker.getByRole('radio')
   }
 
-  /** Open a topic's sole `current` node and wait for the step player to mount. */
+  /** The `map-section` island for a specific section slug. */
+  mapSection(slug: string): Locator {
+    return this.page.locator(`[data-testid="map-section"][data-section-slug="${slug}"]`)
+  }
+
+  /**
+   * The single-open accordion collapses every non-active island body to
+   * `display:none`, so a node inside a collapsed island can't be clicked until its
+   * island is expanded. Locate the `map-section` that CONTAINS `topicSlug`, click
+   * its `island-toggle` when `aria-expanded` is not already `true`, then wait for
+   * the topic's body to be revealed. A no-op when the island is already open.
+   */
+  async expandIslandFor(topicSlug: string, timeout = 15_000): Promise<void> {
+    const section = this.page
+      .locator(`[data-testid="map-section"]:has([data-topic-slug="${topicSlug}"])`)
+      .first()
+    const toggle = section.getByTestId('island-toggle')
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+      await toggle.click()
+    }
+    // Removing the `hidden` attribute un-hides the body (display:none → flex), so
+    // the topic (and its nodes) becomes visible — wait for that before interacting.
+    await this.topic(topicSlug).first().waitFor({ state: 'visible', timeout })
+  }
+
+  /**
+   * Expand the island holding the FIRST map node of a given derived status and
+   * return that (now-visible) node locator. Used where a spec taps a node that may
+   * live in a collapsed island (e.g. a `coming_soon` or `locked` node not in the
+   * default-open active island).
+   */
+  async revealFirstNodeByStatus(status: string, timeout = 15_000): Promise<Locator> {
+    const section = this.page
+      .locator(
+        `[data-testid="map-section"]:has([data-testid="map-level-node"][data-node-status="${status}"])`,
+      )
+      .first()
+    const toggle = section.getByTestId('island-toggle')
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+      await toggle.click()
+    }
+    const node = section
+      .locator(`[data-testid="map-level-node"][data-node-status="${status}"]`)
+      .first()
+    await node.waitFor({ state: 'visible', timeout })
+    return node
+  }
+
+  /**
+   * Open a topic's sole `current` node and wait for the step player to mount. The
+   * containing island is expanded first (Phase 27 accordion), so the node is
+   * interactable even when it sits in a collapsed island.
+   */
   async openCurrentNode(topicSlug: string, timeout = 45_000): Promise<void> {
+    await this.expandIslandFor(topicSlug)
     await this.nodesInTopic(topicSlug, 'current').first().click()
     await this.stepPlayerHost.waitFor({ state: 'visible', timeout })
     await this.stepPlayer.waitFor({ state: 'visible', timeout })
+  }
+
+  /**
+   * Absorb the Phase-27 completion / reward screen after a terminal player action.
+   *
+   * The host settles into ONE of three states after a lesson / quiz / scenario /
+   * sandbox player (or a self-attest mission) finishes: (a) the reward screen
+   * (`step-completion`) — the level finished, dismiss it via `completion-continue`;
+   * (b) the next step's player — the level has more steps, leave it; (c) the host
+   * already closed (defensive). We grab the just-active player, wait until it is
+   * replaced, then click Continue ONLY when the reward screen is what came up.
+   * Row-verified missions celebrate in their own snapshot phase and never land here.
+   */
+  async absorbCompletionScreen(timeout = 45_000): Promise<void> {
+    const handle = await this.stepPlayer
+      .first()
+      .elementHandle({ timeout })
+      .catch(() => null)
+    if (handle) {
+      await this.page
+        .waitForFunction((el) => !(el as Element).isConnected, handle, { timeout })
+        .catch(() => {})
+      await handle.dispose().catch(() => {})
+    }
+    // Settle into the post-action state (the reward screen OR the next player)
+    // before deciding — catches the reward screen's same-tick mount without a sleep.
+    await this.stepCompletion
+      .or(this.stepPlayer)
+      .first()
+      .waitFor({ state: 'visible', timeout })
+      .catch(() => {})
+    if (await this.stepCompletion.isVisible().catch(() => false)) {
+      await this.completionContinue.click()
+    }
   }
 
   /**
@@ -200,8 +335,13 @@ export class CurriculumMapPage {
    * disabled control and tap the first option (any answer proceeds — formative,
    * no XP, no fail) before advancing. Returns the number of interactive cards
    * that had to be answered (0 for an all-text deck).
+   *
+   * When the lesson is the level's terminal step the host interposes the Phase-27
+   * completion screen; by default this helper ABSORBS it (clicks Continue) so
+   * `host-hidden` / `xpValue` assertions keep working. Pass `absorbCompletion:
+   * false` to leave the reward screen up (e.g. a spec asserting on it).
    */
-  async playLessonDeck(): Promise<number> {
+  async playLessonDeck({ absorbCompletion = true }: { absorbCompletion?: boolean } = {}): Promise<number> {
     await this.lessonCard.waitFor({ state: 'visible', timeout: 45_000 })
     let interactiveTapped = 0
     // The cap is a safety net against a stuck deck (a real deck is a handful of
@@ -217,7 +357,10 @@ export class CurriculumMapPage {
         interactiveTapped++
       }
       await advance.click()
-      if (onLast) return interactiveTapped
+      if (onLast) {
+        if (absorbCompletion) await this.absorbCompletionScreen()
+        return interactiveTapped
+      }
     }
     return interactiveTapped
   }
@@ -227,6 +370,10 @@ export class CurriculumMapPage {
    * one option index per question (in order); the last click submits, every
    * earlier one advances. The answer key never reaches the DOM — the caller
    * knows the indices only because it (or the seed content) authored them.
+   *
+   * A passing submission on the level's terminal step raises the Phase-27
+   * completion screen; this helper absorbs it (no-op when the quiz is a mid-level
+   * step and the host advances to the next player instead).
    */
   async answerMcqQuiz(correctIndices: number[]): Promise<void> {
     await this.quizQuestion.waitFor({ state: 'visible', timeout: 45_000 })
@@ -238,6 +385,7 @@ export class CurriculumMapPage {
         await this.quizSubmit.click()
       }
     }
+    await this.absorbCompletionScreen()
   }
 
   /**
@@ -246,9 +394,8 @@ export class CurriculumMapPage {
    * fail state), waits for that option's formative `scenario-feedback`, then
    * either clicks `scenario-done` (a terminal option → completes the step) or
    * `scenario-continue` to advance to the next node. Depth-agnostic (works for a
-   * 2-node fixture or the 5-node term-deposits boss). The `scenario-option` click
-   * auto-waits until the freshly-rendered node's options are enabled, so no
-   * explicit inter-node wait is needed.
+   * 2-node fixture or the 5-node term-deposits boss). The terminal `Done` finishes
+   * the level, so the Phase-27 completion screen is absorbed at the end.
    */
   async playScenarioToEnd(): Promise<void> {
     await this.scenarioNode.first().waitFor({ state: 'visible', timeout: 45_000 })
@@ -257,6 +404,7 @@ export class CurriculumMapPage {
       await this.scenarioFeedback.first().waitFor({ state: 'visible', timeout: 45_000 })
       if ((await this.scenarioDone.count()) > 0) {
         await this.scenarioDone.click()
+        await this.absorbCompletionScreen()
         return
       }
       await this.scenarioContinue.click()
@@ -266,12 +414,14 @@ export class CurriculumMapPage {
 
   /**
    * Complete a 🧮 Sandbox step: assert the mandatory hypothetical banner is
-   * present (it must render before any interaction), then click "Done". Returns
-   * nothing — the caller asserts the resulting XP / host close.
+   * present (it must render before any interaction), then click "Done" and absorb
+   * the Phase-27 completion screen when the sandbox is the level's terminal step
+   * (a no-op when the level advances to the next player).
    */
   async completeSandbox(): Promise<void> {
     await this.sandboxBanner.waitFor({ state: 'visible', timeout: 45_000 })
     await this.sandboxDone.click()
+    await this.absorbCompletionScreen()
   }
 
   /** The crest count integer shown inside Bar #1 (the `.figure.crest` readout). */

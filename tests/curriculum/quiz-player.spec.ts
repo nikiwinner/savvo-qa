@@ -34,6 +34,7 @@ test.describe('Curriculum — quiz player', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
@@ -44,7 +45,9 @@ test.describe('Curriculum — quiz player', () => {
     await page.getByTestId('quiz-option').nth(QUIZ_ANSWER_INDEX).click()
     await page.getByTestId('quiz-submit').click()
 
-    // Pass → level completes → host closes + XP lands on the map.
+    // Pass → the level's terminal step → the Phase-27 reward screen interposes →
+    // absorb it → host closes + XP lands on the map.
+    await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBe(xpBefore + QUIZ_XP)
 
@@ -68,6 +71,7 @@ test.describe('Curriculum — quiz player', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(page.getByTestId('quiz-question')).toBeVisible({ timeout: 45_000 })
@@ -93,6 +97,8 @@ test.describe('Curriculum — quiz player', () => {
     await page.getByTestId('quiz-option').nth(QUIZ_ANSWER_INDEX).click()
     await page.getByTestId('quiz-submit').click()
 
+    // Retry pass → terminal step → absorb the reward screen → host closes.
+    await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     const payload = await api.getCurriculumMap()
     expect(payload.bars.knowledge.xp_total).toBe(QUIZ_XP)

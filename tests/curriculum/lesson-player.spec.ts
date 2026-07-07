@@ -47,6 +47,7 @@ test.describe('Curriculum — lesson player', () => {
     expect(xpBefore).toBe(0)
 
     // Tap the fixture level's node (the sole `current` node in smart-spending).
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
 
@@ -59,7 +60,9 @@ test.describe('Curriculum — lesson player', () => {
     await page.getByTestId('lesson-next').click()
     await page.getByTestId('lesson-done').click()
 
-    // Level completes → the host closes and the map refreshes with the new XP.
+    // Level completes → Phase-27 reward screen interposes → absorb it → the host
+    // closes and the map refreshes with the new XP.
+    await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBe(xpBefore + LESSON_XP)
 
@@ -87,10 +90,15 @@ test.describe('Curriculum — lesson player', () => {
 
     // The capstone is the sole `current` node in earning-money; its mission is a
     // self_attest step → "Mark done" completes the checkpoint level.
+    await map.expandIslandFor('earning-money')
     await map.nodesInTopic('earning-money', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
     await page.getByTestId('mission-verify').click()
+
+    // A self_attest mission DOES get the Phase-27 reward screen → Continue closes
+    // the host; the crest reveal (set when the map refreshed behind it) persists.
+    await map.absorbCompletionScreen()
 
     // Baseline crest reveal pops on the newly-completed checkpoint node …
     await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
@@ -111,6 +119,7 @@ test.describe('Curriculum — lesson player (interactive cards, Phase 24)', () =
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson', { timeout: 45_000 })
@@ -159,6 +168,7 @@ test.describe('Curriculum — lesson player (interactive cards, Phase 24)', () =
     // The deck advances + completes despite the wrong tap (mark-read, no fail).
     await map.lessonNext.click()
     await map.lessonDone.click()
+    await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
   })
 
@@ -178,6 +188,7 @@ test.describe('Curriculum — lesson player (interactive cards, Phase 24)', () =
     // Finish the deck → ONLY the single step-complete award lands (never per tap).
     await map.lessonNext.click()
     await map.lessonDone.click()
+    await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect
       .poll(async () => (await api.getCurriculumMap()).bars.knowledge.xp_total, { timeout: 45_000 })
@@ -198,6 +209,7 @@ test.describe('Curriculum — lesson player (interactive cards, Phase 24)', () =
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson', { timeout: 45_000 })
 

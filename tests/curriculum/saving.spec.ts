@@ -69,6 +69,9 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     await unlockSaving(api)
     await map.goto(45_000)
     await expect(map.topic('saving')).toHaveAttribute('data-topic-status', 'available')
+    // The topic sits in a collapsed island (Phase 27 accordion) — expand it to
+    // confirm the freshly-unlocked current node renders.
+    await map.expandIslandFor('saving')
     await expect(map.nodesInTopic('saving', 'current').first()).toBeVisible()
   })
 
@@ -92,8 +95,9 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     expect(interactiveTapped).toBeGreaterThan(0)
 
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz', { timeout: 45_000 })
-    // `guarantee-the-gap` — three MCQs, correct option index 1 each.
-    await map.answerMcqQuiz([1, 1, 1])
+    // `guarantee-the-gap` — four MCQs (Phase 27 split the dense q#0), correct
+    // indices [1, 0, 0, 1].
+    await map.answerMcqQuiz([1, 0, 0, 1])
 
     // L1 now ends on the `payday-order` SCENARIO (Story 26.5 backfill) — walk it to
     // a terminal before the level can close.
@@ -147,7 +151,9 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     await expect(map.missionSelfAttest).toBeVisible({ timeout: 45_000 })
     await map.missionVerify.click()
 
-    // Both missions done + lesson pre-completed → L3 completes → host closes.
+    // The self_attest reflection was L3's last step → Phase-27 reward screen
+    // interposes → Continue closes the host (both missions + lesson done).
+    await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
 
@@ -325,7 +331,7 @@ test.describe('Curriculum — Saving topic (data-less honesty)', () => {
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson')
     await map.playLessonDeck()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz', { timeout: 45_000 })
-    await map.answerMcqQuiz([1, 1, 1])
+    await map.answerMcqQuiz([1, 0, 0, 1])
 
     // L1 ends on the `payday-order` SCENARIO (Story 26.5 backfill) — a data-less
     // user still plays it (knowledge, not rows) before the level closes.

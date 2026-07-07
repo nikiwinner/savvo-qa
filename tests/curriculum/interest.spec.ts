@@ -44,6 +44,9 @@ test.describe('Curriculum — Interest topic', () => {
     await unlockInterest(api)
     await map.goto(45_000)
     await expect(map.topic('interest')).toHaveAttribute('data-topic-status', 'available')
+    // The topic sits in a collapsed island (Phase 27 accordion) — expand it to
+    // confirm the freshly-unlocked current node renders.
+    await map.expandIslandFor('interest')
     await expect(map.nodesInTopic('interest', 'current').first()).toBeVisible()
   })
 

@@ -70,6 +70,9 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
     await unlockNetWealth(api)
     await map.goto(45_000)
     await expect(map.topic('net-wealth')).toHaveAttribute('data-topic-status', 'available')
+    // The topic sits in a collapsed island (Phase 27 accordion) — expand it to
+    // confirm the freshly-unlocked current node renders.
+    await map.expandIslandFor('net-wealth')
     await expect(map.nodesInTopic('net-wealth', 'current').first()).toBeVisible()
   })
 

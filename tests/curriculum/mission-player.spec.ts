@@ -36,7 +36,8 @@ test.describe('Curriculum — mission player', () => {
     expect(xpBefore).toBe(0)
 
     // `earning-inventory` is a fresh user's `current` node in earning-money and
-    // holds a single self_attest mission.
+    // holds a single self_attest mission (in a collapsed island — expand it first).
+    await map.expandIslandFor('earning-money')
     await map.nodesInTopic('earning-money', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
@@ -46,8 +47,11 @@ test.describe('Curriculum — mission player', () => {
     await expect(page.getByTestId('mission-self-attest')).toBeVisible()
     await expect(page.getByTestId('verifier-snapshot')).toHaveCount(0)
 
-    // "Mark done" completes it on the user's honour.
+    // "Mark done" completes it on the user's honour → a self-attest mission DOES
+    // get the Phase-27 reward screen (no row snapshot to celebrate in) → Continue
+    // closes the host.
     await page.getByTestId('mission-verify').click()
+    await map.absorbCompletionScreen()
 
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
@@ -64,6 +68,7 @@ test.describe('Curriculum — mission player', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
@@ -126,5 +131,39 @@ test.describe('Curriculum — mission player', () => {
     const res = await anon.post(`${BACKEND_URL}/api/steps/${mission.step_id}/verify/`, { data: {} })
     expect(res.status()).toBe(403)
     await anon.dispose()
+  })
+
+  test('a row-verified mission celebrates once via its snapshot', async ({ page, loggedInPage }) => {
+    test.slow()
+    const { api } = loggedInPage
+    const { mission } = await seedPlayerFixtures(api)
+    await makeFixtureLevelPlayable(api, mission.step_id)
+    // Create the real Space up front so the very first verify PASSES against rows.
+    await api.createSpace('QA Celebrate Home')
+
+    const map = new CurriculumMapPage(page)
+    await map.goto(45_000)
+    const xpBefore = await map.xpValue()
+    expect(xpBefore).toBe(0)
+
+    await map.openCurrentNode('smart-spending')
+    await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
+
+    // Verify → PASS → the ENRICHED snapshot phase celebrates in ONE screen: Auri
+    // celebrating + a real +XP chip alongside the row-verified snapshot.
+    await map.missionVerify.click()
+    await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
+    await expect(map.playerAuri).toBeVisible()
+    await expect(map.playerAuri.locator('img.auri-img')).toHaveAttribute('src', /auri_03_celebrate/)
+    await expect(map.completionXp).toBeVisible()
+    await expect(map.completionXp).toContainText(String(MISSION_XP))
+    // A row-verified mission NEVER shows the separate reward screen — the snapshot
+    // IS the celebration (no double screen).
+    await expect(map.stepCompletion).toHaveCount(0)
+
+    // Continue closes the host; the real XP rose by exactly the mission award.
+    await map.missionContinue.click()
+    await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
+    await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBe(xpBefore + MISSION_XP)
   })
 })

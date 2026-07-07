@@ -29,6 +29,7 @@ test.describe('Curriculum — scenario player', () => {
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'scenario', { timeout: 45_000 })
 
@@ -63,6 +64,7 @@ test.describe('Curriculum — scenario player', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'scenario', { timeout: 45_000 })
 
@@ -86,6 +88,7 @@ test.describe('Curriculum — scenario player', () => {
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'scenario', { timeout: 45_000 })
 

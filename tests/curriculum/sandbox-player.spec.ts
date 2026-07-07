@@ -34,6 +34,7 @@ test.describe('Curriculum — sandbox player', () => {
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'sandbox', { timeout: 45_000 })
@@ -63,6 +64,7 @@ test.describe('Curriculum — sandbox player', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'sandbox', { timeout: 45_000 })
 
@@ -81,7 +83,7 @@ test.describe('Curriculum — sandbox player', () => {
       .toBe(true)
 
     // "Done" mark-completes it → the level closes and the real XP lands.
-    await map.sandboxDone.click()
+    await map.completeSandbox()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBe(xpBefore + SANDBOX_XP)
 
@@ -106,6 +108,7 @@ test.describe('Curriculum — sandbox player', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'sandbox', { timeout: 45_000 })
 
@@ -115,7 +118,7 @@ test.describe('Curriculum — sandbox player', () => {
     await expect(map.sandboxCalculator).toContainText(/\d/)
 
     // …and it still completes + awards XP under reduced motion.
-    await map.sandboxDone.click()
+    await map.completeSandbox()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBe(xpBefore + SANDBOX_XP)
   })
@@ -128,6 +131,7 @@ test.describe('Curriculum — sandbox player', () => {
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    await map.expandIslandFor('smart-spending')
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'sandbox', { timeout: 45_000 })
     await expect(map.sandboxCalculator).toBeVisible()

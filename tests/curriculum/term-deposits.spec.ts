@@ -40,6 +40,9 @@ test.describe('Curriculum — Term deposits topic', () => {
     await unlockTermDeposits(api)
     await map.goto(45_000)
     await expect(map.topic('term-deposits')).toHaveAttribute('data-topic-status', 'available')
+    // The topic sits in a collapsed island (Phase 27 accordion) — expand it to
+    // confirm the freshly-unlocked current node renders.
+    await map.expandIslandFor('term-deposits')
     await expect(map.nodesInTopic('term-deposits', 'current').first()).toBeVisible()
   })
 
