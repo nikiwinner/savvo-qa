@@ -11,20 +11,16 @@ export interface CreateExpenseForm {
 }
 
 export class ExpensesPage {
-  readonly heading: Locator
   readonly newExpenseButton: Locator
   readonly createForm: Locator
   readonly emptyState: Locator
   readonly noSpaceMessage: Locator
-  readonly summaryValue: Locator
 
   constructor(private readonly page: Page) {
-    this.heading = page.locator('h1', { hasText: 'Transactions' })
     this.newExpenseButton = page.locator('button.btn-create', { hasText: 'New Transaction' })
     this.createForm = page.locator('.form-paper')
     this.emptyState = page.locator('.empty-state')
     this.noSpaceMessage = page.locator('.alert.alert-info')
-    this.summaryValue = page.locator('.summary-strip .stat-expense .stat-value')
   }
 
   async goto(): Promise<void> {
@@ -37,14 +33,6 @@ export class ExpensesPage {
 
   async gotoWithSpace(spaceId: number): Promise<void> {
     await this.page.goto(`/dashboard/transactions?space=${spaceId}`)
-    await this.page.waitForLoadState('networkidle')
-  }
-
-  // Navigate to the legacy /dashboard/expenses route to exercise the Phase-15
-  // redirect. The server redirects (307) to /dashboard/transactions, preserving
-  // the query string. Used by the redirect assertion test.
-  async gotoLegacy(search = ''): Promise<void> {
-    await this.page.goto(`/dashboard/expenses${search}`)
     await this.page.waitForLoadState('networkidle')
   }
 

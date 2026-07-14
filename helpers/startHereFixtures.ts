@@ -14,6 +14,7 @@
  * A spec seed-completes whichever earlier levels precede the one under test.
  */
 import type { ApiHelper, CurriculumMapPayload, MapLevel, MapTopic } from './api'
+import { allTopics } from './interestFixtures'
 
 export const START_HERE_SECTION = 'start-here'
 export const START_HERE_TOPIC = 'start-here'
@@ -43,10 +44,6 @@ export const MAP_QUIZ_ANSWERS = [1, 0, 1]
 
 // L1's `how-the-course-works` lesson title (the level caption / node aria-label).
 export const L1_TITLE = 'How this course works'
-
-function allTopics(payload: CurriculumMapPayload): MapTopic[] {
-  return payload.sections.flatMap((s) => s.topics)
-}
 
 /** The `start-here` topic out of a fresh map payload. */
 export function startHereTopic(payload: CurriculumMapPayload): MapTopic {

@@ -16,6 +16,7 @@
  */
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
+import { CELEBRATES } from '../../helpers/reactions'
 import {
   seedPlayerFixtures,
   makeFixtureLevelPlayable,
@@ -149,12 +150,12 @@ test.describe('Curriculum — mission player', () => {
     await map.openCurrentNode('smart-spending')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
 
-    // Verify → PASS → the ENRICHED snapshot phase celebrates in ONE screen: Auri
-    // celebrating + a real +XP chip alongside the row-verified snapshot.
+    // Verify → PASS → the ENRICHED snapshot phase celebrates in ONE screen: a
+    // celebrating line + a real +XP chip alongside the row-verified snapshot.
     await map.missionVerify.click()
     await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
-    await expect(map.playerAuri).toBeVisible()
-    await expect(map.playerAuri.locator('img.auri-img')).toHaveAttribute('src', /auri_03_celebrate/)
+    await expect(map.playerReaction).toBeVisible()
+    await expect(map.playerReaction).toHaveText(CELEBRATES)
     await expect(map.completionXp).toBeVisible()
     await expect(map.completionXp).toContainText(String(MISSION_XP))
     // A row-verified mission NEVER shows the separate reward screen — the snapshot

@@ -5,9 +5,9 @@
  * `GET /api/curriculum/map/`. These specs cover the fresh-user journey render,
  * the two-bar topbar (Bar #1 real XP + streak; Bar #2 = the honest Net Wealth
  * figure since Phase 25 — the ONE legal money figure on the surface), the
- * scoped money tripwire (money lives ONLY inside Bar #2), the Auri PNG-vs-glyph
- * fallback (migrated from the retired `coaching/today.spec.ts`), and the
- * graceful map-load-failure degraded card with a working Retry (also migrated).
+ * scoped money tripwire (money lives ONLY inside Bar #2), the mascot-removal
+ * tripwire, and the graceful map-load-failure degraded card with a working
+ * Retry (migrated from the retired `coaching/today.spec.ts`).
  *
  * The `loggedInPage` fixture creates + logs in the user via the API and copies
  * the session cookies into the browser context (no UI landing), so navigating to
@@ -32,9 +32,11 @@ test.describe('Curriculum — unit-map', () => {
     expect(await map.topics.count()).toBeGreaterThanOrEqual(1)
 
     // A fresh user has at least one CURRENT node (the first step-bearing level of
-    // an unlocked topic) …
-    await expect(map.nodesByStatus('current').first()).toBeVisible()
+    // an unlocked topic). Its path lives inside focus mode, so zoom into the
+    // chapter that holds it to see the node on-stage.
     expect(await map.nodesByStatus('current').count()).toBeGreaterThanOrEqual(1)
+    const currentNode = await map.revealFirstNodeByStatus('current')
+    await expect(currentNode).toBeVisible()
 
     // … and locked / coming-soon nodes ahead — the path reads as a journey.
     const locked = await map.nodesByStatus('locked').count()
@@ -103,33 +105,30 @@ test.describe('Curriculum — unit-map', () => {
     expect(barDoingText).toMatch(MONEY_PATTERN)
   })
 
-  test('Auri renders the PNG by default and falls back to the glyph', async ({ page, loggedInPage: _ }) => {
+  test('the mascot is gone: no character mount, no character asset', async ({
+    page,
+    loggedInPage: _,
+  }) => {
+    // Tripwire for the removal. The 12-emotion mascot shipped 2.4 MB of 32-bit
+    // RGBA for a mark that rendered at 140 px; the art is being redone from
+    // scratch. Until it lands, NOTHING may re-introduce the old mounts or fetch
+    // from the deleted asset folder — this test is what makes that loud.
+    const mascotRequests: string[] = []
+    page.on('request', (r) => {
+      if (r.url().includes('/auri/')) mascotRequests.push(r.url())
+    })
+
     const map = new CurriculumMapPage(page)
-
-    // Glyph branch FIRST: abort every Auri PNG BEFORE the first load — a successfully
-    // loaded PNG would be served from the browser cache on reload, bypassing route
-    // interception (this is why the abort cannot come second).
-    await page.route('**/auri/*.png', (route) => route.abort())
     await map.goto()
-    await expect(map.auriCharacter).toBeVisible()
-    // Auto-retrying attribute assertion: the block mounts in `png` mode and only
-    // flips after the aborted request fires the <img> on:error handler — a
-    // one-shot read races that handler.
-    await expect(map.auriCharacter).toHaveAttribute('data-auri-mode', 'glyph')
-    await expect(map.auriCharacter.locator('img.auri-img')).toHaveCount(0)
+    await expect(map.map).toBeVisible()
 
-    // PNG branch: lift the abort and reload — PNGs ARE shipped, so the default
-    // state renders the character image, not the glyph (aborted requests are not
-    // cached, so this fetch hits the network).
-    await page.unroute('**/auri/*.png')
-    await map.goto()
-    await expect(map.auriCharacter).toBeVisible()
-    await expect(map.auriCharacter).toHaveAttribute('data-auri-mode', 'png')
-    const img = map.auriCharacter.locator('img.auri-img')
-    await expect(img).toBeVisible()
-    // The img actually decoded (naturalWidth > 0 → not a broken image).
-    const naturalWidth = await img.evaluate((el) => (el as HTMLImageElement).naturalWidth)
-    expect(naturalWidth).toBeGreaterThan(0)
+    expect(mascotRequests).toEqual([])
+    await expect(page.getByTestId('auri-character')).toHaveCount(0)
+    await expect(page.getByTestId('player-auri')).toHaveCount(0)
+    await expect(page.getByTestId('completion-auri')).toHaveCount(0)
+
+    // The guide still speaks — only its face went. The copy is the product.
+    await expect(map.guideMessage).toBeVisible()
   })
 
   test('a map-load failure degrades gracefully and recovers on retry', async ({ page, loggedInPage: _ }) => {

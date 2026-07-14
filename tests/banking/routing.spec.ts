@@ -7,7 +7,7 @@
  * `apply_rule_to_matching` pass. A real Tink sync cannot be driven from E2E
  * (per the phase brief — do NOT fake a sync). CONFLICT resolution
  * (`resolve_conflict`: highest routing_priority wins, ties → lowest id) and the
- * single-space fallback are now E2E-covered via the DEBUG-only on-demand
+ * ABSENCE of a single-space fallback (Phase 16) are now E2E-covered via the DEBUG-only on-demand
  * endpoint `POST /api/seed/route-unmapped/` (helper `api.routeUnmapped()`),
  * which runs the REAL `route_transaction` over the user's unmapped /
  * non-manually-assigned / non-split bank txns — see the "Conflict resolution"

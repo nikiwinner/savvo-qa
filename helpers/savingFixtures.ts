@@ -14,7 +14,8 @@
  * levels via the DEBUG `seed/level-state`, which bypasses locks) and then
  * seed-completes whichever Saving levels precede the one under test.
  */
-import type { ApiHelper, CurriculumMapPayload, MapLevel, MapTopic } from './api'
+import type { ApiHelper, CurriculumMapPayload, MapLevel } from './api'
+import { findTopic } from './interestFixtures'
 
 export const SAVING_TOPIC = 'saving'
 
@@ -41,16 +42,6 @@ export const CAPSTONE_SLUG = 'first-money-attributed' // L6 · mission · all th
 
 /** Topics that gate `saving` (saving ← budgeting ← smart-spending). */
 const PREREQ_TOPICS = ['smart-spending', 'budgeting']
-
-function allTopics(payload: CurriculumMapPayload): MapTopic[] {
-  return payload.sections.flatMap((s) => s.topics)
-}
-
-function findTopic(payload: CurriculumMapPayload, slug: string): MapTopic {
-  const topic = allTopics(payload).find((t) => t.slug === slug)
-  if (!topic) throw new Error(`topic '${slug}' not present in the curriculum map`)
-  return topic
-}
 
 /** The `saving` topic level, by slug, out of a fresh map payload. */
 export function savingLevel(payload: CurriculumMapPayload, levelSlug: string): MapLevel {

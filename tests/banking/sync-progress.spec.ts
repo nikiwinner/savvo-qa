@@ -9,17 +9,6 @@
  *  - When the sync resolves (successfully or not) the SyncProgress component
  *    transitions out of the syncing state and disappears (parent removes the
  *    id from activeSyncIds via onComplete → invalidateAll).
- *
- * Notes / known gaps (documented, not silently skipped):
- *  - Passive-mode rendering (page load while connection.status === 'syncing')
- *    cannot be tested cleanly: the connections list is loaded SSR-side via
- *    djangoFetch, which Playwright page.route cannot intercept, and there is
- *    no debug endpoint that mutates BankConnection.status. Documented in the
- *    `test.fixme` below.
- *  - The 30s hint requires waiting 30+ seconds while the connection is in
- *    'syncing' state. With no way to pin status='syncing' server-side, we
- *    can't reliably surface the hint without slowing the suite to a crawl.
- *    Documented in the `test.fixme` below.
  */
 import { test, expect } from '../../fixtures/index'
 

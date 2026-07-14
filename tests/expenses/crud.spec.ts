@@ -5,7 +5,6 @@
  * Expenses require an existing space — each test creates one via API.
  */
 import { test, expect } from '../../fixtures/index'
-import { SpacesPage } from '../../pages/SpacesPage'
 import { ExpensesPage } from '../../pages/ExpensesPage'
 
 const TODAY = new Date().toISOString().split('T')[0]

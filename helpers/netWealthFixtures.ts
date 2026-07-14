@@ -18,7 +18,8 @@
  * `balance_amount`. A fresh user's sole auto-provisioned cash account has a NULL
  * balance → the honest FAIL until a balance is entered (via `setCashBalance`).
  */
-import type { ApiHelper, CurriculumMapPayload, MapLevel, MapTopic } from './api'
+import type { ApiHelper, CurriculumMapPayload, MapLevel } from './api'
+import { findTopic } from './interestFixtures'
 
 export const NET_WEALTH_TOPIC = 'net-wealth'
 
@@ -49,16 +50,6 @@ export const L1_QUIZ_ANSWERS = [2, 0, 1]
 
 /** Topics that gate `net-wealth` (net-wealth ← saving ← budgeting ← smart-spending). */
 const PREREQ_TOPICS = ['smart-spending', 'budgeting', 'saving']
-
-function allTopics(payload: CurriculumMapPayload): MapTopic[] {
-  return payload.sections.flatMap((s) => s.topics)
-}
-
-function findTopic(payload: CurriculumMapPayload, slug: string): MapTopic {
-  const topic = allTopics(payload).find((t) => t.slug === slug)
-  if (!topic) throw new Error(`topic '${slug}' not present in the curriculum map`)
-  return topic
-}
 
 /** The `net-wealth` topic level, by slug, out of a fresh map payload. */
 export function netWealthLevel(payload: CurriculumMapPayload, levelSlug: string): MapLevel {

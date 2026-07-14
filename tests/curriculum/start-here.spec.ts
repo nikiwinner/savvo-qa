@@ -48,9 +48,11 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     expect(await map.sections.first().getAttribute('data-section-slug')).toBe(START_HERE_SECTION)
 
     // The `start-here` topic is `available` (no prerequisites) with exactly one
-    // current node — its L1 `how-this-works`.
+    // current node — its L1 `how-this-works`. Its path lives inside focus mode, so
+    // zoom into the chapter to see the node on-stage.
     await expect(map.topic('start-here')).toHaveAttribute('data-topic-status', 'available')
     expect(await map.nodesInTopic('start-here', 'current').count()).toBe(1)
+    await map.expandIslandFor('start-here')
     const currentNode = map.nodesInTopic('start-here', 'current').first()
     await expect(currentNode).toBeVisible()
     await expect(currentNode).toHaveAttribute('aria-label', new RegExp(L1_TITLE))

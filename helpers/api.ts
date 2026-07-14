@@ -315,19 +315,6 @@ export interface LevelManifest {
   steps: ManifestStep[]
 }
 
-/** `POST /api/steps/<id>/complete/` 200 body (lesson / server-graded quiz). */
-export interface CompleteStepResponse {
-  passed: boolean
-  completed: boolean
-  xp_awarded: number | null
-  already?: boolean
-  results?: boolean[]
-  correct?: number
-  total?: number
-  level_completed?: boolean
-  topic_completed?: boolean
-}
-
 /** `POST /api/steps/<id>/verify/` 200 body (mission verification). */
 export interface VerifyStepResponse {
   passed: boolean
@@ -469,7 +456,6 @@ export class ApiHelper {
       description: string
       start_date: string | null
       end_date: string | null
-      primary_currency: string
       routing_priority: number
     }>,
   ): Promise<SpaceRecord> {
@@ -681,18 +667,6 @@ export class ApiHelper {
     })
   }
 
-  /** Throws on non-OK; returns the JSON response (`{ updated: number }`). */
-  async bulkSetSpace(
-    transactionIds: number[],
-    spaceId: number | null,
-  ): Promise<{ updated: number }> {
-    const res = await this.bulkSetSpaceRaw(transactionIds, spaceId)
-    if (!res.ok()) {
-      throw new Error(`bulkSetSpace failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
   /** Fetch a single bank transaction's record via the list endpoint. */
   async getBankTransaction(id: number): Promise<BankTransactionRecord | null> {
     const res = await this.ctx.get(`${this.baseUrl}/api/bank-transactions/${id}/`)
@@ -712,17 +686,6 @@ export class ApiHelper {
     })
     if (!res.ok()) {
       throw new Error(`createCategoryRule failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  async listCategoryRules(spaceId?: number): Promise<CategoryRuleRecord[]> {
-    const url = spaceId
-      ? `${this.baseUrl}/api/category-rules/?space=${spaceId}`
-      : `${this.baseUrl}/api/category-rules/`
-    const res = await this.ctx.get(url)
-    if (!res.ok()) {
-      throw new Error(`listCategoryRules failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
@@ -774,17 +737,6 @@ export class ApiHelper {
     })
     if (!res.ok()) {
       throw new Error(`categorizationReapply failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  /** GET /api/categorization/suggestions/ — pending rung-2 auto-suggestions. */
-  async listCategorySuggestions(): Promise<
-    { merchant: string; category_id: number; category_name: string; occurrence_count: number; space_id: number }[]
-  > {
-    const res = await this.ctx.get(`${this.baseUrl}/api/categorization/suggestions/`)
-    if (!res.ok()) {
-      throw new Error(`listCategorySuggestions failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
@@ -864,14 +816,6 @@ export class ApiHelper {
     }
     const created = await this.createProviderCategoryMapping(providerCategoryId, categoryId)
     return created.id
-  }
-
-  /** PATCH /api/provider-category-mappings/<id>/ — remap to a new category. */
-  async patchProviderCategoryMapping(mappingId: number, categoryId: number): Promise<APIResponse> {
-    return this.ctx.patch(`${this.baseUrl}/api/provider-category-mappings/${mappingId}/`, {
-      data: { category: categoryId },
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
   }
 
   // ── Bank Accounts (DEBUG-only seed) ────────────────────────────────────────
@@ -1141,8 +1085,8 @@ export class ApiHelper {
    * requesting user's unmapped (`space=NULL`), non-manually-assigned, non-split
    * bank transactions and assigns each to the resolved space. This is the
    * on-demand equivalent of routing-at-Tink-sync (which cannot be driven from
-   * E2E), so it lets us exercise the conflict resolver / single-space fallback
-   * branches. Returns `{ routed: N }` — the count of txns that resolved to a
+   * E2E), so it lets us exercise the conflict-resolver branches of the
+   * fallback-free engine. Returns `{ routed: N }` — the count of txns that resolved to a
    * space (txns that stay in the Inbox are NOT counted).
    */
   async routeUnmapped(): Promise<{ routed: number }> {
@@ -1168,14 +1112,6 @@ export class ApiHelper {
     })
   }
 
-  async applyClaimRule(ruleId: number): Promise<{ matched_count: number }> {
-    const res = await this.applyClaimRuleRaw(ruleId)
-    if (!res.ok()) {
-      throw new Error(`applyClaimRule failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
   /** GET /api/claim-rules/suggestions/ — learned merchant→space suggestions (Story 16.5). */
   async listSpaceSuggestions(): Promise<
     { merchant: string; space_id: number; space_name: string; occurrence_count: number }[]
@@ -1183,25 +1119,6 @@ export class ApiHelper {
     const res = await this.ctx.get(`${this.baseUrl}/api/claim-rules/suggestions/`)
     if (!res.ok()) {
       throw new Error(`listSpaceSuggestions failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  /** Raw POST /api/claim-rules/suggestions/accept/ — returns APIResponse for negative tests. */
-  async acceptSpaceSuggestionRaw(spaceId: number, merchant: string): Promise<APIResponse> {
-    return this.ctx.post(`${this.baseUrl}/api/claim-rules/suggestions/accept/`, {
-      data: { space_id: spaceId, merchant },
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
-  }
-
-  async acceptSpaceSuggestion(
-    spaceId: number,
-    merchant: string,
-  ): Promise<{ rule: ClaimRuleRecord; matched_count: number }> {
-    const res = await this.acceptSpaceSuggestionRaw(spaceId, merchant)
-    if (!res.ok()) {
-      throw new Error(`acceptSpaceSuggestion failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }
@@ -1472,23 +1389,6 @@ export class ApiHelper {
     const res = await this.ctx.get(url)
     if (!res.ok()) {
       throw new Error(`fetchLevel failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
-  }
-
-  /**
-   * POST /api/steps/<id>/complete/ — knowledge completion (lesson mark-read /
-   * server-graded quiz). Lesson body is `{}`; quiz body is `{ answers: [...] }`.
-   * A failing quiz still returns 200 (`passed:false` + per-question `results`) —
-   * only a non-2xx (locked / unknown) throws.
-   */
-  async completeStep(stepId: number, body: Record<string, unknown> = {}): Promise<CompleteStepResponse> {
-    const res = await this.ctx.post(`${this.baseUrl}/api/steps/${stepId}/complete/`, {
-      data: body,
-      headers: { 'X-CSRFToken': await this.csrfToken() },
-    })
-    if (!res.ok()) {
-      throw new Error(`completeStep failed (${res.status()}): ${await res.text()}`)
     }
     return res.json()
   }

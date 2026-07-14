@@ -1,10 +1,10 @@
 /**
- * Curriculum — Auri reactions + completion / reward screen (Phase 27, Story 27.4)
+ * Curriculum — the player reactions + completion / reward screen (Phase 27, Story 27.4)
  *
- * Phase 27 gave the players a mini-Auri that reacts to each interaction (correct →
+ * Phase 27 gave the players a mini-the player that reacts to each interaction (correct →
  * celebrate, wrong / fail → support, NEVER shame) and interposed a completion /
  * reward screen (`step-completion`) inside the host when a lesson / quiz /
- * scenario / sandbox step (or a self-attest mission) finishes a level: Auri
+ * scenario / sandbox step (or a self-attest mission) finishes a level: the player
  * celebrating + a real "+N XP" figure (ONLY a positive `xp_awarded` from the
  * response — a replay shows "Reviewed", never a fake number) + a Continue that
  * closes the host. A row-verified mission keeps its own enriched snapshot phase
@@ -18,6 +18,7 @@
  */
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
+import { CELEBRATES, SUPPORTS, SHAME_PATTERN } from '../../helpers/reactions'
 import {
   seedPlayerFixtures,
   makeFixtureLevelPlayable,
@@ -34,7 +35,7 @@ import {
 } from '../../helpers/startHereFixtures'
 
 // The reaction copy is warm and supportive — it must NEVER shame a wrong answer.
-const SHAME_PATTERN = /\b(wrong|stupid|idiot|dumb|failure|failed|loser|useless|terrible|pathetic)\b/i
+
 
 test.describe('Curriculum — completion + reward screen', () => {
   test('completing a lesson shows the completion screen with real +XP', async ({ page, loggedInPage }) => {
@@ -61,9 +62,8 @@ test.describe('Curriculum — completion + reward screen', () => {
     const body = (await (await respPromise).json()) as { xp_awarded: number | null }
     expect(body.xp_awarded).toBe(LESSON_XP)
 
-    // The reward screen shows Auri celebrating + "+N XP" equal to the response.
+    // The reward screen celebrates in words + "+N XP" equal to the response.
     await expect(map.stepCompletion).toBeVisible({ timeout: 45_000 })
-    await expect(map.completionAuri).toBeVisible()
     await expect(map.completionXp).toContainText(`${body.xp_awarded}`)
 
     // Continue closes the host; Bar #1 XP rose by exactly that amount.
@@ -72,7 +72,7 @@ test.describe('Curriculum — completion + reward screen', () => {
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBe(xpBefore + (body.xp_awarded ?? 0))
   })
 
-  test('a lesson tap makes Auri celebrate on correct and stay supportive on wrong', async ({
+  test('a lesson tap makes the player celebrate on correct and stay supportive on wrong', async ({
     page,
     loggedInPage,
   }) => {
@@ -84,33 +84,32 @@ test.describe('Curriculum — completion + reward screen', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    // --- Correct tap → Auri celebrates (formative, no completion) ---
+    // --- Correct tap → the player celebrates (formative, no completion) ---
     await map.openCurrentNode('smart-spending')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson')
     await map.lessonNext.click() // text card (index 0) → choice card (index 1)
     await expect(map.lessonCardChoice).toBeVisible()
     await map.lessonOption.nth(INTERACTIVE_CORRECT_OPTION).click()
-    await expect(map.playerAuri.locator('img.auri-img')).toHaveAttribute('src', /auri_03_celebrate/)
-    expect((await map.playerReaction.innerText()).trim().length).toBeGreaterThan(0)
+    await expect(map.playerReaction).toHaveText(CELEBRATES)
 
     // Close WITHOUT completing (an inline check is formative — the step stays a
     // fresh `current` node), then re-open for the wrong-tap branch.
     await page.keyboard.press('Escape')
     await expect(map.stepPlayerHost).toBeHidden()
 
-    // --- Wrong tap → Auri stays supportive, never shaming ---
+    // --- Wrong tap → the player stays supportive, never shaming ---
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
     await map.lessonNext.click()
     await expect(map.lessonCardChoice).toBeVisible()
     await map.lessonOption.nth(INTERACTIVE_WRONG_OPTION).click()
-    await expect(map.playerAuri.locator('img.auri-img')).toHaveAttribute('src', /auri_06_support/)
+    await expect(map.playerReaction).toHaveText(SUPPORTS)
     const reaction = (await map.playerReaction.innerText()).trim()
-    expect(reaction.length).toBeGreaterThan(0)
     expect(reaction).not.toMatch(SHAME_PATTERN)
+    expect(reaction).not.toMatch(CELEBRATES)
   })
 
-  test('a quiz fail shows the support Auri, not shame', async ({ page, loggedInPage }) => {
+  test('a quiz fail stays supportive, never shaming', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     const { quiz } = await seedPlayerFixtures(api)
@@ -122,12 +121,12 @@ test.describe('Curriculum — completion + reward screen', () => {
     await map.openCurrentNode('smart-spending')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz')
 
-    // Submit a WRONG answer → the fail review renders the supportive Auri.
+    // Submit a WRONG answer → the fail review renders the supportive the player.
     const wrong = QUIZ_ANSWER_INDEX === 0 ? 1 : 0
     await map.quizOption.nth(wrong).click()
     await map.quizSubmit.click()
     await expect(map.quizResult.first()).toBeVisible({ timeout: 45_000 })
-    await expect(map.playerAuri.locator('img.auri-img')).toHaveAttribute('src', /auri_06_support/)
+    await expect(map.playerReaction).toHaveText(SUPPORTS)
 
     // The support copy is never shaming; the host stayed open (a fail = no reward).
     const reaction = (await map.playerReaction.innerText()).trim()

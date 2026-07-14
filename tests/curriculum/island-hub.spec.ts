@@ -49,7 +49,10 @@ function islandState(section: MapSection, activeSlug: string | null): IslandStat
 }
 
 test.describe('Curriculum — island hub', () => {
-  test('renders nine collapsed islands with one expanded by default', async ({ page, loggedInPage }) => {
+  test('renders nine chapter-islands on the world map, none focused by default', async ({
+    page,
+    loggedInPage,
+  }) => {
     test.slow()
     const { api } = loggedInPage
     const payload = await api.getCurriculumMap() // seeds the tree
@@ -59,33 +62,27 @@ test.describe('Curriculum — island hub', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    // Nine section-islands render in the adaptive grid.
+    // Nine chapter-islands render along the world-map road.
     await expect(map.sections).toHaveCount(9)
 
-    // Exactly ONE island is expanded (its toggle `aria-expanded=true`) — the one
-    // holding the canonical current node.
-    const expandedToggles = page.locator('[data-testid="island-toggle"][aria-expanded="true"]')
-    await expect(expandedToggles).toHaveCount(1)
-    await expect(map.mapSection(active!.sectionSlug).getByTestId('island-toggle')).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    )
+    // Default = the world map: NO chapter is focused (no `aria-expanded=true`),
+    // and the focus-back control is absent (it exists only in focus mode).
+    await expect(page.locator('[data-testid="island-toggle"][aria-expanded="true"]')).toHaveCount(0)
+    await expect(map.focusBack).toHaveCount(0)
 
-    // Exactly one CURRENT node is visible (the active island's); the others sit in
-    // collapsed islands whose bodies are `hidden` — present in the DOM but unpainted.
-    const visibleCurrent = page.locator(
-      '[data-testid="map-level-node"][data-node-status="current"]:visible',
-    )
-    await expect(visibleCurrent).toHaveCount(1)
-    await expect(map.nodesInTopic(active!.topicSlug, 'current').first()).toBeVisible()
+    // No level node is on-stage yet — every chapter's path lives inside its focus
+    // mode, so all node bodies stay in the DOM but hidden.
+    await expect(page.locator('[data-testid="map-level-node"]:visible')).toHaveCount(0)
 
-    // A collapsed island's topic body stays in the DOM (count reads) but hidden.
-    const collapsedTopic = payload.sections
-      .flatMap((s) => (s.slug === active!.sectionSlug ? [] : s.topics))
-      .find((t) => t.status !== undefined)
-    expect(collapsedTopic).toBeTruthy()
-    await expect(map.topic(collapsedTopic!.slug)).toHaveCount(1)
-    await expect(map.topic(collapsedTopic!.slug)).toBeHidden()
+    // The active chapter (the one holding the canonical current node) reads
+    // `continue`; a non-active chapter's topic body is present in the DOM but hidden.
+    await expect(map.mapSection(active!.sectionSlug)).toHaveAttribute('data-island-state', 'continue')
+    const otherTopic = payload.sections.flatMap((s) =>
+      s.slug === active!.sectionSlug ? [] : s.topics,
+    )[0]
+    expect(otherTopic).toBeTruthy()
+    await expect(map.topic(otherTopic!.slug)).toHaveCount(1)
+    await expect(map.topic(otherTopic!.slug)).toBeHidden()
   })
 
   test('island states derive from progress', async ({ page, loggedInPage }) => {
@@ -117,36 +114,45 @@ test.describe('Curriculum — island hub', () => {
     expect(expected.get(activeSlug!)).toBe('continue')
   })
 
-  test('an island expands and collapses on toggle', async ({ page, loggedInPage }) => {
+  test('a chapter zooms into focus and returns to the world map', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     const payload = await api.getCurriculumMap()
-    const active = findCanonicalCurrent(payload)
-    const activeSlug = active!.sectionSlug
+    const active = findCanonicalCurrent(payload)!
+    const activeSlug = active.sectionSlug
 
-    // Pick a COLLAPSED island (any section that isn't the active one) + one of its
-    // topics, to prove the accordion reveals its nodes and closes the open island.
-    const collapsedSection = payload.sections.find((s) => s.slug !== activeSlug)!
-    const collapsedTopic = collapsedSection.topics[0]
+    // A SECOND chapter (with at least one topic) to prove focus switches islands.
+    const other = payload.sections.find((s) => s.slug !== activeSlug && s.topics.length > 0)!
+    const otherTopic = other.topics[0]
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
     const activeToggle = map.mapSection(activeSlug).getByTestId('island-toggle')
-    const targetToggle = map.mapSection(collapsedSection.slug).getByTestId('island-toggle')
+    const otherToggle = map.mapSection(other.slug).getByTestId('island-toggle')
 
-    // Baseline: the active island open, the target collapsed (its topic hidden).
-    await expect(activeToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(targetToggle).toHaveAttribute('aria-expanded', 'false')
-    await expect(map.topic(collapsedTopic.slug)).toBeHidden()
-
-    // Expand the target → its nodes reveal; the previously-open island collapses
-    // (single-open accordion).
-    await targetToggle.click()
-    await expect(targetToggle).toHaveAttribute('aria-expanded', 'true')
-    await expect(map.topic(collapsedTopic.slug)).toBeVisible()
+    // World map: nothing focused, both island toggles clickable, paths hidden.
     await expect(activeToggle).toHaveAttribute('aria-expanded', 'false')
-    await expect(map.topic(active!.topicSlug)).toBeHidden()
+    await expect(otherToggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(map.topic(active.topicSlug)).toBeHidden()
+
+    // Click the active island → zoom into focus: its path is on-stage, back shows.
+    await activeToggle.click()
+    await expect(activeToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(map.topic(active.topicSlug)).toBeVisible()
+    await expect(map.focusBack).toBeVisible()
+
+    // Back → the world map: nothing focused, the path is hidden again.
+    await map.focusBack.click()
+    await expect(map.focusBack).toBeHidden()
+    await expect(activeToggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(map.topic(active.topicSlug)).toBeHidden()
+
+    // Focus a DIFFERENT island → single-open: it is the only focused chapter.
+    await otherToggle.click()
+    await expect(otherToggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(map.topic(otherTopic.slug)).toBeVisible()
+    await expect(activeToggle).toHaveAttribute('aria-expanded', 'false')
   })
 
   test('Continue CTA resumes the current node', async ({ page, loggedInPage }) => {

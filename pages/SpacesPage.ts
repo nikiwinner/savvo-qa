@@ -18,19 +18,15 @@ import { Page, Locator } from '@playwright/test'
  * or "leave unassigned" sentinel).
  */
 export class SpacesPage {
-  readonly heading: Locator
   readonly newSpaceButton: Locator
   readonly createForm: Locator
   readonly emptyState: Locator
-  readonly spacesGrid: Locator
   readonly archivedLink: Locator
 
   constructor(private readonly page: Page) {
-    this.heading = page.locator('h1', { hasText: 'Spaces' })
     this.newSpaceButton = page.locator('button.btn-create', { hasText: 'New Space' })
     this.createForm = page.locator('.form-paper')
     this.emptyState = page.locator('.empty-state')
-    this.spacesGrid = page.locator('.spaces-grid')
     this.archivedLink = page.locator('a.btn-archived-link', { hasText: 'View archived' })
   }
 
@@ -70,10 +66,6 @@ export class SpacesPage {
     return this.page.locator('.space-card')
   }
 
-  cardNames(): Locator {
-    return this.page.locator('.space-card h3')
-  }
-
   async editSpace(currentName: string, newName: string): Promise<void> {
     const c = this.card(currentName)
     await c.locator('.action-btn[aria-label="Edit"]').click()
@@ -81,12 +73,6 @@ export class SpacesPage {
     const editName = c.locator('input[name="name"]')
     await editName.fill(newName)
     await c.locator('button', { hasText: 'Save' }).click()
-  }
-
-  async cancelEdit(name: string): Promise<void> {
-    const c = this.card(name)
-    await c.locator('.action-btn[aria-label="Edit"]').click()
-    await c.locator('button', { hasText: 'Cancel' }).click()
   }
 
   // ────────────────────────────────────────────────────────────────────────────

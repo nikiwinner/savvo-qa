@@ -58,7 +58,9 @@ test.describe('Curriculum — step-player host', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    const node = map.nodesByStatus('current').first()
+    // The current node's path lives inside focus mode — zoom into the chapter that
+    // holds the first current node to bring it on-stage, then tap it.
+    const node = await map.revealFirstNodeByStatus('current')
     await expect(node).toBeVisible()
     await node.click()
 

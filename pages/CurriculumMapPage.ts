@@ -1,15 +1,21 @@
 import { Page, Locator } from '@playwright/test'
 
 /**
- * Page object for the curriculum **island-hub** map (`/dashboard/learn`).
+ * Page object for the curriculum **world map** (`/dashboard/learn`).
  *
- * Phase 27 rebuilt the map into an island hub: 9 section-islands in an adaptive
- * collapsed grid with a single-open accordion. The active island (the one holding
- * the canonical current node) is expanded by default; every OTHER island's body
- * stays in the DOM but `hidden` (`display:none`) — so attribute/count reads still
- * work, but a node inside a collapsed island must be EXPANDED before it can be
- * interacted with. Node-open helpers here expand the containing island first
- * (`expandIslandFor` / `openCurrentNode`).
+ * Phase 28 rebuilt the map into a game-like world map: 9 chapter-islands
+ * (sections) laid along a glowing road. Desktop DEFAULT = the world map (no
+ * island focused); clicking an island's `island-toggle` ZOOMS into a focus mode
+ * where the whole stage becomes that chapter's vertical level path (its topics +
+ * level nodes), and a `focus-back` button returns to the world map. The
+ * single-open contract is preserved: a section's `island-toggle` carries
+ * `aria-expanded = (it is the focused chapter)` and its body (topics/nodes) is
+ * shown ONLY while focused — every OTHER section's body stays in the DOM but
+ * hidden (`display:none`), so attribute/count reads still work while a node
+ * inside it must be FOCUSED before it can be interacted with. Node-open helpers
+ * here focus the containing chapter first (`expandIslandFor` / `openCurrentNode`
+ * / `revealFirstNodeByStatus`); `expandIslandFor` is kept as the historical name
+ * for "focus the chapter that holds this topic" so its many callers are unchanged.
  *
  * Phase 27 also interposed a completion / reward screen (`step-completion`) inside
  * the host after a lesson / quiz / scenario / sandbox step or a self-attest
@@ -27,9 +33,6 @@ import { Page, Locator } from '@playwright/test'
  * here waits for the final rendered state (`curriculum-map` visible) rather than
  * assuming SSR HTML.
  *
- * The map hero keeps the DOM-unique `auri-character` testid; the mini-Auri inside
- * a player is `player-auri`, and the celebration Auri on the reward screen is
- * `completion-auri`.
  */
 export class CurriculumMapPage {
   readonly page: Page
@@ -47,16 +50,18 @@ export class CurriculumMapPage {
   readonly topicCrests: Locator
   readonly levelNodes: Locator
 
-  // Island hub (Phase 27) — Continue CTA + per-island accordion chrome
+  // World map (Phase 28) — Continue dock + per-island chrome + focus back button
   readonly continueCta: Locator
   readonly islandToggle: Locator
   readonly islandState: Locator
   readonly islandNext: Locator
+  readonly focusBack: Locator
 
   // Two-bar topbar + streak
   readonly barKnowledge: Locator
   readonly xpTotal: Locator
   readonly barDoing: Locator
+  readonly guideMessage: Locator
   readonly mapStreak: Locator
 
   // Bar #2 (Net Wealth) live readout + tap-through breakdown (Phase 25)
@@ -69,8 +74,6 @@ export class CurriculumMapPage {
   readonly netWealthAccountList: Locator
   readonly netWealthAccountRows: Locator
 
-  // Auri (map hero) + step-player host
-  readonly auriCharacter: Locator
   readonly stepPlayerHost: Locator
   readonly stepHostClose: Locator
 
@@ -78,15 +81,12 @@ export class CurriculumMapPage {
   readonly stepPlayer: Locator
   readonly crestReveal: Locator
 
-  // Player-Auri + reaction line (Phase 27) — DOM-distinct from the map hero
-  readonly playerAuri: Locator
   readonly playerReaction: Locator
 
   // Completion / reward screen (Phase 27)
   readonly stepCompletion: Locator
   readonly completionXp: Locator
   readonly completionContinue: Locator
-  readonly completionAuri: Locator
 
   // Lesson player
   readonly lessonCard: Locator
@@ -155,10 +155,12 @@ export class CurriculumMapPage {
     this.islandToggle = page.getByTestId('island-toggle')
     this.islandState = page.getByTestId('island-state')
     this.islandNext = page.getByTestId('island-next')
+    this.focusBack = page.getByTestId('focus-back')
 
     this.barKnowledge = page.getByTestId('bar-knowledge')
     this.xpTotal = page.getByTestId('xp-total')
     this.barDoing = page.getByTestId('bar-doing')
+    this.guideMessage = page.getByTestId('guide-message')
     this.mapStreak = page.getByTestId('map-streak')
 
     this.netWealthFigure = page.getByTestId('net-wealth-figure')
@@ -170,20 +172,17 @@ export class CurriculumMapPage {
     this.netWealthAccountList = page.getByTestId('net-wealth-account-list')
     this.netWealthAccountRows = page.getByTestId('net-wealth-account-row')
 
-    this.auriCharacter = page.getByTestId('auri-character')
     this.stepPlayerHost = page.getByTestId('step-player-host')
     this.stepHostClose = page.getByTestId('step-host-close')
 
     this.stepPlayer = page.getByTestId('step-player')
     this.crestReveal = page.getByTestId('crest-reveal')
 
-    this.playerAuri = page.getByTestId('player-auri')
     this.playerReaction = page.getByTestId('player-reaction')
 
     this.stepCompletion = page.getByTestId('step-completion')
     this.completionXp = page.getByTestId('completion-xp')
     this.completionContinue = page.getByTestId('completion-continue')
-    this.completionAuri = page.getByTestId('completion-auri')
 
     this.lessonCard = page.getByTestId('lesson-card')
     this.lessonNext = page.getByTestId('lesson-next')
@@ -239,30 +238,54 @@ export class CurriculumMapPage {
   }
 
   /**
-   * The single-open accordion collapses every non-active island body to
-   * `display:none`, so a node inside a collapsed island can't be clicked until its
-   * island is expanded. Locate the `map-section` that CONTAINS `topicSlug`, click
-   * its `island-toggle` when `aria-expanded` is not already `true`, then wait for
-   * the topic's body to be revealed. A no-op when the island is already open.
+   * If a chapter is currently in focus mode, click `focus-back` to return to the
+   * world map (where the island toggles are visible + clickable). No-op on the
+   * world map (the `focus-back` control is only rendered in focus mode).
+   */
+  async ensureWorldMode(timeout = 15_000): Promise<void> {
+    if (await this.focusBack.isVisible().catch(() => false)) {
+      await this.focusBack.click()
+      await this.focusBack.waitFor({ state: 'hidden', timeout }).catch(() => {})
+    }
+  }
+
+  /**
+   * Focus a chapter-island so its level path is on-stage. No-op when it is already
+   * the focused chapter (`aria-expanded="true"`); otherwise return to the world
+   * map first (so the target island toggle is clickable), click it, and wait until
+   * focus mode is up (`focus-back` visible). Single-open: focusing one chapter
+   * un-focuses the rest.
+   */
+  private async focusSection(section: Locator, timeout = 15_000): Promise<void> {
+    const toggle = section.getByTestId('island-toggle')
+    if ((await toggle.getAttribute('aria-expanded')) === 'true') return
+    await this.ensureWorldMode(timeout)
+    await toggle.waitFor({ state: 'visible', timeout })
+    await toggle.click()
+    await this.focusBack.waitFor({ state: 'visible', timeout })
+  }
+
+  /**
+   * Focus the chapter that CONTAINS `topicSlug`, then wait for that topic's body to
+   * be revealed. Kept under its historical name — every player / mission /
+   * net-wealth spec calls `expandIslandFor(topic)` then taps a node in the topic;
+   * focusing the chapter makes those nodes visible + interactable exactly as the
+   * old accordion expand did. A no-op when the chapter is already focused.
    */
   async expandIslandFor(topicSlug: string, timeout = 15_000): Promise<void> {
     const section = this.page
       .locator(`[data-testid="map-section"]:has([data-topic-slug="${topicSlug}"])`)
       .first()
-    const toggle = section.getByTestId('island-toggle')
-    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
-      await toggle.click()
-    }
-    // Removing the `hidden` attribute un-hides the body (display:none → flex), so
-    // the topic (and its nodes) becomes visible — wait for that before interacting.
+    await this.focusSection(section, timeout)
+    // Focus mode reveals the chapter's body (topics + nodes) — wait before use.
     await this.topic(topicSlug).first().waitFor({ state: 'visible', timeout })
   }
 
   /**
-   * Expand the island holding the FIRST map node of a given derived status and
+   * Focus the chapter holding the FIRST map node of a given derived status and
    * return that (now-visible) node locator. Used where a spec taps a node that may
-   * live in a collapsed island (e.g. a `coming_soon` or `locked` node not in the
-   * default-open active island).
+   * live in a chapter other than the current one (e.g. a `coming_soon` or `locked`
+   * node).
    */
   async revealFirstNodeByStatus(status: string, timeout = 15_000): Promise<Locator> {
     const section = this.page
@@ -270,10 +293,7 @@ export class CurriculumMapPage {
         `[data-testid="map-section"]:has([data-testid="map-level-node"][data-node-status="${status}"])`,
       )
       .first()
-    const toggle = section.getByTestId('island-toggle')
-    if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
-      await toggle.click()
-    }
+    await this.focusSection(section, timeout)
     const node = section
       .locator(`[data-testid="map-level-node"][data-node-status="${status}"]`)
       .first()
@@ -283,8 +303,8 @@ export class CurriculumMapPage {
 
   /**
    * Open a topic's sole `current` node and wait for the step player to mount. The
-   * containing island is expanded first (Phase 27 accordion), so the node is
-   * interactable even when it sits in a collapsed island.
+   * containing chapter is focused first (Phase 28 world map), so the node is
+   * interactable.
    */
   async openCurrentNode(topicSlug: string, timeout = 45_000): Promise<void> {
     await this.expandIslandFor(topicSlug)
