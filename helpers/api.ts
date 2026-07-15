@@ -206,7 +206,7 @@ export interface MapNetWealth {
 
 /**
  * Bar #2 — "what you're DOING" (Phase 25). Net Wealth is real; `score` stays
- * `null` ("Financial Score coming soon" — Phase 50), NEVER a fake 0/100 and
+ * `null` ("Financial Score coming soon" — Phase 51), NEVER a fake 0/100 and
  * NEVER fed by XP. `bars.doing` is `null` only in a data-less / degraded case
  * where even the empty figure can't be computed.
  */

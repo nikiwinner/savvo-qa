@@ -4,8 +4,13 @@ import { Page, Locator } from '@playwright/test'
  * Page object for the curriculum **world map** (`/dashboard/learn`).
  *
  * Phase 28 rebuilt the map into a game-like world map: 9 chapter-islands
- * (sections) laid along a glowing road. Desktop DEFAULT = the world map (no
- * island focused); clicking an island's `island-toggle` ZOOMS into a focus mode
+ * (sections) threaded along a road that snakes DOWN the page (islands alternate
+ * hard left / hard right; the page itself scrolls — there is no inner scroller and
+ * no separate mobile layout). Each island is hand-drawn art (`island-art`) plus
+ * its floating rocks (`island-rock`), cut out of the same bitmap and drifting
+ * independently. The two progress bars and Continue live in a sticky RAIL to the
+ * right of the map (they unstack above it below 768px). Desktop DEFAULT = the
+ * world map (no island focused); clicking an island's `island-toggle` ZOOMS into a focus mode
  * where the whole stage becomes that chapter's vertical level path (its topics +
  * level nodes), and a `focus-back` button returns to the world map. The
  * single-open contract is preserved: a section's `island-toggle` carries
@@ -50,9 +55,16 @@ export class CurriculumMapPage {
   readonly topicCrests: Locator
   readonly levelNodes: Locator
 
-  // World map (Phase 28) — Continue dock + per-island chrome + focus back button
+  // World map (Phase 28) — Continue + per-island chrome + focus back button.
+  // `chapterCard` (and therefore `sectionCrests` / `islandState` / `islandNext`,
+  // which live INSIDE it) renders on the ACTIVE chapter ONLY — every other chapter
+  // wears a quiet `chapter-nameplate`. Expect exactly ONE of each on the map.
   readonly continueCta: Locator
   readonly islandToggle: Locator
+  readonly islandArt: Locator
+  readonly islandRock: Locator
+  readonly chapterCard: Locator
+  readonly chapterNameplate: Locator
   readonly islandState: Locator
   readonly islandNext: Locator
   readonly focusBack: Locator
@@ -153,6 +165,10 @@ export class CurriculumMapPage {
 
     this.continueCta = page.getByTestId('continue-cta')
     this.islandToggle = page.getByTestId('island-toggle')
+    this.islandArt = page.getByTestId('island-art')
+    this.islandRock = page.getByTestId('island-rock')
+    this.chapterCard = page.getByTestId('chapter-card')
+    this.chapterNameplate = page.locator('.chapter-nameplate')
     this.islandState = page.getByTestId('island-state')
     this.islandNext = page.getByTestId('island-next')
     this.focusBack = page.getByTestId('focus-back')
