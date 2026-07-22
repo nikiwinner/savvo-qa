@@ -26,7 +26,7 @@ The backend already whitelists `http://localhost:5174` in
 
 ```bash
 pnpm install            # install dependencies (uses pnpm, not npm)
-pnpm test               # run all E2E tests (3 projects: chromium, mobile-safari, tablet)
+pnpm test               # run all E2E tests (3 browser projects: chromium, mobile-safari, tablet + a `setup` pre-seed project all three depend on)
 pnpm test:auth          # run auth tests only
 pnpm test:headed        # run with browser visible
 ```
