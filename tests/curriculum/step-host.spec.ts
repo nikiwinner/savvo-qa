@@ -25,6 +25,7 @@ import type { Locator } from '@playwright/test'
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
 import { seedPlayerFixtures, makeFixtureLevelPlayable } from '../../helpers/curriculumFixtures'
+import { completeEarningMoneyLevels, EM_PRE_CAPSTONE_LEVELS } from '../../helpers/earnFixtures'
 
 // Read a locator's boundingBox once it has SETTLED — two consecutive reads that
 // agree (to the rounded pixel) with a non-zero width. Under emulated reduced
@@ -109,11 +110,15 @@ test.describe('Curriculum — step-player host', () => {
 
     // Seed the fixtures + make the lesson the ONLY incomplete step in
     // smart-spending / name-what-you-buy, so that topic exposes a `current` node
-    // that mounts the Lesson player. The real self_attest `earning-inventory`
-    // mission stays a fresh user's `current` node in earning-money — a SECOND
-    // node whose content length differs sharply (deck vs prose checklist).
+    // that mounts the Lesson player (node A — a short 2-card deck).
     const { lesson } = await seedPlayerFixtures(api)
     await makeFixtureLevelPlayable(api, lesson.step_id)
+    // Seed-complete earning-money's L1–L4 so its `current` node is the L5
+    // `sketch-your-income-mix` capstone MISSION (a guided-v2 flow, not a lesson deck)
+    // — node B, a different step + kind from the deck (the frame-stability contrast;
+    // Phase 29 gave L1 a lesson, so the old lone-mission `earning-inventory` node no
+    // longer sits at the topic's fresh `current`).
+    await completeEarningMoneyLevels(api, EM_PRE_CAPSTONE_LEVELS)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
@@ -155,8 +160,9 @@ test.describe('Curriculum — step-player host', () => {
       expect(a.x + a.width).toBeLessThanOrEqual(vw - 20)
     }
 
-    // --- Frame stability: a DIFFERENT step (the earning-inventory mission, with
-    // a very different content length) yields the SAME dialog box -------------
+    // --- Frame stability: a DIFFERENT step + kind (the L5 `sketch-your-income-mix`
+    // capstone — a guided-v2 mission flow, not a lesson deck) yields the SAME dialog
+    // box (the frame is fixed regardless of the step's content) -------------
     await map.stepHostClose.click()
     await expect(map.stepPlayerHost).toBeHidden()
 

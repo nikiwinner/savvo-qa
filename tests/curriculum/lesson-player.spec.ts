@@ -27,6 +27,7 @@ import {
   INTERACTIVE_WRONG_OPTION,
   INTERACTIVE_FEEDBACK,
 } from '../../helpers/curriculumFixtures'
+import { completeEarningMoneyLevels, seedIncomeRows, EM_PRE_CAPSTONE_LEVELS } from '../../helpers/earnFixtures'
 
 test.describe('Curriculum — lesson player', () => {
   test('a seeded lesson plays through its deck and completes', async ({ page, loggedInPage }) => {
@@ -76,29 +77,32 @@ test.describe('Curriculum — lesson player', () => {
     const { api } = loggedInPage
     await api.getCurriculumMap() // seed the tree
 
-    // Unlock the earning-money capstone `income-shows-up` (a step-bearing
-    // CHECKPOINT) by completing the two step-bearing levels before it.
-    await api.seedLevelState({ topic_slug: 'earning-money', level_slug: 'earning-inventory' })
-    await api.seedLevelState({ topic_slug: 'earning-money', level_slug: 'plant-one-new-stream' })
+    // Unlock the earning-money capstone `income-shows-up` (a ROW-VERIFIED CHECKPOINT
+    // since Phase 29) by completing the four step-bearing levels before it, and seed
+    // ≥2 income rows so the pure `income_rows_exist` capstone verifies PASS against
+    // real data.
+    await completeEarningMoneyLevels(api, EM_PRE_CAPSTONE_LEVELS)
+    await seedIncomeRows(api, 2)
 
-    // No crest earned yet (neither unlocked level is a checkpoint).
+    // No crest earned yet (none of the four unlocked levels is a checkpoint).
     const before = await api.getCurriculumMap()
     expect(before.bars.knowledge.crest_count).toBe(0)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    // The capstone is the sole `current` node in earning-money; its mission is a
-    // self_attest step → "Mark done" completes the checkpoint level.
+    // The capstone is the sole `current` node in earning-money; it is a guided-v2
+    // row-verified mission (Verify terminal + snapshot), NOT self_attest — walk
+    // action → choice to the terminal, Verify PASSES against the rows, and Continue
+    // closes the host onto the revealed crest.
     await map.expandIslandFor('earning-money')
     await map.nodesInTopic('earning-money', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
-    await page.getByTestId('mission-verify').click()
-
-    // A self_attest mission DOES get the Phase-27 reward screen → Continue closes
-    // the host; the crest reveal (set when the map refreshed behind it) persists.
-    await map.absorbCompletionScreen()
+    await map.walkMissionFlow()
+    await map.missionVerify.click()
+    await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
+    await map.missionContinue.click()
 
     // Baseline crest reveal pops on the newly-completed checkpoint node …
     await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })

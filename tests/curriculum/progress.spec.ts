@@ -15,9 +15,10 @@
  * Content facts used below trace to `backend/src/app/curriculum/content/`:
  *   - `smart-spending` (S2, no prereq) has 4 step-bearing levels — `catch-every-spend`
  *     is one of them.
- *   - `earning-money` (S1, no prereq) has EXACTLY 3 step-bearing levels
- *     (`earning-inventory`, `plant-one-new-stream`, `income-shows-up`); `career-choice`'s
- *     ONLY prerequisite is `earning-money`.
+ *   - `earning-money` (S1, no prereq) has 5 step-bearing levels (`income-is-a-number`,
+ *     `earning-inventory`, `active-passive-one-off`, `plant-one-new-stream`,
+ *     `income-shows-up` — L1 + L3 gained steps in Phase 29); `career-choice`'s ONLY
+ *     prerequisite is `earning-money`.
  *   - `saving` (S3, nature `applied`) is prereq-locked for a fresh user
  *     (saving ← budgeting ← smart-spending).
  */
@@ -110,7 +111,15 @@ test.describe('Curriculum — derived progress', () => {
     await expect(map.topic('career-choice')).toHaveAttribute('data-topic-status', 'locked')
 
     // Complete EVERY step-bearing level of earning-money → the topic completes.
-    for (const level of ['earning-inventory', 'plant-one-new-stream', 'income-shows-up']) {
+    // Phase 29 added steps to L1 (`income-is-a-number`) and L3 (`active-passive-one-off`),
+    // so all FIVE levels must be completed for the topic to read `completed`.
+    for (const level of [
+      'income-is-a-number',
+      'earning-inventory',
+      'active-passive-one-off',
+      'plant-one-new-stream',
+      'income-shows-up',
+    ]) {
       await api.seedLevelState({ topic_slug: 'earning-money', level_slug: level })
     }
 

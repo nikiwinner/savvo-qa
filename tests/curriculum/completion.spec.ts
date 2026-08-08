@@ -128,10 +128,13 @@ test.describe('Curriculum — completion + reward screen', () => {
     await expect(map.quizResult.first()).toBeVisible({ timeout: 45_000 })
     await expect(map.playerReaction).toHaveText(SUPPORTS)
 
-    // The support copy is never shaming; the host stayed open (a fail = no reward).
+    // The support copy is never shaming, and NEVER celebrating either (I1 — the
+    // `quiz_fail` pool must be disjoint from CELEBRATES; mirrors the lesson-wrong
+    // guard). A quiz fail that read as a celebration would be dishonest.
     const reaction = (await map.playerReaction.innerText()).trim()
     expect(reaction.length).toBeGreaterThan(0)
     expect(reaction).not.toMatch(SHAME_PATTERN)
+    expect(reaction).not.toMatch(CELEBRATES)
     await expect(map.stepCompletion).toHaveCount(0)
     await expect(map.stepPlayerHost).toBeVisible()
   })

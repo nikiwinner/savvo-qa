@@ -48,6 +48,12 @@ export class CurriculumMapPage {
   readonly error: Locator
   readonly retryButton: Locator
 
+  /** The floating "Back to your lesson" pill — shown OFF Learn while a mission's
+   *  deep-link excursion is open, hidden on Learn itself (the map reopens the
+   *  step on its own). Rendered by the dashboard layout, not by the map. */
+  readonly resumePill: Locator
+  readonly resumeContinue: Locator
+
   // Tree
   readonly sections: Locator
   readonly sectionCrests: Locator
@@ -117,6 +123,8 @@ export class CurriculumMapPage {
   readonly quizOption: Locator
   readonly quizSubmit: Locator
   readonly quizResult: Locator
+  /** The explanation shown under a MISSED question on the fail review. */
+  readonly quizFeedback: Locator
   readonly quizRetry: Locator
   readonly quizNext: Locator
   readonly quizBack: Locator
@@ -131,6 +139,7 @@ export class CurriculumMapPage {
   // Sandbox player (Phase 26 — 🧮 labeled-hypothetical calculator)
   readonly sandboxBanner: Locator
   readonly sandboxCalculator: Locator
+  readonly sandboxChart: Locator
   readonly sandboxDone: Locator
 
   // Mission player + verify snapshot (Phase 22/23)
@@ -141,6 +150,17 @@ export class CurriculumMapPage {
   readonly verifierSnapshot: Locator
   readonly snapshotFigure: Locator
   readonly missionContinue: Locator
+
+  // Guided-v2 mission flow (Phase 29 Amendment 1) — path chooser, per-screen
+  // controls, the self-attest terminal + the two keyed completion leads.
+  readonly missionPath: Locator
+  readonly missionScreen: Locator
+  readonly missionScreenOption: Locator
+  readonly missionScreenInput: Locator
+  readonly missionScreenNext: Locator
+  readonly missionAttest: Locator
+  readonly missionReportedLead: Locator
+  readonly missionPassLead: Locator
 
   // Space picker (Phase 23 — binds_space missions only)
   readonly spacePicker: Locator
@@ -156,6 +176,8 @@ export class CurriculumMapPage {
     this.map = page.getByTestId('curriculum-map')
     this.error = page.getByTestId('learn-error')
     this.retryButton = page.getByTestId('learn-retry')
+    this.resumePill = page.getByTestId('learn-resume')
+    this.resumeContinue = page.getByTestId('learn-resume-continue')
 
     this.sections = page.getByTestId('map-section')
     this.sectionCrests = page.getByTestId('section-crest')
@@ -214,6 +236,7 @@ export class CurriculumMapPage {
     this.quizOption = page.getByTestId('quiz-option')
     this.quizSubmit = page.getByTestId('quiz-submit')
     this.quizResult = page.getByTestId('quiz-result')
+    this.quizFeedback = page.getByTestId('quiz-feedback')
     this.quizRetry = page.getByTestId('quiz-retry')
     // The quiz "Next" / "Back" affordances carry no testid (only the last-question
     // "Submit" does), so they are addressed by their accessible names.
@@ -228,6 +251,7 @@ export class CurriculumMapPage {
 
     this.sandboxBanner = page.getByTestId('sandbox-banner')
     this.sandboxCalculator = page.getByTestId('sandbox-calculator')
+    this.sandboxChart = page.getByTestId('sandbox-chart')
     this.sandboxDone = page.getByTestId('sandbox-done')
 
     this.missionVerify = page.getByTestId('mission-verify')
@@ -240,6 +264,15 @@ export class CurriculumMapPage {
     // testid — addressed by its accessible name, SCOPED to the host so it never
     // collides with the map's `continue-cta` hero (whose name also has "Continue").
     this.missionContinue = this.stepPlayerHost.getByRole('button', { name: /Continue/ })
+
+    this.missionPath = page.getByTestId('mission-path')
+    this.missionScreen = page.getByTestId('mission-screen')
+    this.missionScreenOption = page.getByTestId('mission-screen-option')
+    this.missionScreenInput = page.getByTestId('mission-screen-input')
+    this.missionScreenNext = page.getByTestId('mission-screen-next')
+    this.missionAttest = page.getByTestId('mission-attest')
+    this.missionReportedLead = page.getByTestId('mission-reported-lead')
+    this.missionPassLead = page.getByTestId('mission-pass-lead')
 
     this.spacePicker = page.getByTestId('space-picker')
     this.spacePickerEmpty = page.getByTestId('space-picker-empty')
@@ -323,7 +356,7 @@ export class CurriculumMapPage {
    * interactable.
    */
   async openCurrentNode(topicSlug: string, timeout = 45_000): Promise<void> {
-    await this.expandIslandFor(topicSlug)
+    await this.expandIslandFor(topicSlug, timeout)
     await this.nodesInTopic(topicSlug, 'current').first().click()
     await this.stepPlayerHost.waitFor({ state: 'visible', timeout })
     await this.stepPlayer.waitFor({ state: 'visible', timeout })
@@ -339,11 +372,19 @@ export class CurriculumMapPage {
    * already closed (defensive). We grab the just-active player, wait until it is
    * replaced, then click Continue ONLY when the reward screen is what came up.
    * Row-verified missions celebrate in their own snapshot phase and never land here.
+   *
+   * The INITIAL attach gets a SHORT (2s) budget, NOT the full `timeout` (I2b): when
+   * the completion swap wins the race and unmounts the just-active player before we
+   * grab it, the old full-`timeout` `elementHandle` stalled the whole 45s waiting
+   * for a player that will never appear. With the short budget a lost race falls
+   * straight through to the settle path (reward screen / next player / already-
+   * closed) and recovers immediately, while a player that IS still up is tracked
+   * until it detaches (the level-close swap) exactly as before.
    */
   async absorbCompletionScreen(timeout = 45_000): Promise<void> {
     const handle = await this.stepPlayer
       .first()
-      .elementHandle({ timeout })
+      .elementHandle({ timeout: 2_000 })
       .catch(() => null)
     if (handle) {
       await this.page
@@ -361,6 +402,62 @@ export class CurriculumMapPage {
     if (await this.stepCompletion.isVisible().catch(() => false)) {
       await this.completionContinue.click()
     }
+  }
+
+  /**
+   * Walk a guided-v2 mission flow (Phase 29 Amendment 1) from its first screen to
+   * the terminal control — the `mission-attest` button (self-attest) or
+   * `mission-verify` (row-verified) — handing control back to the caller there.
+   *
+   * `pathId` optionally picks a path first: the chooser (`mission-path`) renders
+   * ONLY when the mission has >1 path (a single-path mission auto-selects and shows
+   * no chooser), so this is a no-op on a single-path mission — call it bare.
+   *
+   * Per screen (`mission-screen`, keyed by `data-screen-kind`): a `choice` is a
+   * FORMATIVE picker → tap the first option (any pick unlocks Next, no verdict); an
+   * `input` gets one throwaway line (page-state only, never posted); an `action` is
+   * just an instruction → the deep-link is NOT tapped (that would navigate away).
+   * Then advance. It stops the instant the screen block is gone and the terminal is
+   * up (the two are mutually exclusive Svelte branches).
+   */
+  async walkMissionFlow(pathId?: string): Promise<void> {
+    if (pathId !== undefined) {
+      const path = this.page.locator(`[data-testid="mission-path"][data-path-id="${pathId}"]`)
+      await path.waitFor({ state: 'visible', timeout: 45_000 })
+      await path.click()
+    }
+    // ≤3 screens + the terminal — the cap is a safety net against a stuck flow.
+    for (let i = 0; i < 5; i++) {
+      await this.missionScreen
+        .or(this.missionAttest)
+        .or(this.missionVerify)
+        .first()
+        .waitFor({ state: 'visible', timeout: 45_000 })
+      // Terminal reached (the screen block is gone) — hand back to the caller.
+      if ((await this.missionScreen.count()) === 0) return
+      const kind = await this.missionScreen.getAttribute('data-screen-kind')
+      if (kind === 'choice') {
+        await this.missionScreenOption.first().click()
+      } else if (kind === 'input') {
+        await this.missionScreenInput.fill('QA note')
+      } else if (kind !== 'action') {
+        // A 4th screen kind must be walked deliberately, never blind-Nexted.
+        throw new Error(`walkMissionFlow: unknown screen kind '${kind}' — extend the walker`)
+      }
+      await this.missionScreenNext.click()
+    }
+    throw new Error('mission flow never reached the attest/verify terminal within 5 screens')
+  }
+
+  /**
+   * Tap a self-attest mission's terminal `mission-attest` button (the explicit
+   * attestation NAMING the action). A reported pass then shows its OWN pass screen
+   * (`mission-reported-lead` + Continue) — NOT the separate Phase-27 reward screen
+   * (the mission `refresh` already marked the step done) — so the caller drives
+   * `missionContinue` to close the host; there is no `absorbCompletionScreen` here.
+   */
+  async attestMission(): Promise<void> {
+    await this.missionAttest.click()
   }
 
   /**

@@ -27,33 +27,54 @@ import {
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8001'
 
 test.describe('Curriculum — mission player', () => {
-  test('a self_attest mission shows the honest label and completes', async ({ page, loggedInPage }) => {
+  test('a self_attest mission walks its guided flow and reports on honour', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
+    await api.getCurriculumMap() // seed the tree
+    // Phase 29 A1: earning-money's L2 `your-earning-inventory` is now a guided-v2
+    // self_attest mission (choice → input → attest). L1 (`income-is-a-number`) leads
+    // with a lesson, so seed-complete L1 + the L2 `what-you-already-own` lesson
+    // (per-step, writes NO XP) so `earning-inventory` (L2) is current and opens
+    // directly to the mission (it mounts after its teach-first lesson).
+    await api.seedLevelState({ topic_slug: 'earning-money', level_slug: 'income-is-a-number' })
+    await api.seedStepCompletion({ level_slug: 'earning-inventory', step_slug: 'what-you-already-own' })
 
     const map = new CurriculumMapPage(page)
-    await map.goto(45_000) // fresh user — seeds the tree + renders the map
+    await map.goto(45_000)
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    // `earning-inventory` is a fresh user's `current` node in earning-money and
-    // holds a single self_attest mission (in a collapsed island — expand it first).
+    // `earning-inventory` (L2) is now the `current` node; its lesson is done, so the
+    // host opens directly on the lone `your-earning-inventory` self_attest mission
+    // (in a collapsed island — expand it first).
     await map.expandIslandFor('earning-money')
     await map.nodesInTopic('earning-money', 'current').first().click()
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
 
-    // The honest "nothing to verify but you" label — and NO fabricated row check.
-    await expect(page.getByTestId('mission-self-attest')).toBeVisible()
-    await expect(page.getByTestId('verifier-snapshot')).toHaveCount(0)
+    // Single-path mission → no chooser; walk the guided screens (choice → input) to
+    // the attest terminal.
+    await map.walkMissionFlow()
 
-    // "Mark done" completes it on the user's honour → a self-attest mission DOES
-    // get the Phase-27 reward screen (no row snapshot to celebrate in) → Continue
-    // closes the host.
-    await page.getByTestId('mission-verify').click()
-    await map.absorbCompletionScreen()
+    // The terminal is an explicit attestation NAMING the action, alongside the
+    // honest "nothing to verify but you" note — and NO fabricated row check.
+    await expect(map.missionSelfAttest).toBeVisible()
+    await expect(map.missionAttest).toBeVisible()
+    await expect(map.verifierSnapshot).toHaveCount(0)
 
+    // Attest → a REPORTED pass, honoured on the user's word ("Done — on your
+    // honour."), with NO verifier snapshot; the player celebrates in words + real XP.
+    await map.attestMission()
+    await expect(map.missionReportedLead).toBeVisible({ timeout: 45_000 })
+    await expect(map.missionPassLead).toHaveCount(0)
+    await expect(map.verifierSnapshot).toHaveCount(0)
+    await expect(map.playerReaction).toHaveText(CELEBRATES)
+    await expect(map.completionXp).toBeVisible()
+
+    // A reported pass shows its OWN pass screen (no separate reward screen) →
+    // Continue closes the host; the real XP rose from the Bar #1 ledger.
+    await map.missionContinue.click()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
     const payload = await api.getCurriculumMap()
@@ -74,9 +95,12 @@ test.describe('Curriculum — mission player', () => {
     await expect(map.stepPlayerHost).toBeVisible()
     await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
-    // Row-verified — NOT a self_attest label; there's a real "Verify" action + deep link.
+    // Row-verified — NOT a self_attest label; there's a real "Verify" action + a
+    // deep link that names where it goes (there is no generic "Open Savvo"
+    // fallback any more — it landed on the page the reader was already on).
     await expect(page.getByTestId('mission-self-attest')).toHaveCount(0)
     await expect(page.getByTestId('mission-deeplink')).toBeVisible()
+    await expect(page.getByTestId('mission-deeplink')).toHaveAttribute('href', /\/dashboard\/spaces/)
 
     // No space yet → honest FAIL, no completion.
     await page.getByTestId('mission-verify').click()

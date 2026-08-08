@@ -68,9 +68,11 @@ test.describe('Curriculum — sandbox player', () => {
     await map.nodesInTopic('smart-spending', 'current').first().click()
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'sandbox', { timeout: 45_000 })
 
-    // The inline-SVG calculator renders with figures on it.
+    // The inline-SVG calculator renders with figures on it. The CHART carries its
+    // own testid: the calculator box also holds icon svgs (the per-control `?`
+    // hints, the coach lamp), so a bare `locator('svg')` names several elements.
     await expect(map.sandboxCalculator).toBeVisible()
-    await expect(map.sandboxCalculator.locator('svg')).toBeVisible()
+    await expect(map.sandboxChart).toBeVisible()
     await expect(map.sandboxCalculator).toContainText(/\d/)
 
     // Adjusting an input re-renders the calculator (the drawn figures change).

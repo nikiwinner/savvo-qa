@@ -141,6 +141,13 @@ export const QUIZ_OPTIONS = [
   'A holiday you booked once',
 ]
 
+/**
+ * The seeded question's `feedback` line — the explanation the reader is shown
+ * when they MISS it. Stripped from the manifest like the answer key, so a spec
+ * finding this string in the DOM before a graded fail is a leak.
+ */
+export const QUIZ_FEEDBACK = 'A fixed bill lands on the same date every month, whether you think about it or not.'
+
 export interface SeededFixtures {
   lesson: SeedStepResult
   quiz: SeedStepResult
@@ -191,6 +198,7 @@ export async function seedPlayerFixtures(api: ApiHelper): Promise<SeededFixtures
           type: 'mcq',
           options: QUIZ_OPTIONS,
           answer: QUIZ_ANSWER_INDEX,
+          feedback: QUIZ_FEEDBACK,
         },
       ],
     },
@@ -209,6 +217,10 @@ export async function seedPlayerFixtures(api: ApiHelper): Promise<SeededFixtures
       steps: ['Open Spaces and create a Space that matches your everyday life.'],
       estimated_minutes: 5,
       difficulty: 'EASY',
+      // A REAL route for the CTA. The player no longer falls back to a generic
+      // "Open Savvo" → `/dashboard` (which 307s to the Learn page the reader is
+      // already on), so a mission that wants a CTA has to name where it goes.
+      deep_link: { route: '/dashboard/spaces', label: 'Open Spaces' },
     },
     verifier: { predicate: 'space_exists' },
   })
