@@ -783,8 +783,18 @@ export class ApiHelper {
   }
 
   /** GET /api/provider-category-mappings/ — GLOBAL ProviderCategory → Category map. */
+  /**
+   * The shared defaults (`is_default: true`) PLUS the caller's own overrides
+   * (`is_default: false`). Another user's overrides are never returned.
+   */
   async listProviderCategoryMappings(): Promise<
-    { id: number; provider_category: number; category: number; is_seeded: boolean }[]
+    {
+      id: number
+      provider_category: number
+      category: number | null
+      is_default: boolean
+      is_seeded: boolean
+    }[]
   > {
     const res = await this.ctx.get(`${this.baseUrl}/api/provider-category-mappings/`)
     if (!res.ok()) {
@@ -793,7 +803,11 @@ export class ApiHelper {
     return res.json()
   }
 
-  /** Raw POST — returns APIResponse so duplicate-create tests can assert 400. */
+  /**
+   * Raw POST — returns APIResponse for status assertions. Since 2026-08-20 this
+   * UPSERTS the caller's own override: a first call is 201, a repeat is 200
+   * (it used to collide on the old global OneToOne and 400). Currently unused.
+   */
   async createProviderCategoryMappingRaw(
     providerCategoryId: number,
     categoryId: number,
