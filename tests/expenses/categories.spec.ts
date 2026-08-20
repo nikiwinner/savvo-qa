@@ -29,7 +29,7 @@ test.describe('Expense categories', () => {
     // Wait for categories to load (they load via onMount).
     // Use exact-word regex to avoid matching parallel-test categories like
     // "Groceries-IM" or "Groceries-D1" which can pollute the global list
-    // (categories are global per Gotcha #9).
+    // (categories are global).
     await expect(
       picker.locator('[role="radio"]', { hasText: /(?:^|\s)Groceries(?:\s|$)/ }),
     ).toHaveCount(1, { timeout: 5000 })
@@ -131,7 +131,7 @@ test.describe('Expense categories', () => {
     await expenses.openCreateForm()
 
     // Wait for categories to load — the user A-created category must appear as
-    // a chip in user B's picker (categories are global per Gotcha #9).
+    // a chip in user B's picker (categories are global).
     const picker = expenses.createForm.locator(
       '[role="radiogroup"][data-chip-picker-id="category"]',
     )

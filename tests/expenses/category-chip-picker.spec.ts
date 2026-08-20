@@ -66,7 +66,7 @@ test.describe('Category chip picker', () => {
     // Every default seeded EXPENSE category must have a chip with its name.
     // (We deliberately don't assert an exact total chip count: the QA test DB
     // is shared across runs and may carry custom user-created categories from
-    // sibling specs — categories are global per Gotcha #9. Asserting presence
+    // sibling specs — categories are global. Asserting presence
     // of every default and the picker being functional is what matters here.)
     // We use exact-word regex matching so parallel-test categories like
     // "Groceries-IM" or "Other-D1" don't satisfy a substring `hasText` match.
@@ -169,7 +169,7 @@ test.describe('Category chip picker', () => {
     // Sanity: each remaining default expense category (the 11 not in Recent) is
     // still reachable in the remaining-expense grid. We assert presence rather
     // than an exact total — the shared QA DB may carry user-created categories
-    // from sibling specs (categories are global per Gotcha #9).
+    // from sibling specs (categories are global).
     const remainingDefaults = DEFAULT_CATEGORY_NAMES.filter(
       (n) => n !== 'Groceries' && n !== 'Transportation' && n !== 'Utilities',
     )

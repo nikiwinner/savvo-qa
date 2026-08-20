@@ -17,7 +17,9 @@ export default defineConfig({
   globalSetup: './global-setup.ts',
 
   use: {
-    baseURL: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+    // Fall back to the QA port this same config starts below (:5174), NEVER the
+    // dev :5173 — a dev-port default once ran the whole suite against the dev DB.
+    baseURL: process.env.FRONTEND_URL ?? 'http://localhost:5174',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',

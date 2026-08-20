@@ -14,10 +14,15 @@
  * then seed-completes whichever Net Wealth levels precede the one under test.
  *
  * Every Net Wealth mission is plain `account_balances_known` (non-binding): it
- * PASSes iff the user has ≥1 active account AND every one carries a non-null
- * `balance_amount`. A fresh user's sole auto-provisioned cash account has a NULL
- * balance → the honest FAIL until a balance is entered (via `setCashBalance`).
+ * PASSes iff the user has ≥1 active account AND every one is KNOWN. Derived
+ * cash: a cash account ALWAYS counts as known (its figure is the row sum —
+ * Σ income − Σ expense over its Expense rows — never a NULL), so a fresh user's
+ * sole auto-provisioned cash account PASSes immediately; the honest FAIL now
+ * belongs ONLY to real bank accounts with a null (never-synced) balance. A real
+ * cash figure is established by recording rows (`seedCashIncome`), not by
+ * setting a stored balance — that write surface is retired.
  */
+import { utcToday } from './api'
 import type { ApiHelper, CurriculumMapPayload, MapLevel } from './api'
 import { findTopic } from './interestFixtures'
 
@@ -105,17 +110,27 @@ export async function precompleteNetWealthStep(
 }
 
 /**
- * Enter a real balance on the user's sole auto-provisioned cash account (the
- * exact PATCH the Banking-settings cash-balance control drives). After this the
- * user has ≥1 account with a non-null balance → `account_balances_known` PASSes
- * and Net Wealth reads the entered figure.
+ * Establish a real cash figure the ONLY way that exists now (derived cash):
+ * record ONE income Expense row of `amount` on the user's auto-provisioned cash
+ * account. The derived cash figure (Σ income − Σ expense) then equals `amount`
+ * and Net Wealth folds it in. Expense rows require a Space, so one is created
+ * per call (fresh `loggedInPage` users have none). Returns the cash account id.
  */
-export async function setCashBalance(
+export async function seedCashIncome(
   api: ApiHelper,
   amount: string,
   currency = 'EUR',
 ): Promise<number> {
   const cash = await api.cashAccount()
-  await api.updateCashBalance(cash.id, amount, currency)
+  const space = await api.createSpace('Net wealth QA')
+  await api.createExpense({
+    space: space.id,
+    description: 'Starting cash',
+    amount: Number(amount),
+    type: 'income',
+    expense_date: utcToday(),
+    currency,
+    account: cash.id,
+  })
   return cash.id
 }

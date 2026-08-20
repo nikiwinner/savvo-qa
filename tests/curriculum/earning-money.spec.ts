@@ -57,7 +57,7 @@ import {
 // Money/currency tripwire (same shape as map.spec / saving.spec / net-wealth.spec):
 // any currency symbol, a currency-formatted decimal, or an ISO code. The learn
 // surface shows exactly ONE legal money figure — Bar #2 (Net Wealth), Phase 25 —
-// and nothing else money; XP / crest / streak stay money-free (behavior-rules: no
+// and nothing else money; XP / crest / streak stay money-free (no
 // fake numbers). The labeled growth sandbox renders money only INSIDE its player
 // (never on the map surface this asserts).
 const MONEY_PATTERN = /[€$£¥]|\b\d+[.,]\d{2}\b|\bEUR\b|\bUSD\b|\bGBP\b/
@@ -249,7 +249,7 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
 
     // Play the L3 lesson → the scenario auto-mounts → walk it to a terminal. Both
     // are knowledge steps: they award XP even with zero financial rows (a data-less
-    // user still learns — behavior-rules). The L3 order-quiz remains, so the level
+    // user still learns). The L3 order-quiz remains, so the level
     // stays OPEN and the map display is stale — assert the SERVER Bar #1 ledger.
     await map.openCurrentNode('earning-money')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson')

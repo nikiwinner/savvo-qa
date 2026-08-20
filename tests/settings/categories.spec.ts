@@ -44,8 +44,8 @@ test.describe('Categories settings page', () => {
     const categoriesTable = page.locator('.paper table').first()
     await expect(categoriesTable).toBeVisible()
     // At least one row for Groceries. Use exact-word regex so parallel-test
-    // categories like "Groceries-IM"/"Groceries-D1" (categories are global
-    // per Gotcha #9) don't trigger a strict-mode multiple-match violation.
+    // categories like "Groceries-IM"/"Groceries-D1" (categories are
+    // global) don't trigger a strict-mode multiple-match violation.
     const groceriesRowExact = /(?:^|\s)Groceries(?:\s|$)/
     await expect(categoriesTable.locator('tbody tr', { hasText: groceriesRowExact })).toBeVisible()
 
@@ -83,7 +83,7 @@ test.describe('Categories settings page', () => {
     // Category appears in the table. Scope to the FIRST `.paper table` — the
     // categories table. A second `.paper table` (the bank category-mappings
     // table) is present whenever sibling specs have seeded provider categories
-    // (global, gotcha #9), and its <option>s contain the category name, so a
+    // (global), and its <option>s contain the category name, so a
     // bare `tbody tr` locator hits a strict-mode violation.
     const categoriesTbody = page.locator('.paper table').first().locator('tbody')
     await expect(categoriesTbody.locator('tr', { hasText: uniqueName })).toBeVisible()

@@ -88,7 +88,7 @@ test.describe('Per-space summary FX', () => {
     await expect(indicator).toContainText(/stale|unavailable/i)
 
     // The affected card also carries the per-row "rate unavailable" chip
-    // (gotcha #27e — per-row staleness display), so the user can tell WHICH
+    // (per-row staleness display), so the user can tell WHICH
     // space's numbers are approximate.
     await expect(
       page.locator(`.space-card[data-space-id="${hh.id}"]`).getByTestId('summary-fx-stale'),

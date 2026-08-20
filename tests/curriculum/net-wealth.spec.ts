@@ -4,25 +4,30 @@
  * Net wealth (Section 3, `net-wealth`) is the section's payoff and the product's
  * Bar #2 anchor — the first honest, real-data "how you're actually DOING" number.
  * Every mission is plain `account_balances_known` (non-binding): PASS iff the user
- * has ≥1 active account AND every one carries a non-null balance. A fresh user's
- * sole auto-provisioned cash account has a NULL balance, so the missions stay
- * honestly OPEN until a real balance is entered (via the guarded cash-balance
- * PATCH on `/dashboard/settings/banking`).
+ * has ≥1 active account AND every one is KNOWN. Derived cash: a cash account
+ * ALWAYS counts as known (its figure is the row sum — Σ income − Σ expense over
+ * its Expense rows — never a NULL), so a fresh user's sole auto-provisioned cash
+ * account PASSes immediately; the "balance unknown" honest-FAIL path belongs
+ * ONLY to real bank accounts with a null (never-synced) balance. A real cash
+ * figure is established by recording rows (`seedCashIncome`) — the stored-balance
+ * PATCH is retired.
  *
  * Two blocks:
  *   • APPLIED HAPPY PATH — L1 lesson→quiz award XP; the L2 log-accounts mission
- *     FAILs with a null cash balance → enter a real balance → verify PASS +
- *     snapshot + XP; the capstone PASSes → the Save & Grow section crest + Bar #1
- *     crest count rises; Bar #2 (`data-bar-doing="live"`) shows the entered
- *     (FX-folded) figure + "Score coming soon", tappable to the per-account
- *     breakdown listing the real cash account.
- *   • DATA-LESS HONESTY — a user with no known balance gets the honest FAIL on the
- *     applied missions (deep-link CTA, no completion, zero XP), yet learns every
- *     lesson/quiz; Bar #2 shows "0.00" + a completeness hint, never a fake 0/100.
+ *     PASSes for the cash-only user (1/1 known) with snapshot + XP; the capstone
+ *     PASSes → the Save & Grow section crest + Bar #1 crest count rises; Bar #2
+ *     (`data-bar-doing="live"`) shows the derived (FX-folded) cash figure +
+ *     "Score coming soon", tappable to the per-account breakdown listing the
+ *     real cash account.
+ *   • DATA-LESS HONESTY — a user with an unknown REAL bank balance gets the
+ *     honest FAIL on the applied missions (deep-link CTA, no completion, zero
+ *     XP), yet learns every lesson/quiz; a row-less user's Bar #2 shows the
+ *     honest "0.00" (cash counted known), the completeness hint fires only for
+ *     unknown bank balances, never a fake 0/100.
  *
  * Pollution-safety (gotcha #26): Net wealth is REAL seeded content, so this file
  * seeds NO global `Step` — every fixture in `helpers/netWealthFixtures.ts` is
- * PER-USER progress (StepCompletion / cash-balance), `request.user`-scoped. Each
+ * PER-USER progress (StepCompletion / Expense rows / spaces), `request.user`-scoped. Each
  * test uses a fresh `loggedInPage` user, so the specs are idempotent across the
  * DB's cross-run persistence. URLs come from `process.env.BACKEND_URL/FRONTEND_URL`
  * (via the ApiHelper / baseURL) — never a hard-coded :8000/:5173.
@@ -33,7 +38,7 @@ import {
   unlockNetWealth,
   completeNetWealthLevels,
   precompleteNetWealthStep,
-  setCashBalance,
+  seedCashIncome,
   netWealthLevel,
   netWealthStepId,
   L1_QUIZ_ANSWERS,
@@ -52,7 +57,7 @@ import {
 // Money/currency tripwire (same shape as map.spec): any currency symbol, a
 // currency-formatted decimal, or an ISO code. The learn surface shows exactly
 // ONE legal money figure — Bar #2 (Net Wealth), Phase 25 — and nothing else
-// money; XP / crest / streak stay money-free (behavior-rules: no fake numbers).
+// money; XP / crest / streak stay money-free (no fake numbers).
 const MONEY_PATTERN = /[€$£¥]|\b\d+[.,]\d{2}\b|\bEUR\b|\bUSD\b|\bGBP\b/
 
 test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
@@ -105,13 +110,16 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
     expect(payload.bars.knowledge.xp_total).toBeGreaterThan(0)
   })
 
-  test('entering a cash balance passes the log-accounts mission', async ({ page, loggedInPage }) => {
+  test('the log-accounts mission passes — the cash account always counts as known', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     await unlockNetWealth(api)
     await completeNetWealthLevels(api, L1_WHAT_NET_WEALTH)
     // Pre-complete the L2 lesson so the log-accounts MISSION is the active step.
     await precompleteNetWealthStep(api, L2_FIND_EVERY_ACCOUNT, FORGOTTEN_ACCOUNT_LESSON)
+    // Record real cash income so the derived figure the mission points at is real
+    // (the PASS itself needs no rows — derived cash is always known).
+    await seedCashIncome(api, '1500.00')
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
@@ -119,24 +127,16 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
     expect(xpBefore).toBe(0)
 
     // A plain (non-binding) mission: NO Space picker, NO self_attest, a real
-    // deep-link CTA to the cash-balance entry surface.
+    // deep-link CTA to the banking surface.
     await map.openCurrentNode('net-wealth')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.spacePicker).toHaveCount(0)
     await expect(map.missionSelfAttest).toHaveCount(0)
     await expect(map.missionDeeplink).toBeVisible()
 
-    // Fresh cash account has a NULL balance → honest FAIL: no completion, no
-    // snapshot, zero XP.
-    await map.missionVerify.click()
-    await expect(map.missionFailNote).toBeVisible({ timeout: 45_000 })
-    await expect(map.verifierSnapshot).toHaveCount(0)
-    expect(await map.xpValue()).toBe(xpBefore)
-
-    // Enter a REAL balance on the auto-provisioned cash account (the exact PATCH
-    // the Banking-settings control drives), then verify again → PASS naming the
+    // Derived cash: the sole auto-provisioned cash account ALWAYS counts as
+    // known (its figure is the row sum, never a NULL) → verify PASSes naming the
     // real account counts (1/1), tappable to the banking surface (no fake numbers).
-    await setCashBalance(api, '1500.00', 'EUR')
     await map.missionVerify.click()
     await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
     await expect(map.snapshotFigure.first()).toContainText('1/1')
@@ -160,9 +160,10 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
       L4_BUILD_YOUR_NUMBER,
       L5_WATCH_IT_GROW,
     )
-    // The capstone verifies `account_balances_known` — enter a real cash balance
-    // so every account is known (no null gaps).
-    await setCashBalance(api, '2750.00', 'EUR')
+    // The capstone verifies `account_balances_known` — the cash-only account set
+    // is always fully known (derived cash); record real income so the figure the
+    // capstone celebrates is a real row sum, not an empty 0.00.
+    await seedCashIncome(api, '2750.00')
 
     const crestBefore = (await api.getCurriculumMap()).bars.knowledge.crest_count
 
@@ -189,14 +190,15 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
     expect(netWealthLevel(payload, L6_COMPLETE).status).toBe('completed')
   })
 
-  test('Bar #2 shows the real Net Wealth figure once a balance is entered', async ({ page, loggedInPage }) => {
+  test('Bar #2 shows the real Net Wealth figure once cash income is recorded', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     await unlockNetWealth(api)
 
-    // Enter a real cash balance — Bar #2 (Net Wealth) folds it into the user's
-    // currency (default EUR here → 1:1, no FX seed needed).
-    await setCashBalance(api, '3200.50', 'EUR')
+    // Record real cash income — Bar #2 (Net Wealth) folds the DERIVED cash
+    // figure (row sum) into the user's currency (default EUR here → 1:1, no FX
+    // seed needed).
+    await seedCashIncome(api, '3200.50')
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
@@ -225,13 +227,21 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
 })
 
 test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
-  test('a data-less user gets the honest FAIL on the log-accounts mission', async ({ page, loggedInPage }) => {
+  test('an unknown real bank balance gets the honest FAIL on the log-accounts mission', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     await unlockNetWealth(api)
     await completeNetWealthLevels(api, L1_WHAT_NET_WEALTH)
     // Pre-complete the L2 lesson so the log-accounts mission is the active step.
     await precompleteNetWealthStep(api, L2_FIND_EVERY_ACCOUNT, FORGOTTEN_ACCOUNT_LESSON)
+    // Derived cash means the cash account is always known — the "balance
+    // unknown" honest-FAIL path belongs ONLY to real bank accounts now. Seed a
+    // never-synced one (null balance) so the account set is honestly incomplete.
+    await api.seedBankAccount({
+      account_name: 'QA Checking',
+      bank_name: 'QA Bank',
+      balance_amount: null,
+    })
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
@@ -241,10 +251,10 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     await map.openCurrentNode('net-wealth')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.missionSelfAttest).toHaveCount(0)
-    // The deep-link CTA to go enter a real balance stays present.
+    // The deep-link CTA to go look at the account set stays present.
     await expect(map.missionDeeplink).toBeVisible()
 
-    // No known balance (auto-provisioned cash account is null) → honest FAIL: no
+    // The real bank account's balance is unknown (1/2 known) → honest FAIL: no
     // completion, no snapshot, zero XP, host stays open. No fabricated pass/number.
     await map.missionVerify.click()
     await expect(map.missionFailNote).toBeVisible({ timeout: 45_000 })
@@ -254,18 +264,24 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     expect((await api.getCurriculumMap()).bars.knowledge.xp_total).toBe(0)
   })
 
-  test('a data-less user gets the honest FAIL on the build-your-number missions', async ({ page, loggedInPage }) => {
+  test('an unknown real bank balance gets the honest FAIL on the build-your-number missions', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     await unlockNetWealth(api)
     await completeNetWealthLevels(api, L1_WHAT_NET_WEALTH, L2_FIND_EVERY_ACCOUNT, L3_ASSET_VS_LIABILITY)
     // Pre-complete the L4 lesson so the `see-your-net-wealth` mission is active.
     await precompleteNetWealthStep(api, L4_BUILD_YOUR_NUMBER, YOUR_REAL_TOTAL_LESSON)
+    // The honest FAIL needs an unknown REAL bank balance (cash is always known).
+    await api.seedBankAccount({
+      account_name: 'QA Checking',
+      bank_name: 'QA Bank',
+      balance_amount: null,
+    })
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    // Second data-less mission (L4 `see-your-net-wealth`) → honest FAIL, zero XP.
+    // Second unknown-balance mission (L4 `see-your-net-wealth`) → honest FAIL, zero XP.
     await map.openCurrentNode('net-wealth')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.missionDeeplink).toBeVisible()
@@ -274,8 +290,9 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     await expect(map.verifierSnapshot).toHaveCount(0)
     expect((await api.getCurriculumMap()).bars.knowledge.xp_total).toBe(0)
 
-    // API-level parity: the sibling L4 mission FAILs identically with no known
-    // balance (the honest FAIL is stable across both build-your-number missions).
+    // API-level parity: the sibling L4 mission FAILs identically while the bank
+    // balance stays unknown (the honest FAIL is stable across both
+    // build-your-number missions).
     const closeGapStepId = await netWealthStepId(api, L4_BUILD_YOUR_NUMBER, CLOSE_A_GAP_MISSION)
     const seeStepId = await netWealthStepId(api, L4_BUILD_YOUR_NUMBER, SEE_NET_WEALTH_MISSION)
     for (const stepId of [seeStepId, closeGapStepId]) {
@@ -286,7 +303,7 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     }
   })
 
-  test('Bar #2 shows 0.00 with a completeness hint, never a fake score', async ({ page, loggedInPage }) => {
+  test('Bar #2 shows the honest 0.00; the completeness hint fires only for unknown bank balances', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
     await unlockNetWealth(api)
@@ -294,23 +311,40 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    // A data-less user (sole cash account, null balance) → Bar #2 is LIVE with the
-    // honest "0.00" and a completeness hint (0/1), NEVER a fake 0/100 or a score.
+    // A row-less user (sole cash account, zero recorded rows) → Bar #2 is LIVE
+    // with the honest derived "0.00". The cash account counts as KNOWN (derived
+    // cash is never null), so there is NO completeness gap and no hint — and
+    // NEVER a fake 0/100 or a score.
     await expect(map.barDoing).toHaveAttribute('data-bar-doing', 'live')
     await expect(map.netWealthFigure).toContainText('0.00')
-    await expect(map.netWealthCompletenessHint).toContainText('0/1')
+    await expect(map.netWealthCompletenessHint).toHaveCount(0)
     await expect(map.netWealthScoreNote).toContainText('Score coming soon')
 
     // The word "score" appears only as "coming soon" — no fabricated N/100 anywhere.
     const barText = await map.barDoing.innerText()
     expect(barText).not.toMatch(/\/\s*100\b/)
 
-    // API parity — the honest empty payload: total 0.00, 0 known, score null.
-    const payload = await api.getCurriculumMap()
-    expect(payload.bars.doing?.net_wealth.total).toBe('0.00')
-    expect(payload.bars.doing?.net_wealth.accounts_known).toBe(0)
-    expect(payload.bars.doing?.net_wealth.accounts_total).toBe(1)
-    expect(payload.bars.doing?.score).toBeNull()
+    // API parity — the honest empty payload: total 0.00, the cash account
+    // counted as known (1/1), score null.
+    const emptyPayload = await api.getCurriculumMap()
+    expect(emptyPayload.bars.doing?.net_wealth.total).toBe('0.00')
+    expect(emptyPayload.bars.doing?.net_wealth.accounts_known).toBe(1)
+    expect(emptyPayload.bars.doing?.net_wealth.accounts_total).toBe(1)
+    expect(emptyPayload.bars.doing?.score).toBeNull()
+
+    // "Balance unknown" belongs ONLY to real bank accounts now: a never-synced
+    // (null-balance) bank account opens the honest completeness gap (1/2 known)
+    // and the hint appears.
+    await api.seedBankAccount({
+      account_name: 'QA Checking',
+      bank_name: 'QA Bank',
+      balance_amount: null,
+    })
+    await map.goto(45_000)
+    await expect(map.netWealthCompletenessHint).toContainText(/1\s*\/\s*2/)
+    const gapPayload = await api.getCurriculumMap()
+    expect(gapPayload.bars.doing?.net_wealth.accounts_known).toBe(1)
+    expect(gapPayload.bars.doing?.net_wealth.accounts_total).toBe(2)
   })
 
   test('knowledge steps stay completable with no financial data', async ({ page, loggedInPage }) => {
@@ -318,8 +352,11 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     const { api } = loggedInPage
     await unlockNetWealth(api)
 
-    // Genuinely data-less: no known balances (the cash account is null), no rows.
-    expect((await api.getNetWealth()).accounts_known).toBe(0)
+    // Genuinely row-less: zero recorded rows → the derived cash figure is the
+    // honest 0.00 (and the cash account still counts as known — never null).
+    const netWealth = await api.getNetWealth()
+    expect(netWealth.total).toBe('0.00')
+    expect(netWealth.accounts_known).toBe(1)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
@@ -327,7 +364,7 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     expect(xpBefore).toBe(0)
 
     // The L1 lesson + quiz complete + award XP even with zero financial data —
-    // learning is never blocked (behavior-rules: a data-less user still learns).
+    // learning is never blocked (a data-less user still learns).
     await map.openCurrentNode('net-wealth')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson')
     await map.playLessonDeck()
@@ -343,9 +380,10 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     test.slow()
     const { api } = loggedInPage
     await unlockNetWealth(api)
-    // Enter a real balance so Bar #2 carries a non-zero figure — it must still be
-    // the ONLY money figure, and it must tap through to real per-account rows.
-    await setCashBalance(api, '900.00', 'EUR')
+    // Record real cash income so Bar #2 carries a non-zero (derived) figure — it
+    // must still be the ONLY money figure, and it must tap through to real
+    // per-account rows.
+    await seedCashIncome(api, '900.00')
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)

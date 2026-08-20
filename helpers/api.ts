@@ -149,6 +149,13 @@ export interface CreateExpenseData {
   expense_date: string
   /** ISO 4217 currency code from the 8-code whitelist. Default: viewer's User.currency. */
   currency?: string
+  /**
+   * Cash `BankAccount` PK to attach the row to — must be one of the user's OWN
+   * cash accounts (the serializer scopes the writable queryset). Omitted → the
+   * auto-provisioned cash account. Derived cash reads these rows: an is_cash
+   * account's figure IS Σ(income) − Σ(expense) over its Expense rows.
+   */
+  account?: number
 }
 
 // ── Curriculum unit-map payload (Phase 21) — GET /api/curriculum/map/ ───────
@@ -229,8 +236,10 @@ export interface CurriculumMapPayload {
 
 /**
  * One row in the Net Wealth per-account breakdown. Each row is one real
- * `BankAccount`; a `null` `balance` is an unknown-balance account (listed,
- * excluded from `total`).
+ * `BankAccount`; a `null` `balance` is an unknown-balance REAL bank account
+ * (listed, excluded from `total`). Cash accounts never read unknown — their
+ * `balance` is the DERIVED figure (row sum) in the target currency, with
+ * `converted_*` null (same-currency convention) and `balance_updated_at` null.
  */
 export interface NetWealthAccount {
   account_id: number
@@ -254,7 +263,15 @@ export interface NetWealthDetail {
   accounts: NetWealthAccount[]
 }
 
-/** One account row from `GET /api/bank-accounts/` (real bank OR cash). */
+/**
+ * One account row from `GET /api/bank-accounts/` (real bank OR cash). Derived
+ * cash: cash accounts carry the read-only `derived_*` trio (their figure is
+ * Σ income − Σ expense over the account's Expense rows, FX-folded into the
+ * requesting user's currency at today's date — may be NEGATIVE when the
+ * starting-balance income row is missing). Real bank accounts: null/null/false —
+ * their `balance_*` stay Tink-owned; a cash account's stored `balance_*` are
+ * unread legacy.
+ */
 export interface BankAccountRecord {
   id: number
   connection: number | null
@@ -264,6 +281,9 @@ export interface BankAccountRecord {
   balance_currency: string
   balance_updated_at: string | null
   owner?: number | null
+  derived_balance: string | null
+  derived_currency: string | null
+  derived_fx_stale: boolean
 }
 
 // ── Curriculum step players (Phase 22) ─────────────────────────────────────
@@ -554,7 +574,7 @@ export class ApiHelper {
    * Idempotent variant of {@link createCategory}. Returns the existing row
    * by name when POST returns 400 "already exists".
    *
-   * Categories are global (CLAUDE.md Gotcha #9) — the QA test DB persists
+   * Categories are global — the QA test DB persists
    * across project runs (chromium → mobile-safari → tablet) and across
    * separate `pnpm test` invocations. Use this helper from any test that
    * seeds shared category names; reserve {@link createCategory} for tests
@@ -855,9 +875,10 @@ export class ApiHelper {
   }
 
   /**
-   * GET /api/bank-accounts/ — the user's accounts (real bank + cash). Every user
-   * has ONE auto-provisioned cash account (`is_cash=true`, null balance) from
-   * signup, so this is how a spec resolves the cash account id it PATCHes.
+   * GET /api/bank-accounts/ — the user's accounts (real bank + cash), a pure
+   * read-only surface. Every user has ONE auto-provisioned cash account
+   * (`is_cash=true`) from signup, so this is how a spec resolves the cash
+   * account id it attaches Expense rows to (derived cash).
    */
   async listBankAccounts(): Promise<BankAccountRecord[]> {
     const res = await this.ctx.get(`${this.baseUrl}/api/bank-accounts/`)
@@ -875,37 +896,18 @@ export class ApiHelper {
   }
 
   /**
-   * PATCH /api/bank-accounts/<id>/balance/ (Phase 25) — raw form returns
-   * APIResponse so negative tests (foreign/non-cash/bad-currency/<0) can inspect
-   * the status. `balanceCurrency` omitted → the account's current currency is
-   * kept (the key is absent from the body).
+   * The Phase-25 cash-balance write surface is RETIRED (derived cash): cash is
+   * managed ONLY through transaction rows and `bank-accounts` is back to a pure
+   * read-only surface. This probe PATCHes the removed `/balance/` route and
+   * returns the raw status so specs can assert the surface stays GONE
+   * (404/405) — never a 2xx write, never the old 400 guard.
    */
-  async updateCashBalanceRaw(
-    accountId: number,
-    balanceAmount: string,
-    balanceCurrency?: string,
-  ): Promise<APIResponse> {
-    const body: Record<string, unknown> = { balance_amount: balanceAmount }
-    if (balanceCurrency !== undefined) {
-      body['balance_currency'] = balanceCurrency
-    }
-    return this.ctx.patch(`${this.baseUrl}/api/bank-accounts/${accountId}/balance/`, {
-      data: body,
+  async retiredBalancePatchStatus(accountId: number): Promise<number> {
+    const res = await this.ctx.patch(`${this.baseUrl}/api/bank-accounts/${accountId}/balance/`, {
+      data: { balance_amount: '1.00', balance_currency: 'EUR' },
       headers: { 'X-CSRFToken': await this.csrfToken() },
     })
-  }
-
-  /** Throws on non-OK; returns the updated account record. */
-  async updateCashBalance(
-    accountId: number,
-    balanceAmount: string,
-    balanceCurrency?: string,
-  ): Promise<BankAccountRecord> {
-    const res = await this.updateCashBalanceRaw(accountId, balanceAmount, balanceCurrency)
-    if (!res.ok()) {
-      throw new Error(`updateCashBalance failed (${res.status()}): ${await res.text()}`)
-    }
-    return res.json()
+    return res.status()
   }
 
   /**
@@ -1178,7 +1180,7 @@ export class ApiHelper {
 
   /**
    * POST /api/expenses/<id>/set_allocations/ — split a manual expense across
-   * spaces (gotcha #33). The allocation amounts MUST sum to the parent's full
+   * spaces. The allocation amounts MUST sum to the parent's full
    * amount (rejection, never proration). Raw form returns APIResponse so
    * negative tests can inspect the status without throwing.
    */

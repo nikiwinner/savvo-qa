@@ -90,7 +90,10 @@ test.describe('Archived exclusion (Phase 12 Story 12.4)', () => {
     // Belt-and-suspenders: NO KPI cards rendered (they only appear when
     // hasSpace=true) — guarantees there's no live "data" being shown for the
     // archived space.
-    await expect(page.getByTestId('analytics-section-kpis')).toHaveCount(0)
+    // `analytics-section-kpis` never existed in any commit, so the old
+    // toHaveCount(0) here passed even when the cards DID render. The KPI hero
+    // is `analytics-hero` (class `kpis`), gated on `hasSpace`.
+    await expect(page.getByTestId('analytics-hero')).toHaveCount(0)
   })
 
   test('restoring brings the space back to analytics', async ({ page, loggedInPage }) => {

@@ -143,7 +143,7 @@ test.describe('Curriculum — sandbox player', () => {
     expect(surface).toMatch(/\d/)
     // … but NONE of them is a traceable/real money figure: no currency symbol, no
     // ISO code, no `\d+[.,]\d{2}` balance. Every figure is inside the labeled
-    // hypothetical (behavior-rules: no fake numbers — a calculator is never a
+    // hypothetical (no fake numbers — a calculator is never a
     // real balance).
     expect(surface).not.toMatch(MONEY_PATTERN)
   })

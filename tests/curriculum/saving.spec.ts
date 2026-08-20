@@ -51,7 +51,7 @@ import {
 // Money/currency tripwire (same shape as map.spec): any currency symbol, a
 // currency-formatted decimal, or an ISO code. The learn surface shows exactly
 // ONE legal money figure — Bar #2 (Net Wealth), Phase 25 — and nothing else
-// money; XP / crest / streak stay money-free (behavior-rules: no fake numbers).
+// money; XP / crest / streak stay money-free (no fake numbers).
 const MONEY_PATTERN = /[€$£¥]|\b\d+[.,]\d{2}\b|\bEUR\b|\bUSD\b|\bGBP\b/
 
 test.describe('Curriculum — Saving topic (applied happy path)', () => {

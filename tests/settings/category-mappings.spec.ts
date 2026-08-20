@@ -3,7 +3,7 @@
  *
  * The "Bank category mappings" section on /dashboard/settings/categories lets a
  * user map their bank's PFM categories (rung 4) to an app Category. Mappings are
- * GLOBAL (provider categories are global, gotcha #9). Editing a mapping changes
+ * GLOBAL (provider categories are global). Editing a mapping changes
  * what the cascade (run via reapply) assigns to newly-categorized rows.
  *
  * NOTE on the empty-state test: `/api/provider-categories/` is GLOBAL and the QA
@@ -89,7 +89,7 @@ test.describe('Bank category mappings editor', () => {
     // The old "No bank categories yet" empty state was REMOVED: `+page.svelte`
     // now wraps the whole `.mappings-section` in `{#if providerCategories.length
     // > 0}`. So the section is ABSENT when no provider category exists DB-wide.
-    // Provider categories are GLOBAL (gotcha #9) and the QA DB is shared, so a
+    // Provider categories are GLOBAL and the QA DB is shared, so a
     // sibling spec may seed one — we branch on the actual global state.
     await page.goto('/dashboard/settings/categories')
     await page.waitForLoadState('networkidle')

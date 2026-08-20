@@ -67,14 +67,15 @@ test.describe('Curriculum — unit-map', () => {
     expect(payload.bars.knowledge.xp_total).toBe(40)
 
     // Bar #2 (Net Wealth) flipped null → object in Phase 25 — the SANCTIONED
-    // contract change (phase_25.md "Tests touching the old contract"). A fresh
-    // user has one auto-provisioned cash account with a NULL balance, so the
-    // honest figure is "0.00" with accounts_known=0 — never a fake 0/100 and
-    // NEVER fed by XP (the 40 XP above does not touch this number).
+    // contract change (phase_25.md "Tests touching the old contract"). Since
+    // derived cash (2026-08-11) a fresh user's auto-provisioned cash account is
+    // ALWAYS known (balance derives from cash transaction rows; zero rows →
+    // honest 0.00), so accounts_known is 1 — never a fake 0/100 and NEVER fed
+    // by XP (the 40 XP above does not touch this number).
     expect(payload.bars.doing).not.toBeNull()
     expect(payload.bars.doing?.score).toBeNull()
     expect(payload.bars.doing?.net_wealth.total).toBe('0.00')
-    expect(payload.bars.doing?.net_wealth.accounts_known).toBe(0)
+    expect(payload.bars.doing?.net_wealth.accounts_known).toBe(1)
 
     // Bar #2 renders LIVE (a real figure now), not the locked placeholder; the
     // figure is the honest 0.00 and "Score coming soon" is present.
@@ -94,7 +95,7 @@ test.describe('Curriculum — unit-map', () => {
     // Every money figure must live INSIDE the bar-doing island — subtract its
     // text from the page text and assert the remainder is money-free. The
     // tripwire keeps its teeth: XP / crest / streak still never render money,
-    // and any NEW money figure outside Bar #2 fails here (behavior-rules).
+    // and any NEW money figure outside Bar #2 fails here (no fake numbers).
     const pageText = await map.learnPage.innerText()
     const barDoingText = await map.barDoing.innerText()
     const outsideBarDoing = pageText.split(barDoingText).join('')

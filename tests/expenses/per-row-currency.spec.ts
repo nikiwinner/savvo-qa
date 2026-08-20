@@ -6,7 +6,7 @@
  *
  * Setup uses two users with different `User.currency` values in the same
  * space. Bob (USD) seeds the expense, so the expense's currency is
- * snapshotted as USD at create-time (per gotcha #23). Alice (EUR) views the
+ * snapshotted as USD at create-time. Alice (EUR) views the
  * expenses page and must see the USD symbol on Bob's row.
  */
 import { test, expect } from '@playwright/test'
@@ -40,7 +40,7 @@ test.describe('Per-row currency rendering on /dashboard/transactions', () => {
     await apiAlice.assignUser(space.id, bobInfo!.id)
 
     // Bob seeds an expense — backend snapshots Expense.currency from Bob's
-    // user.currency (USD) at create-time per gotcha #23.
+    // user.currency (USD) at create-time.
     //
     // `hasText` is a substring match and the savvo_test DB persists across
     // parallel workers, so a bare `Date.now()` can collide (same ms) AND a

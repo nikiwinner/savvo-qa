@@ -94,7 +94,7 @@ export default async function globalSetup(): Promise<void> {
   // levels / 30 missions inside one request while every parallel worker queues
   // behind it — a cold-start thundering herd that can push the earliest
   // map/login tests past their 30s ceiling. Seeding it here (idempotent,
-  // create-only — gotcha #40a) makes the first hit a no-op, so the curriculum +
+  // create-only) makes the first hit a no-op, so the curriculum +
   // coaching specs start against a warm tree.
   console.log('🌱 Seeding curriculum content tree (sections / topics / levels / missions)...')
   try {
