@@ -30,6 +30,73 @@ test.describe('Bulk categorization', () => {
     await expect(bankRow.locator('.cell-checkbox input[type="checkbox"]')).toBeVisible()
   })
 
+  /**
+   * The floating bar and the phone tab bar are BOTH `position: fixed` at
+   * `z-index: 100`, so nothing but geometry keeps them apart — and on a tie the
+   * later element in the tree wins, which is this bar. Unguarded, it painted
+   * over 41px of the navigation and swallowed every tap aimed at the middle
+   * tabs, leaving the page with no way out until the selection was cleared.
+   * The identical defect hit `ResumePill`'s dock first (round 2) and was fixed
+   * there with no test, which is why it came back somewhere else.
+   */
+  test('the floating bar clears the phone tab bar instead of covering it', async ({
+    page,
+    loggedInPage,
+  }) => {
+    const { api } = loggedInPage
+    const space = await api.createSpace('Bulk Bar Clearance')
+
+    await api.createBankTransaction({
+      description: 'CLEARANCE TXN',
+      amount: '12.00',
+      type: 'expense',
+      transaction_date: TODAY,
+      space_id: space.id,
+    })
+
+    // Explicit viewport: this test IS about the phone chrome, so it must not
+    // depend on which of the three browser projects is running it.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto(`/dashboard/transactions?space=${space.id}`)
+    await page.waitForLoadState('networkidle')
+
+    const row = page.locator('tbody tr.row-bank', { hasText: 'CLEARANCE TXN' })
+    await expect(row).toBeVisible()
+    await row.locator('.cell-checkbox input[type="checkbox"]').check()
+
+    const bar = page.locator('.bulk-action-bar')
+    await expect(bar).toBeVisible()
+
+    const barBox = await bar.boundingBox()
+    const navBox = await page.locator('.nav-menu').boundingBox()
+    expect(barBox, 'bulk bar has a box').not.toBeNull()
+    expect(navBox, 'tab bar has a box').not.toBeNull()
+
+    const barBottom = barBox!.y + barBox!.height
+    expect(
+      barBottom,
+      `bulk bar reaches ${Math.round(barBottom)}px, tab bar starts at ${Math.round(navBox!.y)}px`,
+    ).toBeLessThanOrEqual(navBox!.y)
+
+    // …and it fits the screen sideways. Centred with `white-space: nowrap` it
+    // used to run off BOTH edges, putting "Move to space…" and "Cancel" where
+    // no tap can reach them. `no-horizontal-overflow.spec.ts` cannot catch this
+    // one: the bar is `position: fixed`, so it never adds to `scrollWidth` and
+    // the page stays perfectly undraggable while a control sits off-screen.
+    const strays = await page.evaluate(() => {
+      const bar = document.querySelector('.bulk-action-bar')
+      if (!bar) return ['no bar']
+      const vw = document.documentElement.clientWidth
+      return Array.from(bar.querySelectorAll('*'))
+        .filter((el) => {
+          const r = el.getBoundingClientRect()
+          return r.width > 0 && (r.left < -0.5 || r.right > vw + 0.5)
+        })
+        .map((el) => `${el.tagName.toLowerCase()}: ${(el.textContent ?? '').trim().slice(0, 24)}`)
+    })
+    expect(strays, 'bulk bar controls hang off the screen').toEqual([])
+  })
+
   test('select all selects visible bank transactions', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     const space = await api.createSpace('Select All Home')

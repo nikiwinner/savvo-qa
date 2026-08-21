@@ -10,16 +10,18 @@ import { Page, Locator } from '@playwright/test'
  * `/dashboard/spaces` — use `gotoSpaces()` and the `summary*` helpers (the
  * markers keep their old `summary-figure-*` testids), plus `periodPreset()` for
  * the shared period pill. Logout moved from the removed top bar into the sidebar
- * account block (`logoutButton`, still `aria-label="Logout"`, still a POST
- * /logout form).
+ * account block and is now a LABELLED row under it (`aria-label="Log out"`,
+ * still a POST /logout form).
  */
 export class DashboardPage {
   readonly logoutButton: Locator
 
   constructor(private readonly page: Page) {
     // The top bar was removed in the nav redesign — logout lives in the sidebar
-    // account block (bottom), keeping its `aria-label="Logout"`.
-    this.logoutButton = page.locator('button[aria-label="Logout"]')
+    // account block (bottom). It became a labelled "Log out" row in the
+    // 2026-08-20 settings redesign, so the accessible name matches the visible
+    // text: `aria-label="Log out"`.
+    this.logoutButton = page.locator('button[aria-label="Log out"]')
   }
 
   async goto(): Promise<void> {

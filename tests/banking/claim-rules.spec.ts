@@ -190,17 +190,25 @@ test.describe('Claim rules — from_transaction (API)', () => {
     const space = await api.createSpace('ApplyMatching Space')
 
     // Three unmapped sibling rows from the same merchant.
-    const seed = await Promise.all(
-      ['ALDI SUED 1', 'ALDI SUED 2', 'ALDI SUED 3'].map((desc) =>
-        api.createBankTransaction({
+    // Seeded SEQUENTIALLY, not with `Promise.all`. `/api/seed/bank-transaction/`
+    // lazily `get_or_create`s ONE debug BankConnection per user, so three
+    // concurrent calls all miss, all create, and the next lookup dies with
+    // `MultipleObjectsReturned: returned 2` — a 500 that fails the test with no
+    // hint that the cause was the seeding, not the feature. Parallelism here was
+    // never the thing under test; it saved ~100ms and cost a rare red suite
+    // (surfaced 2026-08-21 when a heavier sweep widened the window).
+    const seed = []
+    for (const desc of ['ALDI SUED 1', 'ALDI SUED 2', 'ALDI SUED 3']) {
+      seed.push(
+        await api.createBankTransaction({
           description: desc,
           amount: '5.00',
           type: 'expense',
           transaction_date: TODAY,
           space_id: null,
         }),
-      ),
-    )
+      )
+    }
 
     // Make a rule from the first row, generalized to "aldi sued", apply to matching.
     const result = await api.fromTransaction({

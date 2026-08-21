@@ -69,6 +69,46 @@ Causes that bite repeatedly:
 | Inline edit form not found after clicking Edit | The card locator loses its context on the DOM swap — re-query by the hidden `input[name="id"]` |
 | `APIResponse.json()` throws | Check `res.ok()` first and throw with the body; only then call `.json()` |
 | Cookie not set in the browser | Domain mismatch — cookies need `domain: 'localhost'` with no port |
+
+### The WebKit wedge — 10 failures, 5 `mobile-safari` + 5 `tablet`, `page.goto` at exactly 30s
+
+**This is not your code. Do not chase it, and do not weaken a test to get past it.**
+
+Recognise it by all five of these at once:
+
+1. Every failure is `Error: page.goto` with `Test timeout of 30000ms exceeded` — the page never
+   loaded at all, not an assertion that went false.
+2. The failing specs are DIFFERENT every run and span unrelated features, usually including
+   `tests/landing/landing-structure.spec.ts`, which loads the public landing page with no auth.
+3. Roughly 5 per WebKit project, ~10 total, whatever the worker count — reproduced at
+   `--workers=5`, `3` and `2` (the last over 21.6 minutes).
+4. `qa/test-results/*/test-failed-1.png` is byte-identical **pure white** across the failures. The
+   app is dark-themed, so white means `about:blank`: the document never committed and no page code
+   ran. Check this first — it is the fastest way to tell a wedge from a real regression.
+5. `error-context.md` also says `Tearing down "context" exceeded the test timeout` — a page cannot
+   wedge its own teardown, but a sick browser process can.
+
+Cause: Playwright's bundled WebKit network process dies. macOS files a crash report per event —
+`ls -lt ~/Library/Logs/DiagnosticReports/ExcUserFault_com.apple.WebKit.Networking.Development-*.ips`
+— every one faulting in
+`WebKit::NetworkConnectionToWebProcess::didReceiveInvalidMessage`, with the binary under
+`~/Library/Caches/ms-playwright/webkit-2272/`. Each event wedges one worker for its whole test.
+
+**`chromium` being clean is NOT evidence that your change is WebKit-specific.** The three projects
+run STRICTLY SEQUENTIALLY — chromium occupies roughly the first third of the wall clock and finishes
+before the first WebKit test starts. A late-run stall cannot touch it. Measured in five runs:
+chromium 18–171s, mobile-safari 174–370s, tablet 370–555s, zero overlap.
+
+To tell a wedge from a real regression, in ascending cost:
+
+1. Look at the failure screenshots. All white → wedge.
+2. Re-run the failing spec files alone on the same projects. A wedge passes; 129/129 in 1.1 min was
+   the observed case on 2026-08-21.
+3. Re-run the specs covering only the pages your diff touched, all three projects.
+
+Recorded 2026-08-21 after this cost several hours. It is not new — three runs on 2026-08-20 show the
+identical `10 failed / 1185 passed`, 5 + 5, before the work being tested existed.
+
 | Redirected to `/login` when a session was expected | The session cookie never reached the browser context — check the `context.addCookies()` call |
 | A pass/fail flicker across runs | A race, not flake. Re-run the spec in isolation ×3 and fix the race — never retry it away |
 
