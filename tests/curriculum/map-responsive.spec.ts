@@ -37,7 +37,8 @@ interface WorldGeometry {
   boxes: { left: number; right: number }[]
   centres: number[]
   road: { left: number; width: number }
-  card: { left: number; right: number } | null
+  card: { left: number; right: number; width: number } | null
+  activeIsland: number | null
 }
 
 async function readWorldOnce(page: import('@playwright/test').Page): Promise<WorldGeometry> {
@@ -62,7 +63,11 @@ async function readWorldOnce(page: import('@playwright/test').Page): Promise<Wor
         return b.left + b.width / 2
       }),
       road: { left: road.left, width: road.width },
-      card: card ? { left: card.left, right: card.right } : null,
+      card: card ? { left: card.left, right: card.right, width: card.width } : null,
+      activeIsland: (() => {
+        const stage = document.querySelector('.map-section.is-active .island-stage')
+        return stage ? stage.getBoundingClientRect().width : null
+      })(),
     }
   })
 }
@@ -140,6 +145,34 @@ test.describe('Curriculum — world map geometry', () => {
         expect(Math.abs(centre - lanePoint), `${label}: island ${i} sits on the road`).toBeLessThanOrEqual(2)
       }
     }
+  })
+
+  test('the chapter card is sized from the island, not stretched to its column', async ({
+    page,
+    loggedInPage: _,
+  }) => {
+    const map = new CurriculumMapPage(page)
+    await map.goto()
+    await expect(map.chapterCard).toBeVisible()
+
+    // Wide enough that `--island-size` is at its 330px cap in BOTH layouts, so
+    // every project measures the same island and the card's ratio is the ratio
+    // the user chose (0.62) rather than the content floor that governs on a
+    // narrow window.
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    await expect(map.chapterCard).toBeVisible()
+    const w = await readWorld(page)
+
+    expect(w.activeIsland, 'the active island is on stage').not.toBeNull()
+    expect(w.card, 'the chapter card is on stage').not.toBeNull()
+    const ratio = w.card!.width / w.activeIsland!
+
+    // The card used to be `width: 100%` of the section box — a ratio of 1. The
+    // upper bound is what stops that regression; the lower bound stops the card
+    // collapsing onto its content and losing the plate it needs to read as a
+    // card.
+    expect(ratio, `card ${Math.round(w.card!.width)}px vs island ${Math.round(w.activeIsland!)}px`).toBeLessThanOrEqual(0.7)
+    expect(ratio, `card ${Math.round(w.card!.width)}px vs island ${Math.round(w.activeIsland!)}px`).toBeGreaterThanOrEqual(0.5)
   })
 
   test('a coarse pointer gets the compact layout, a fine one keeps the rail beside the map', async ({
