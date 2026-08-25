@@ -55,8 +55,11 @@ relies on the QA stack owning :5174/:8001.
 ### Testing a branch instead of `main`
 
 The suite starts the servers it tests, so it has to be told which checkout to
-start them from. Set the override for whichever repo the branch touches; leave
-the other unset to keep testing `main`'s side of the pair.
+start them from. **Running from a qa worktree, set both — absolute.** Unset means
+"the sibling of the `qa/` directory in use", and a worktree has no sibling
+checkout, so leaving one out aborts the run instead of falling back to `main`.
+To test a branch on one side only, point that variable at the worktree and the
+other at the main checkout.
 
 | Variable       | Default       | Purpose                                                             |
 |----------------|---------------|---------------------------------------------------------------------|
@@ -64,7 +67,9 @@ the other unset to keep testing `main`'s side of the pair.
 | `FRONTEND_DIR` | `../frontend` | Frontend checkout that gets built and previewed                     |
 
 ```bash
-BACKEND_DIR=/Users/you/code/savvo/backend/.worktrees/<branch> pnpm test
+BACKEND_DIR=/Users/you/code/savvo/backend/.worktrees/<branch> \
+FRONTEND_DIR=/Users/you/code/savvo/frontend \
+  pnpm test
 ```
 
 `.claude/scripts/worktree-start.sh` prints both lines already filled in, absolute.
@@ -83,8 +88,10 @@ Three things worth knowing:
   fixed, and `reuseExistingServer: false` means a second concurrent run fails on the
   taken port. Only one QA run at a time, worktree or not.
 
-A path that does not contain `manage.py` (backend) or `package.json` (frontend)
-fails at import with the resolved path in the message, before any server starts.
+A path that does not contain `manage.py` (backend) or `svelte.config.js`
+(frontend) fails at import with the resolved path in the message, before any
+server starts. The frontend marker is deliberately not `package.json` — every
+repo in this tree has one, so a typo pointing at the wrong repo would pass.
 
 ## Diagnosing a failure
 

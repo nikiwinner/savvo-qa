@@ -20,9 +20,6 @@ export const testDbEnv: Record<string, string> = {
 }
 
 export default async function globalSetup(): Promise<void> {
-  // Resolved in paths.ts so this and the server playwright.config.ts starts can
-  // never disagree — they share one database, and a split seeds the wrong schema.
-  const backendDir = BACKEND_DIR
   const pgEnv = { ...process.env, PGPASSWORD: DB_PASSWORD }
 
   // 1. Create the test database if it doesn't exist
@@ -44,7 +41,7 @@ export default async function globalSetup(): Promise<void> {
   console.log('\n🔄 Running migrations on test database...')
   try {
     execSync('uv run python manage.py migrate --no-input', {
-      cwd: backendDir,
+      cwd: BACKEND_DIR,
       env: { ...process.env, ...testDbEnv },
       stdio: 'inherit',
       timeout: 60_000,
@@ -59,7 +56,7 @@ export default async function globalSetup(): Promise<void> {
   console.log('🗑️  Flushing test database before test run...')
   try {
     execSync('uv run python manage.py flush --no-input', {
-      cwd: backendDir,
+      cwd: BACKEND_DIR,
       env: { ...process.env, ...testDbEnv },
       stdio: 'inherit',
       timeout: 30_000,
@@ -80,7 +77,7 @@ export default async function globalSetup(): Promise<void> {
   console.log('🌱 Seeding categorization tables (MerchantSeed + default categories)...')
   try {
     execSync('uv run python manage.py seed_categorization', {
-      cwd: backendDir,
+      cwd: BACKEND_DIR,
       env: { ...process.env, ...testDbEnv },
       stdio: 'inherit',
       timeout: 30_000,
@@ -102,7 +99,7 @@ export default async function globalSetup(): Promise<void> {
   console.log('🌱 Seeding curriculum content tree (sections / topics / levels / missions)...')
   try {
     execSync('uv run python manage.py seed_curriculum', {
-      cwd: backendDir,
+      cwd: BACKEND_DIR,
       env: { ...process.env, ...testDbEnv },
       stdio: 'inherit',
       timeout: 30_000,

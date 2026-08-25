@@ -25,14 +25,22 @@ import path from 'path'
 // value persisted in `.env` outlives the worktree it points at, silently pinning
 // every later run to a directory `worktree-finish.sh` has already deleted. Fail
 // loudly rather than quietly ignoring it.
+// `export KEY=value` is the form worktree-start.sh prints, so it is the single
+// most likely thing to get pasted into .env — dotenv honours it, and a guard that
+// misses it advertises coverage it does not have. `KEY : value` and `KEY = value`
+// are honoured too.
+const PERSISTED_KEY = /^(?:export\s+)?(BACKEND_DIR|FRONTEND_DIR)\s*[=:]/
 const envFile = path.resolve(__dirname, '.env')
 if (fs.existsSync(envFile)) {
-  const persisted = fs
-    .readFileSync(envFile, 'utf8')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => /^(BACKEND_DIR|FRONTEND_DIR)=/.test(line))
-    .map((line) => line.split('=')[0])
+  const persisted = [
+    ...new Set(
+      fs
+        .readFileSync(envFile, 'utf8')
+        .split('\n')
+        .map((line) => line.trim().match(PERSISTED_KEY)?.[1])
+        .filter((key): key is string => key !== undefined)
+    ),
+  ]
   if (persisted.length > 0) {
     throw new Error(
       `qa/.env sets ${persisted.join(' and ')}. Export it for the run instead — ` +
@@ -47,13 +55,20 @@ function resolveCheckout(envVar: 'BACKEND_DIR' | 'FRONTEND_DIR', fallback: strin
   const raw = process.env[envVar] || fallback
   const dir = path.resolve(__dirname, raw)
   if (!fs.existsSync(path.join(dir, marker))) {
+    const why = process.env[envVar]
+      ? `${envVar}=${process.env[envVar]}`
+      : `${envVar} is unset, so it defaulted to ${fallback} — the sibling of the qa/ directory in ` +
+        `use, which a worktree does not have`
     throw new Error(
-      `${envVar}=${process.env[envVar] ?? '(unset)'} resolved to ${dir}, which contains no ${marker}. ` +
-        `Point it at a checkout of that repository — an absolute path is safest.`
+      `${why}. That resolves to ${dir}, which contains no ${marker}. ` +
+        `Set ${envVar} to an absolute path to a checkout of that repository.`
     )
   }
   return dir
 }
 
 export const BACKEND_DIR = resolveCheckout('BACKEND_DIR', '../backend', 'manage.py')
-export const FRONTEND_DIR = resolveCheckout('FRONTEND_DIR', '../frontend', 'package.json')
+// svelte.config.js, not package.json: every repo in this tree has a package.json,
+// so `FRONTEND_DIR=<the qa repo>` would sail through and fail ~180s later inside
+// `npm run build` with a vite error naming neither the variable nor the path.
+export const FRONTEND_DIR = resolveCheckout('FRONTEND_DIR', '../frontend', 'svelte.config.js')
