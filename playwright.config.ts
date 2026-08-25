@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test'
 import path from 'path'
+import { BACKEND_DIR, FRONTEND_DIR } from './paths'
 import dotenv from 'dotenv'
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
@@ -75,9 +76,9 @@ export default defineConfig({
       // (127.0.0.1) and would otherwise trip login (5/min) / signup (10/hour).
       // The limits themselves are covered by the backend unit suite
       // (authzone/tests/test_throttling.py).
-      // BACKEND_DIR overrides the backend checkout to test (e.g. a git
-      // worktree under backend/.worktrees/<branch>); defaults to ../backend.
-      command: `cd ${process.env.BACKEND_DIR ?? path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True OAUTH_TEST_MODE=True AUTH_THROTTLE_ENABLED=False FRONTEND_URL=http://localhost:5174 FX_PROVIDER_BASE_URL=http://127.0.0.1:9 FX_FETCH_TIMEOUT_SECONDS=1 FX_AUTO_WARM=False uv run python manage.py runserver 127.0.0.1:8001`,
+      // Which backend checkout gets started is BACKEND_DIR's call — see paths.ts.
+      // The path is quoted: an unquoted `cd` splits on spaces.
+      command: `cd '${BACKEND_DIR}' && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True OAUTH_TEST_MODE=True AUTH_THROTTLE_ENABLED=False FRONTEND_URL=http://localhost:5174 FX_PROVIDER_BASE_URL=http://127.0.0.1:9 FX_FETCH_TIMEOUT_SECONDS=1 FX_AUTO_WARM=False uv run python manage.py runserver 127.0.0.1:8001`,
       url: 'http://127.0.0.1:8001/api/auth/me/',
       reuseExistingServer: false,
       timeout: 30_000,
@@ -93,9 +94,8 @@ export default defineConfig({
       // is inlined at build time.
       // --strictPort makes Vite fail loudly if :5174 is taken instead of
       // silently falling back to a random port (which would break baseURL).
-      // FRONTEND_DIR overrides the frontend checkout to test (e.g. a git
-      // worktree under frontend/.worktrees/<branch>); defaults to ../frontend.
-      command: `cd ${process.env.FRONTEND_DIR ?? path.resolve(__dirname, '../frontend')} && PUBLIC_API_BASE_URL=http://localhost:8001 npm run build && PUBLIC_API_BASE_URL=http://localhost:8001 npm run preview -- --port 5174 --strictPort`,
+      // Which frontend checkout gets built is FRONTEND_DIR's call — see paths.ts.
+      command: `cd '${FRONTEND_DIR}' && PUBLIC_API_BASE_URL=http://localhost:8001 npm run build && PUBLIC_API_BASE_URL=http://localhost:8001 npm run preview -- --port 5174 --strictPort`,
       url: 'http://localhost:5174',
       reuseExistingServer: false,
       timeout: 180_000,

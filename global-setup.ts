@@ -1,6 +1,7 @@
 import { execSync } from 'child_process'
 import path from 'path'
 import dotenv from 'dotenv'
+import { BACKEND_DIR } from './paths'
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 
@@ -19,11 +20,9 @@ export const testDbEnv: Record<string, string> = {
 }
 
 export default async function globalSetup(): Promise<void> {
-  // BACKEND_DIR overrides the backend checkout to test (e.g. a git worktree
-  // under backend/.worktrees/<branch>); defaults to ../backend. Must match the
-  // value playwright.config.ts uses — these migrations and the server it starts
-  // share one database, so a split between them seeds the wrong schema.
-  const backendDir = process.env.BACKEND_DIR ?? path.resolve(__dirname, '../backend')
+  // Resolved in paths.ts so this and the server playwright.config.ts starts can
+  // never disagree — they share one database, and a split seeds the wrong schema.
+  const backendDir = BACKEND_DIR
   const pgEnv = { ...process.env, PGPASSWORD: DB_PASSWORD }
 
   // 1. Create the test database if it doesn't exist

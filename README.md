@@ -54,23 +54,37 @@ relies on the QA stack owning :5174/:8001.
 
 ### Testing a branch instead of `main`
 
-The suite starts the servers itself and resolves their checkouts from its own
-directory, so `../backend` and `../frontend` are wrong whenever the suite runs
-from a git worktree. Two overrides fix that — set the ones whose repo the branch
-touches, leave the other unset to keep testing `main`'s side:
+The suite starts the servers it tests, so it has to be told which checkout to
+start them from. Set the override for whichever repo the branch touches; leave
+the other unset to keep testing `main`'s side of the pair.
 
-| Variable       | Default        | Purpose                                                     |
-|----------------|----------------|-------------------------------------------------------------|
-| `BACKEND_DIR`  | `../backend`   | Backend checkout: the server, migrations, seeds, merchant seed list |
-| `FRONTEND_DIR` | `../frontend`  | Frontend checkout that gets built and previewed             |
+| Variable       | Default       | Purpose                                                             |
+|----------------|---------------|---------------------------------------------------------------------|
+| `BACKEND_DIR`  | `../backend`  | Backend checkout: the server, migrations, seeds, merchant seed list |
+| `FRONTEND_DIR` | `../frontend` | Frontend checkout that gets built and previewed                     |
 
 ```bash
-BACKEND_DIR=../../backend/.worktrees/<branch> pnpm test
+BACKEND_DIR=/Users/you/code/savvo/backend/.worktrees/<branch> pnpm test
 ```
 
-`.claude/scripts/worktree-start.sh` prints both lines already filled in.
-`BACKEND_DIR` must be the same for the whole run — `global-setup.ts` migrates and
-seeds one database that the server it starts then reads.
+`.claude/scripts/worktree-start.sh` prints both lines already filled in, absolute.
+
+Three things worth knowing:
+
+- **Both are resolved once, in `paths.ts`,** against the `qa/` directory — so a
+  relative value means the same thing no matter where you invoke the suite from.
+  Resolving them at each call site is what would let `global-setup.ts` migrate one
+  checkout's schema while the spawned server serves another checkout's code
+  against the one shared `savvo_test` database.
+- **Do not put them in `qa/.env`.** A value persisted there outlives the worktree
+  it points at and silently pins every later run to a deleted directory. `paths.ts`
+  refuses to start if it finds either key in `.env`; export them for the run instead.
+- **The QA stack itself is still global** — `:8001`, `:5174` and `savvo_test` are
+  fixed, and `reuseExistingServer: false` means a second concurrent run fails on the
+  taken port. Only one QA run at a time, worktree or not.
+
+A path that does not contain `manage.py` (backend) or `package.json` (frontend)
+fails at import with the resolved path in the message, before any server starts.
 
 ## Diagnosing a failure
 

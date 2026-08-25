@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { BACKEND_DIR } from '../paths'
 
 /**
  * Backend rung-3 categorization guard (CLAUDE.md gotcha #37).
@@ -17,11 +18,7 @@ import path from 'path'
  * couples to the backend checkout (playwright.config.ts spawns the backend from
  * it), so the file is always present during a run.
  */
-// BACKEND_DIR overrides the backend checkout to read the seed library from
-// (e.g. a git worktree under backend/.worktrees/<branch>); defaults to ../../backend.
-const SEED_PATH = process.env.BACKEND_DIR
-  ? path.resolve(process.env.BACKEND_DIR, 'src/app/banking/seed_merchants.py')
-  : path.resolve(__dirname, '../../backend/src/app/banking/seed_merchants.py')
+const SEED_PATH = path.resolve(BACKEND_DIR, 'src/app/banking/seed_merchants.py')
 
 function loadSeedTokens(): string[] {
   const src = fs.readFileSync(SEED_PATH, 'utf8')
