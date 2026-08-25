@@ -85,6 +85,54 @@ test.describe('Display-currency-first amount on /dashboard/transactions (Story 1
     await expect(row.locator('[data-testid="amount-rate-unavailable"]')).toHaveCount(0)
   })
 
+  test('substituted-rate row names the real rate date in the native tooltip', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    await api.setUserCurrency('EUR')
+
+    // GBP->EUR is seeded ONLY at a 10-day-old date. No other spec touches GBP
+    // (the ExchangeRate cache is GLOBAL across parallel specs), so the row's
+    // conversion deterministically lands on the old rate via the 14-day
+    // walk-back — a SUBSTITUTED rate (>7 days behind the row's date), whose
+    // real date the API ships as `converted_rate_date` (fx-honesty).
+    const rateDate = new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0]
+    await api.seedExchangeRate('GBP', 'EUR', '0.50', rateDate)
+
+    const hh = await api.createSpace('FX Rate Date Home')
+    const description = `gbp-row-${Date.now()}`
+    await api.createExpense({
+      space: hh.id,
+      description,
+      amount: 200,
+      expense_date: TODAY,
+      currency: 'GBP',
+    })
+
+    await page.goto(`/dashboard/transactions?space=${hh.id}`)
+    await page.waitForLoadState('networkidle')
+
+    const row = page.locator('tbody tr', { hasText: description })
+    await expect(row).toBeVisible({ timeout: 5000 })
+
+    // The conversion itself still succeeds: 200 GBP * 0.50 = 100.00 EUR.
+    await expect(row.locator('[data-testid="amount-primary"]')).toContainText(/100\.00/)
+    const native = row.locator('[data-testid="amount-native"]')
+    await expect(native).toBeVisible()
+
+    // Hovering the native line opens the tooltip naming the REAL rate date —
+    // never "today's rate" for a substituted conversion.
+    await native.hover()
+    // Same 'en-US' + month/day/year options the app's formatDate uses, so the
+    // expected string matches byte-for-byte (e.g. "Aug 15, 2026").
+    const expectedDate = new Date(`${rateDate}T00:00:00`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+    const tooltip = page.getByRole('tooltip')
+    await expect(tooltip).toContainText('Actual transaction amount')
+    await expect(tooltip).toContainText(`the rate of ${expectedDate}`)
+  })
+
   test('FX-failed row shows native primary + "rate unavailable" hint', async ({ page, loggedInPage }) => {
     const { api } = loggedInPage
     await api.setUserCurrency('EUR')

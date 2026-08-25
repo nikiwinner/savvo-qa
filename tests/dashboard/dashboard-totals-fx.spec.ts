@@ -94,4 +94,40 @@ test.describe('Per-space summary FX', () => {
       page.locator(`.space-card[data-space-id="${hh.id}"]`).getByTestId('summary-fx-stale'),
     ).toBeVisible()
   })
+
+  test('a substituted (too-old) rate converts but still flips the stale indicator', async ({ page, loggedInPage }) => {
+    const { api } = loggedInPage
+    await api.setUserCurrency('EUR')
+
+    // PLN->EUR exists ONLY 10 days back (global ExchangeRate cache — no other
+    // spec uses PLN). The conversion SUCCEEDS via the 14-day walk-back, but a
+    // rate more than 7 days behind the row's date is a SUBSTITUTED rate
+    // (fx-honesty, 2026-08-24) — the totals must carry the staleness flag even
+    // though every row converted to a number.
+    const rateDate = new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0]
+    await api.seedExchangeRate('PLN', 'EUR', '0.25', rateDate)
+
+    const hh = await api.createSpace('FX Substituted Home')
+    await api.createExpense({
+      space: hh.id,
+      description: 'PLN old-rate row',
+      amount: 100,
+      expense_date: TODAY,
+      currency: 'PLN',
+    })
+
+    const dashboard = new DashboardPage(page)
+    await dashboard.gotoSpaces()
+
+    // The number itself converts: 100 PLN * 0.25 = 25.00 EUR...
+    await expect(dashboard.summaryOutflow()).toContainText('25.00')
+    // ...and the honesty flag appears anyway: a substituted rate is not the
+    // real rate of the row's date, so the total is marked approximate.
+    await expect(page.getByTestId('fx-stale-indicator')).toBeVisible()
+    // The per-card chip rides the same per-space fx_stale flag, so the user
+    // can tell WHICH space's numbers are approximate.
+    await expect(
+      page.locator(`.space-card[data-space-id="${hh.id}"]`).getByTestId('summary-fx-stale'),
+    ).toBeVisible()
+  })
 })

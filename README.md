@@ -69,6 +69,12 @@ Causes that bite repeatedly:
 | Inline edit form not found after clicking Edit | The card locator loses its context on the DOM swap — re-query by the hidden `input[name="id"]` |
 | `APIResponse.json()` throws | Check `res.ok()` first and throw with the body; only then call `.json()` |
 | Cookie not set in the browser | Domain mismatch — cookies need `domain: 'localhost'` with no port |
+| Redirected to `/login` when a session was expected | The session cookie never reached the browser context — check the `context.addCookies()` call |
+| A pass/fail flicker across runs | A race, not flake. Re-run the spec in isolation ×3 and fix the race — never retry it away |
+
+**Only the test side is a legitimate fix here.** If the failure is an app bug, describe it precisely
+and stop — a previously-green test going red is a code bug to fix, never a test to weaken, skip or
+`.fixme` (`.claude/rules/gsd.md` VERIFY gate).
 
 ### The WebKit wedge — 10 failures, 5 `mobile-safari` + 5 `tablet`, `page.goto` at exactly 30s
 
@@ -108,10 +114,3 @@ To tell a wedge from a real regression, in ascending cost:
 
 Recorded 2026-08-21 after this cost several hours. It is not new — three runs on 2026-08-20 show the
 identical `10 failed / 1185 passed`, 5 + 5, before the work being tested existed.
-
-| Redirected to `/login` when a session was expected | The session cookie never reached the browser context — check the `context.addCookies()` call |
-| A pass/fail flicker across runs | A race, not flake. Re-run the spec in isolation ×3 and fix the race — never retry it away |
-
-**Only the test side is a legitimate fix here.** If the failure is an app bug, describe it precisely
-and stop — a previously-green test going red is a code bug to fix, never a test to weaken, skip or
-`.fixme` (`.claude/rules/gsd.md` VERIFY gate).
