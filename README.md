@@ -52,6 +52,26 @@ Do **not** point `FRONTEND_URL`/`BACKEND_URL` at :5173/:8000 unless you
 explicitly want to share state with the dev stack — the entire isolation model
 relies on the QA stack owning :5174/:8001.
 
+### Testing a branch instead of `main`
+
+The suite starts the servers itself and resolves their checkouts from its own
+directory, so `../backend` and `../frontend` are wrong whenever the suite runs
+from a git worktree. Two overrides fix that — set the ones whose repo the branch
+touches, leave the other unset to keep testing `main`'s side:
+
+| Variable       | Default        | Purpose                                                     |
+|----------------|----------------|-------------------------------------------------------------|
+| `BACKEND_DIR`  | `../backend`   | Backend checkout: the server, migrations, seeds, merchant seed list |
+| `FRONTEND_DIR` | `../frontend`  | Frontend checkout that gets built and previewed             |
+
+```bash
+BACKEND_DIR=../../backend/.worktrees/<branch> pnpm test
+```
+
+`.claude/scripts/worktree-start.sh` prints both lines already filled in.
+`BACKEND_DIR` must be the same for the whole run — `global-setup.ts` migrates and
+seeds one database that the server it starts then reads.
+
 ## Diagnosing a failure
 
 Read selectors LIVE, never from a hardcoded list — the app's markup changes every phase and any

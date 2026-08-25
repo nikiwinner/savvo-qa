@@ -19,7 +19,11 @@ export const testDbEnv: Record<string, string> = {
 }
 
 export default async function globalSetup(): Promise<void> {
-  const backendDir = path.resolve(__dirname, '../backend')
+  // BACKEND_DIR overrides the backend checkout to test (e.g. a git worktree
+  // under backend/.worktrees/<branch>); defaults to ../backend. Must match the
+  // value playwright.config.ts uses — these migrations and the server it starts
+  // share one database, so a split between them seeds the wrong schema.
+  const backendDir = process.env.BACKEND_DIR ?? path.resolve(__dirname, '../backend')
   const pgEnv = { ...process.env, PGPASSWORD: DB_PASSWORD }
 
   // 1. Create the test database if it doesn't exist

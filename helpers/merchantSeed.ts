@@ -14,10 +14,14 @@ import path from 'path'
  *
  * We read the token list from the LIVE backend source (READ-ONLY) instead of
  * mirroring it, so it can never drift when the seed grows. The QA stack already
- * couples to `../backend` (playwright.config.ts spawns the backend from there),
- * so the file is always present during a run.
+ * couples to the backend checkout (playwright.config.ts spawns the backend from
+ * it), so the file is always present during a run.
  */
-const SEED_PATH = path.resolve(__dirname, '../../backend/src/app/banking/seed_merchants.py')
+// BACKEND_DIR overrides the backend checkout to read the seed library from
+// (e.g. a git worktree under backend/.worktrees/<branch>); defaults to ../../backend.
+const SEED_PATH = process.env.BACKEND_DIR
+  ? path.resolve(process.env.BACKEND_DIR, 'src/app/banking/seed_merchants.py')
+  : path.resolve(__dirname, '../../backend/src/app/banking/seed_merchants.py')
 
 function loadSeedTokens(): string[] {
   const src = fs.readFileSync(SEED_PATH, 'utf8')

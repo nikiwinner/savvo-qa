@@ -75,7 +75,9 @@ export default defineConfig({
       // (127.0.0.1) and would otherwise trip login (5/min) / signup (10/hour).
       // The limits themselves are covered by the backend unit suite
       // (authzone/tests/test_throttling.py).
-      command: `cd ${path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True OAUTH_TEST_MODE=True AUTH_THROTTLE_ENABLED=False FRONTEND_URL=http://localhost:5174 FX_PROVIDER_BASE_URL=http://127.0.0.1:9 FX_FETCH_TIMEOUT_SECONDS=1 FX_AUTO_WARM=False uv run python manage.py runserver 127.0.0.1:8001`,
+      // BACKEND_DIR overrides the backend checkout to test (e.g. a git
+      // worktree under backend/.worktrees/<branch>); defaults to ../backend.
+      command: `cd ${process.env.BACKEND_DIR ?? path.resolve(__dirname, '../backend')} && POSTGRES_DB_NAME=${TEST_DB_NAME} DEBUG=True OAUTH_TEST_MODE=True AUTH_THROTTLE_ENABLED=False FRONTEND_URL=http://localhost:5174 FX_PROVIDER_BASE_URL=http://127.0.0.1:9 FX_FETCH_TIMEOUT_SECONDS=1 FX_AUTO_WARM=False uv run python manage.py runserver 127.0.0.1:8001`,
       url: 'http://127.0.0.1:8001/api/auth/me/',
       reuseExistingServer: false,
       timeout: 30_000,
