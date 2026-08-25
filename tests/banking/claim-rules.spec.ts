@@ -2,7 +2,7 @@
  * Phase 13 — Story 13.1 / 13.4 / 13.7: SpaceClaimRule CRUD + one-tap
  * make-rule-from-transaction (API + UI).
  *
- * Backend contracts (mas/roadmap/phase_13.md, API Reference):
+ * Backend contracts (mas/roadmap/done/phase_13.md, API Reference):
  *   - GET  /api/claim-rules/                  — scoped to the user's spaces, ?space= filter
  *   - POST /api/claim-rules/                  — ≥1 condition required (else 400 non_field_errors)
  *   - DELETE /api/claim-rules/<id>/           — 204; 404 for a non-member rule

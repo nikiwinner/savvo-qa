@@ -244,7 +244,7 @@ test.describe('Conflict resolution — real routing engine (seed/route-unmapped)
     // lone-candidate auto-attach fallback: a Space is a deliberate project, not
     // a default bucket. So an unmatched row stays in the Inbox (space=NULL) even
     // when there is only one place it could go. (This test was INVERTED from the
-    // old Phase-13 fallback assertion — see phase_16.md "Tests touching the old
+    // old Phase-13 fallback assertion — see mas/roadmap/done/phase_16.md "Tests touching the old
     // contract".)
     const lone = await api.createSpace('Lone No-Fallback Space')
 

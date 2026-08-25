@@ -67,7 +67,7 @@ test.describe('Curriculum — unit-map', () => {
     expect(payload.bars.knowledge.xp_total).toBe(40)
 
     // Bar #2 (Net Wealth) flipped null → object in Phase 25 — the SANCTIONED
-    // contract change (phase_25.md "Tests touching the old contract"). Since
+    // contract change (mas/roadmap/done/phase_25.md "Tests touching the old contract"). Since
     // derived cash (2026-08-11) a fresh user's auto-provisioned cash account is
     // ALWAYS known (balance derives from cash transaction rows; zero rows →
     // honest 0.00), so accounts_known is 1 — never a fake 0/100 and NEVER fed
