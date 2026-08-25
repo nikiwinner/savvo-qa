@@ -131,6 +131,27 @@ test.describe('Display-currency-first amount on /dashboard/transactions (Story 1
     const tooltip = page.getByRole('tooltip')
     await expect(tooltip).toContainText('Actual transaction amount')
     await expect(tooltip).toContainText(`the rate of ${expectedDate}`)
+
+    // The amount column is the RIGHTMOST one, and the table lives inside
+    // `.table-paper { overflow-x: auto }` — a scroll container, which CSS
+    // makes clip BOTH axes, so an absolutely-positioned bubble was cut off by
+    // it (measured 2026-08-25 at 1246px: 240px wide, 98px past the container's
+    // right edge). Two assertions, because either alone passes vacuously:
+    //   1. `position: fixed` — the mechanism that escapes ancestor clipping.
+    //      An absolute bubble fails here even where it happens to fit.
+    //   2. inside the window — the fix must not simply move the cut to the
+    //      window edge. This is what actually fails on a narrow viewport.
+    const boxIsFixed = await tooltip.evaluate((el) => getComputedStyle(el).position)
+    expect(boxIsFixed).toBe('fixed')
+
+    const bubbleBox = await tooltip.boundingBox()
+    const viewport = page.viewportSize()
+    expect(bubbleBox).not.toBeNull()
+    expect(viewport).not.toBeNull()
+    expect(bubbleBox!.x).toBeGreaterThanOrEqual(0)
+    expect(bubbleBox!.x + bubbleBox!.width).toBeLessThanOrEqual(viewport!.width)
+    expect(bubbleBox!.y).toBeGreaterThanOrEqual(0)
+    expect(bubbleBox!.y + bubbleBox!.height).toBeLessThanOrEqual(viewport!.height)
   })
 
   test('FX-failed row shows native primary + "rate unavailable" hint', async ({ page, loggedInPage }) => {

@@ -125,9 +125,12 @@ test.describe('Per-space summary FX', () => {
     // real rate of the row's date, so the total is marked approximate.
     await expect(page.getByTestId('fx-stale-indicator')).toBeVisible()
     // The per-card chip rides the same per-space fx_stale flag, so the user
-    // can tell WHICH space's numbers are approximate.
-    await expect(
-      page.locator(`.space-card[data-space-id="${hh.id}"]`).getByTestId('summary-fx-stale'),
-    ).toBeVisible()
+    // can tell WHICH space's numbers are approximate. Its copy must hold for
+    // BOTH causes of that flag: here a rate existed (just from the wrong
+    // date), so the old "rate unavailable" wording would be a lie.
+    const chip = page.locator(`.space-card[data-space-id="${hh.id}"]`).getByTestId('summary-fx-stale')
+    await expect(chip).toBeVisible()
+    await expect(chip).toContainText(/approximate/i)
+    await expect(chip).not.toContainText(/unavailable/i)
   })
 })
