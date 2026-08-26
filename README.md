@@ -28,7 +28,14 @@ The backend already whitelists `http://localhost:5174` in
 pnpm install            # install dependencies (uses pnpm, not npm)
 pnpm test               # run all E2E tests (3 browser projects: chromium, mobile-safari, tablet + a `setup` pre-seed project all three depend on)
 pnpm test:auth          # run auth tests only
+pnpm test:spaces        # run spaces tests only
+pnpm test:expenses      # run expenses tests only
+pnpm test:dashboard     # run dashboard tests only
+pnpm test:mobile        # run the mobile-safari project only
+pnpm test:tablet        # run the tablet project only
 pnpm test:headed        # run with browser visible
+pnpm test:ui            # open the Playwright UI runner
+pnpm report             # open the last HTML report
 ```
 
 `global-setup.ts` creates `savvo_test` if it doesn't exist, runs

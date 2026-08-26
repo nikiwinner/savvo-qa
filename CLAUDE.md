@@ -1,8 +1,8 @@
 # CLAUDE.md — qa
 
-Loads when a file under `qa/` is touched. Cross-repo invariants stay in `savvo/CLAUDE.md`; the
-Playwright commands, project names and the failure-diagnosis table are in `qa/README.md` and nowhere
-else. Paths are relative to the `savvo/` working directory.
+Loads when a file under `qa/` is touched. Cross-repo invariants stay in `savvo/CLAUDE.md`. See
+`qa/README.md` for Playwright run commands, project names, and the failure-diagnosis table. Paths
+are relative to the `savvo/` working directory.
 
 `qa/.env` — copy from `qa/.env.example` (#26).
 
