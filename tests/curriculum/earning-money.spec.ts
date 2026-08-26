@@ -24,8 +24,8 @@
  *     complete with zero financial rows; `sell-something-idle` offers two authored
  *     paths; the capstone PASSes (row-verified, `self_attested:false`) with income
  *     rows → the topic crest, and FAILS honestly with zero income rows.
- *   • FOLD-IN GUARDS — a completed earn-career chapter shows the "…done. Nice."
- *     guide copy (I4); the topic surface shows only the traceable Bar #2 money
+ *   • FOLD-IN GUARDS — a completed earn-career chapter shows the "…every level
+ *     done." guide copy (I4); the topic surface shows only the traceable Bar #2 money
  *     figure (no-fake-numbers).
  *
  * Pollution-safety (gotcha #26): Earning money is REAL seeded content, so this file
@@ -418,7 +418,7 @@ test.describe('Curriculum — Earning money topic (fold-in guards)', () => {
     // Focus the earn-career chapter (the island holding earning-money) → the guide
     // copy switches to the focused-chapter message.
     await map.expandIslandFor('earning-money')
-    await expect(map.guideMessage).toContainText('done. Nice.')
+    await expect(map.guideMessage).toContainText('every level done')
     await expect(map.guideMessage).not.toContainText('up next')
   })
 

@@ -15,7 +15,7 @@
 
 /** `lesson_correct` + `mission_pass` — the celebration pools. */
 export const CELEBRATES =
-  /(got it|nailed it|exactly right|that's the one|spot on|love it|you did it|real progress|done and dusted|pulled it off|a real win|proud of you)/i
+  /(got it|nailed it|exactly right|that's the one|spot on|love it|you did it|progress you can point to|done and dusted|pulled it off|a win|proud of you)/i
 
 /** `lesson_wrong` + `quiz_fail` + `mission_fail` — the supportive pools. */
 export const SUPPORTS =

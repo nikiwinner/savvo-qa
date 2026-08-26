@@ -135,7 +135,7 @@ export async function completeEarningMoneyLevels(api: ApiHelper, levelSlugs: str
  * section (Section 1) — earning-money's 5 levels PLUS the legacy-mission levels in
  * career-choice / job-applications / pay-and-tax — so the SECTION crest reads
  * complete (`levels_completed === levels_total_playable`). That full-section
- * completion is what flips the focused-chapter guide copy to the "…done. Nice."
+ * completion is what flips the focused-chapter guide copy to the "…every level done."
  * short-circuit (I4); completing ONLY earning-money leaves the section crest short
  * (the other Section-1 topics still carry step-bearing legacy-mission levels).
  * Same 3-pass self-verify retry, verified against the section crest.
