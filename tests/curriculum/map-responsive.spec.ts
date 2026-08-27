@@ -2,9 +2,10 @@
  * Curriculum — the world map fits its frame at every screen size
  *
  * The world map places its 9 chapter-islands from CSS alone: a lane offset
- * (`--lane-offset`) and a row pitch (`--row-pitch`), both derived from one
- * `--island-size`. Three things can silently break in that arrangement, and each
- * has already broken once:
+ * (`--lane-offset`) and a row pitch (`--row-pitch`), both resolved from the
+ * constants `CurriculumMap.svelte` emits; the compact layout re-derives the
+ * pitch from `--island-size`. Three things can silently break in that
+ * arrangement, and each has already broken once:
  *
  * 1. CLIPPING. `.map-frame` is `overflow: hidden`, so a section box that misses
  *    the frame is not a horizontal scroll anybody can see — it is a chapter card
