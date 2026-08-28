@@ -223,10 +223,11 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     await expect(map.missionDeeplink).toBeVisible()
     await expect(map.missionDeeplink).toHaveAttribute('href', /\/dashboard\/transactions/)
 
-    // "Mark done" (self_attest) completes the tour → it's the last L3 step → a
+    // "Mark done" (self_attest) completes the tour — through the Phase-30
+    // accountability confirm — → it's the last L3 step → a
     // self-attest mission DOES get the Phase-27 reward screen → Continue closes
     // the host and the real XP lands, traceable to the ledger (API parity).
-    await map.missionVerify.click()
+    await map.markDone()
     await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)

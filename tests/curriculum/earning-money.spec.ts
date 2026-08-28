@@ -14,7 +14,7 @@
  * guided flow (intro → optional path chooser → screens → terminal). The two
  * row-verified missions (`log-your-income`, the capstone) end in a `Verify` button
  * that checks real income rows; the three commitments end in an explicit
- * `mission-attest` NAMING the action → a REPORTED pass ("Done — on your honour",
+ * `mission-attest` NAMING the action → a REPORTED pass ("Done. Your word is the receipt",
  * no snapshot). The capstone is a PURE `income_rows_exist{min_count:1}` check now —
  * the old `any_of` self-attest arm is GONE, so a data-less user gets an honest FAIL.
  *
@@ -314,7 +314,7 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     expect(body.passed).toBe(true)
     expect(body.self_attested).toBe(false)
 
-    // The fact-named verified lead + a real snapshot (no reported "on your honour").
+    // The fact-named verified lead + a real snapshot (no reported-pass lead).
     await expect(map.missionPassLead).toBeVisible({ timeout: 45_000 })
     await expect(map.verifierSnapshot).toBeVisible()
     await expect(map.missionReportedLead).toHaveCount(0)

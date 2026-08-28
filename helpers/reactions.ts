@@ -4,7 +4,8 @@
  * The mascot was removed with the character art, so the reaction is no longer
  * observable as an asset path or an emotion attribute — the LINE is the whole
  * signal now, and the line is what the user actually reads. These patterns are
- * mirrors of the pools in `frontend/src/lib/curriculum/reactions.ts`; the specs
+ * mirrors of the pools in `frontend/src/lib/curriculum/reactions.ts` (re-voiced
+ * by Phase 30 into the hybrid warm-base / dry-seasoning register); the specs
  * assert against them so a wrong answer can never quietly start celebrating (or
  * start shaming).
  *
@@ -15,11 +16,11 @@
 
 /** `lesson_correct` + `mission_pass` — the celebration pools. */
 export const CELEBRATES =
-  /(got it|nailed it|exactly right|that's the one|spot on|love it|you did it|progress you can point to|done and dusted|pulled it off|a win|proud of you)/i
+  /(try to look surprised|getting suspicious|exactly it|no notes|well spotted|nailed it|future self|the actual thing|what progress looks like|casually handled|beautifully done|a win)/i
 
 /** `lesson_wrong` + `quiz_fail` + `mission_fail` — the supportive pools. */
 export const SUPPORTS =
-  /(almost|not quite|good try|no worries|close|so close|nearly there|good effort|not there yet|give it another go)/i
+  /(audition|decoy|bites everyone|not quite|close\. ish|slipped past|rematch|so close|skim what's marked|next time|tricky ones|not yet|not showing|finish the step|no pressure|you're close)/i
 
 /** Language that must NEVER reach the user on a wrong answer. */
 export const SHAME_PATTERN =

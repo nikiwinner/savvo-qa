@@ -97,8 +97,8 @@ Three things worth knowing:
 
 A path that does not contain `manage.py` (backend) or `svelte.config.js`
 (frontend) fails at import with the resolved path in the message, before any
-server starts. The frontend marker is deliberately not `package.json` — every
-repo in this tree has one, so a typo pointing at the wrong repo would pass.
+server starts. The frontend marker is deliberately not `package.json` — the qa
+repo has one too, so `FRONTEND_DIR` typo'd at the qa checkout would pass.
 
 ## Diagnosing a failure
 

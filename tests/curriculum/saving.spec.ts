@@ -146,10 +146,11 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     await expect(figure).toContainText(String(space.id))
     await expect(figure).toHaveAttribute('href', /\/dashboard\/spaces/)
 
-    // Continue → host auto-advances to the self_attest reflection → "Mark done".
+    // Continue → host auto-advances to the self_attest reflection → "Mark done"
+    // (through the Phase-30 accountability confirm).
     await map.missionContinue.click()
     await expect(map.missionSelfAttest).toBeVisible({ timeout: 45_000 })
-    await map.missionVerify.click()
+    await map.markDone()
 
     // The self_attest reflection was L3's last step → Phase-27 reward screen
     // interposes → Continue closes the host (both missions + lesson done).

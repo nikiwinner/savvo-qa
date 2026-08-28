@@ -2,7 +2,7 @@
  * Curriculum — Mission player + verify write-path (Phase 22, Story 22.6 / 22.3)
  *
  * The ★ Mission player is the first production caller of the Phase-20 verifier.
- * A `self_attest` mission completes on an honest "nothing to verify but you"
+ * A `self_attest` mission completes on an honest "the only verification here is you"
  * label; a row-verified mission (`space_exists`) FAILS without real data and
  * PASSES once the row exists, rendering a `verifier-snapshot` whose every figure
  * taps through to the source rows (no-fake-numbers). Verification is strictly
@@ -17,6 +17,7 @@
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
 import { CELEBRATES } from '../../helpers/reactions'
+import { ATTEST_CONFIRMS, ATTEST_CONFIRM_TITLE } from '../../helpers/attestConfirm'
 import {
   seedPlayerFixtures,
   makeFixtureLevelPlayable,
@@ -58,13 +59,88 @@ test.describe('Curriculum — mission player', () => {
     await map.walkMissionFlow()
 
     // The terminal is an explicit attestation NAMING the action, alongside the
-    // honest "nothing to verify but you" note — and NO fabricated row check.
+    // honest "the only verification here is you" note — and NO fabricated row check.
     await expect(map.missionSelfAttest).toBeVisible()
     await expect(map.missionAttest).toBeVisible()
     await expect(map.verifierSnapshot).toHaveCount(0)
 
-    // Attest → a REPORTED pass, honoured on the user's word ("Done — on your
-    // honour."), with NO verifier snapshot; the player celebrates in words + real XP.
+    // Phase 30 (30.2): the attest asks ONCE — "Not yet — take me back" returns
+    // to the step with no completion and no XP written. The request tripwire is
+    // what makes the no-completion assert time-proof: a regressed cancelAttest
+    // firing the verify POST would otherwise race the point-in-time reads.
+    let verifyFiredDuringNotYet = false
+    const notYetTripwire = (r: import('@playwright/test').Request): void => {
+      if (r.url().includes('/verify/') && r.method() === 'POST') verifyFiredDuringNotYet = true
+    }
+    page.on('request', notYetTripwire)
+    await map.missionAttest.click()
+    await expect(map.attestConfirm).toBeVisible()
+
+    // The wording is drawn at random from the pool on every open, so the assert
+    // is MEMBERSHIP — and the message must belong to the SAME pair as the title.
+    const firstTitle = ((await map.attestConfirmTitle.textContent()) ?? '').trim()
+    expect(firstTitle).toMatch(ATTEST_CONFIRM_TITLE)
+    const firstPair = ATTEST_CONFIRMS.find((p) => p.title === firstTitle)
+    expect(firstPair, `"${firstTitle}" is not a pooled confirm title`).toBeDefined()
+    await expect(map.attestConfirmMessage).toHaveText(firstPair?.message ?? '')
+
+    // Escape = "Not yet — take me back": the confirm closes, the PLAYER stays
+    // open, and the host's scroll lock survives (a regressed Esc used to close
+    // the whole player and strand body.overflow as 'hidden' forever).
+    await page.keyboard.press('Escape')
+    await expect(map.attestConfirm).toHaveCount(0)
+    await expect(map.stepPlayerHost).toBeVisible()
+    await expect(map.missionAttest).toBeVisible()
+    // Still locked while the player is up. NOTE this value alone does not prove
+    // the fix: on the regressed path the host restores '' and the dying dialog
+    // then writes its stale 'hidden' back, so BOTH paths read 'hidden' here.
+    // What discriminates is the unlock after the host closes, asserted below.
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden')
+
+    // …and the wording VARIES between opens. The picker never hands out the pair
+    // it just handed out, so this is an exact assertion, not a probabilistic one:
+    // every one of eight consecutive draws must differ from the one before it and
+    // must still be a pooled title.
+    let previousTitle = firstTitle
+    const seenTitles = new Set<string>([firstTitle])
+    for (let i = 0; i < 8; i += 1) {
+      await map.missionAttest.click()
+      await expect(map.attestConfirm).toBeVisible()
+      const title = ((await map.attestConfirmTitle.textContent()) ?? '').trim()
+      expect(title, `"${title}" is not a pooled confirm title`).toMatch(ATTEST_CONFIRM_TITLE)
+      expect(title, `draw ${i + 1} repeated the previous confirm`).not.toBe(previousTitle)
+      // The message must belong to the SAME pair on every draw, not only the
+      // first — a crossed pair is the failure a title-only loop cannot see.
+      const pair = ATTEST_CONFIRMS.find((p) => p.title === title)
+      expect(pair, `"${title}" is not a pooled confirm title`).toBeDefined()
+      await expect(map.attestConfirmMessage).toHaveText(pair?.message ?? '')
+      previousTitle = title
+      seenTitles.add(title)
+      await page.keyboard.press('Escape')
+      await expect(map.attestConfirm).toHaveCount(0)
+    }
+    // "Differs from the previous one" alone is satisfied by a picker that just
+    // ping-pongs between two pairs. Nine draws off a step-over picker walk the
+    // whole 7-pair pool, so under 4 distinct titles is a real regression.
+    expect(seenTitles.size, 'the confirm pool is barely varying').toBeGreaterThanOrEqual(4)
+
+    await map.missionAttest.click()
+    await expect(map.attestConfirm).toBeVisible()
+    await map.attestConfirmNotYet.click()
+    await expect(map.attestConfirm).toHaveCount(0)
+    await expect(map.missionAttest).toBeVisible()
+    await expect(map.missionReportedLead).toHaveCount(0)
+    expect(await map.xpValue()).toBe(xpBefore)
+    // …and from the SERVER, not the readout behind the overlay: `xpValue()`
+    // reads the map underneath the open host and only refreshes once the host
+    // closes, so on its own it could not see a completion that HAD been written.
+    expect((await api.getCurriculumMap()).bars.knowledge.xp_total).toBe(0)
+    page.off('request', notYetTripwire)
+    expect(verifyFiredDuringNotYet).toBe(false)
+
+    // Attest → the confirm's "I did it" → a REPORTED pass, honoured on the
+    // user's word ("Done. Your word is the receipt."), with NO verifier
+    // snapshot; the player celebrates in words + real XP.
     await map.attestMission()
     await expect(map.missionReportedLead).toBeVisible({ timeout: 45_000 })
     await expect(map.missionPassLead).toHaveCount(0)
@@ -76,6 +152,9 @@ test.describe('Curriculum — mission player', () => {
     // Continue closes the host; the real XP rose from the Bar #1 ledger.
     await map.missionContinue.click()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
+    // The scroll lock is RELEASED once the host is gone. A stranded 'hidden'
+    // here is the Amendment-1 bug: the page would never scroll again.
+    expect(await page.evaluate(() => document.body.style.overflow)).toBe('')
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
     const payload = await api.getCurriculumMap()
     expect(payload.bars.knowledge.xp_total).toBeGreaterThan(0)
@@ -177,7 +256,13 @@ test.describe('Curriculum — mission player', () => {
     // Verify → PASS → the ENRICHED snapshot phase celebrates in ONE screen: a
     // celebrating line + a real +XP chip alongside the row-verified snapshot.
     await map.missionVerify.click()
+    // Phase 30 (30.2): a row-verified mission never sees the accountability
+    // confirm — its check is the rows, not the user's word.
+    // Asserted AFTER the snapshot lands: `toHaveCount(0)` is satisfied at t=0
+    // whether or not a dialog is one tick from rendering, so on its own it
+    // proves nothing about a confirm that never blocked the flow.
     await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
+    await expect(map.attestConfirm).toHaveCount(0)
     await expect(map.playerReaction).toBeVisible()
     await expect(map.playerReaction).toHaveText(CELEBRATES)
     await expect(map.completionXp).toBeVisible()

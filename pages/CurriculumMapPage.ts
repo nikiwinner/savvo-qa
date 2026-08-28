@@ -159,6 +159,12 @@ export class CurriculumMapPage {
   readonly missionScreenInput: Locator
   readonly missionScreenNext: Locator
   readonly missionAttest: Locator
+  // The Phase-30 accountability confirm on honour-based completions
+  readonly attestConfirm: Locator
+  readonly attestConfirmTitle: Locator
+  readonly attestConfirmMessage: Locator
+  readonly attestConfirmYes: Locator
+  readonly attestConfirmNotYet: Locator
   readonly missionReportedLead: Locator
   readonly missionPassLead: Locator
 
@@ -271,6 +277,15 @@ export class CurriculumMapPage {
     this.missionScreenInput = page.getByTestId('mission-screen-input')
     this.missionScreenNext = page.getByTestId('mission-screen-next')
     this.missionAttest = page.getByTestId('mission-attest')
+    // Located by testid, NOT by its title: the title is drawn at random from the
+    // pool in `helpers/attestConfirm.ts` on every open. A role+name lookup is out
+    // for the same reason, and a bare `getByRole('dialog')` is ambiguous — the
+    // player host is a dialog too, and the confirm renders inside it.
+    this.attestConfirm = page.getByTestId('confirm-dialog')
+    this.attestConfirmTitle = this.attestConfirm.getByRole('heading')
+    this.attestConfirmMessage = this.attestConfirm.locator('p.dialog-message')
+    this.attestConfirmYes = this.attestConfirm.getByRole('button', { name: 'I did it' })
+    this.attestConfirmNotYet = this.attestConfirm.getByRole('button', { name: 'Not yet — take me back' })
     this.missionReportedLead = page.getByTestId('mission-reported-lead')
     this.missionPassLead = page.getByTestId('mission-pass-lead')
 
@@ -458,6 +473,24 @@ export class CurriculumMapPage {
    */
   async attestMission(): Promise<void> {
     await this.missionAttest.click()
+    await this.answerAttestConfirm()
+  }
+
+  /**
+   * Tap a v1 self-attest mission's "Mark done" (rendered on the `mission-verify`
+   * button) and answer the Phase-30 accountability confirm with "I did it".
+   * Row-verified missions never show the confirm — keep clicking
+   * `missionVerify` directly for those.
+   */
+  async markDone(): Promise<void> {
+    await this.missionVerify.click()
+    await this.answerAttestConfirm()
+  }
+
+  /** Phase 30 (30.2): every honour-based completion asks once before it counts. */
+  private async answerAttestConfirm(): Promise<void> {
+    await this.attestConfirm.waitFor({ state: 'visible', timeout: 45_000 })
+    await this.attestConfirmYes.click()
   }
 
   /**

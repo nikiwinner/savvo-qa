@@ -17,6 +17,8 @@ WAS the long-standing "infra flake"); don't switch it back for speed.
 Suite size: **1267 listed** (422 × 3 browser cells + 1 setup); authoritative:
 `cd qa && pnpm exec playwright test --list`. Drift tripwire:
 `grep -rhE "(^|\s)test(\.skip|\.fixme|\.only)?\(" qa/tests --include='*.spec.ts' | wc -l` × 3 = **1233**
-(undercounts 11/project — loop-parametrized specs — plus the setup spec); use it for relative drift,
+(undercounts 11/project — 10 tests declared through an ALIASED fixture import, `appTest(` ×8
+and `baseTest(` ×2, which the regex cannot match, plus 1 loop-parametrized spec — and the setup
+spec); use it for relative drift,
 `--list` for truth. A per-test skip must be written `testInfo.skip(...)`, never an in-body
 `test.skip(...)`, or it inflates this count.

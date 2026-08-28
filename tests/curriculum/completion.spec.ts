@@ -91,6 +91,13 @@ test.describe('Curriculum — completion + reward screen', () => {
     await expect(map.lessonCardChoice).toBeVisible()
     await map.lessonOption.nth(INTERACTIVE_CORRECT_OPTION).click()
     await expect(map.playerReaction).toHaveText(CELEBRATES)
+    // Disjointness is asserted in BOTH directions (I1). The support mirror now
+    // carries broad tokens ("not yet", "next time", "no pressure"), so a future
+    // celebrate rewrite could drift into it without either wrong-answer guard
+    // below noticing.
+    const celebration = (await map.playerReaction.innerText()).trim()
+    expect(celebration).not.toMatch(SUPPORTS)
+    expect(celebration).not.toMatch(SHAME_PATTERN)
 
     // Close WITHOUT completing (an inline check is formative — the step stays a
     // fresh `current` node), then re-open for the wrong-tap branch.
