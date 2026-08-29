@@ -9,8 +9,9 @@
  *     replays until nothing is missed; only then does the step complete.
  *
  *   assessment (the topic-end boss, until phase 32) — the all-or-nothing batch
- *     submit, and `POST /api/steps/<id>/check/` REFUSES it so its answer key can
- *     never be read one question at a time.
+ *     submit, and `POST /api/steps/<id>/check/` REFUSES it, keeping one step on
+ *     one mechanic. (Not a confidentiality boundary: a failing `complete/`
+ *     already returns per-question results.)
  *
  * Leak-safety is asserted at the source in both modes: the manifest carries no
  * `answer` and no `feedback`.
@@ -256,7 +257,7 @@ test.describe('Curriculum — quiz player (assessment)', () => {
     await makeFixtureLevelPlayable(api, bossQuiz.step_id)
 
     // The practice quiz answers; the assessment quiz refuses — that refusal is
-    // what stops a boss key being read one question at a time.
+    // what keeps one step on one mechanic.
     const boss = await api.checkStepQuestion(bossQuiz.step_id, 0, BOSS_ANSWER_INDEX)
     expect(boss.status).toBe(400)
     expect(String(boss.body.detail)).toContain('complete/')

@@ -1434,8 +1434,8 @@ export class ApiHelper {
    * POST /api/steps/<id>/check/ — grade ONE practice question (Phase 31).
    *
    * Returns the STATUS alongside the body instead of throwing, because the
-   * refusals are the contract: an `assessment` quiz must answer 400 so a boss
-   * quiz's key can never be read one question at a time.
+   * refusals are the contract: an `assessment` quiz must answer 400, keeping one
+   * step on one mechanic.
    */
   async checkStepQuestion(
     stepId: number,
