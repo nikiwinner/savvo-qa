@@ -1430,6 +1430,31 @@ export class ApiHelper {
     return res.json()
   }
 
+  /**
+   * POST /api/steps/<id>/check/ — grade ONE practice question (Phase 31).
+   *
+   * Returns the STATUS alongside the body instead of throwing, because the
+   * refusals are the contract: an `assessment` quiz must answer 400 so a boss
+   * quiz's key can never be read one question at a time.
+   */
+  async checkStepQuestion(
+    stepId: number,
+    question: number,
+    answer: number | number[]
+  ): Promise<{ status: number; body: Record<string, unknown> }> {
+    const res = await this.ctx.post(`${this.baseUrl}/api/steps/${stepId}/check/`, {
+      data: { question, answer },
+      headers: { 'X-CSRFToken': await this.csrfToken() },
+    })
+    let body: Record<string, unknown> = {}
+    try {
+      body = await res.json()
+    } catch {
+      body = {}
+    }
+    return { status: res.status(), body }
+  }
+
   // ── Internal ───────────────────────────────────────────────────────────────
 
   private async csrfToken(): Promise<string> {

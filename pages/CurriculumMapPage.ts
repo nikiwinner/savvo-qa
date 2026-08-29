@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test'
+import { Page, Locator, expect } from '@playwright/test'
 
 /**
  * Page object for the curriculum **world map** (`/dashboard/learn`).
@@ -128,6 +128,16 @@ export class CurriculumMapPage {
   readonly quizRetry: Locator
   readonly quizNext: Locator
   readonly quizBack: Locator
+  /** Phase 31 — the single practice control: step on, replay, or submit. */
+  readonly quizAdvance: Locator
+  /** Phase 31 — an `order` question is arranged, then committed with this. */
+  readonly quizCheck: Locator
+  /** Phase 31 — an `order` miss spells its sequence out; there is no option to mark. */
+  readonly quizCorrectOrder: Locator
+  /** Phase 31 — the lesson deck's review-round control. */
+  readonly lessonReviewNext: Locator
+  /** The interactive card's question line — the key `playLessonDeck` learns answers by. */
+  readonly lessonCardPrompt: Locator
 
   // Scenario player (Phase 26 — 🎭 branching decision sim)
   readonly scenarioNode: Locator
@@ -248,6 +258,11 @@ export class CurriculumMapPage {
     // "Submit" does), so they are addressed by their accessible names.
     this.quizNext = page.getByRole('button', { name: /Next/ })
     this.quizBack = page.getByRole('button', { name: 'Previous question' })
+    this.quizAdvance = page.getByTestId('quiz-advance')
+    this.quizCheck = page.getByTestId('quiz-check')
+    this.quizCorrectOrder = page.getByTestId('quiz-correct-order')
+    this.lessonReviewNext = page.getByTestId('lesson-review-next')
+    this.lessonCardPrompt = page.getByTestId('lesson-card-prompt')
 
     this.scenarioNode = page.getByTestId('scenario-node')
     this.scenarioOption = page.getByTestId('scenario-option')
@@ -396,11 +411,18 @@ export class CurriculumMapPage {
    * closed) and recovers immediately, while a player that IS still up is tracked
    * until it detaches (the level-close swap) exactly as before.
    */
-  async absorbCompletionScreen(timeout = 45_000): Promise<void> {
-    const handle = await this.stepPlayer
-      .first()
-      .elementHandle({ timeout: 2_000 })
-      .catch(() => null)
+  async absorbCompletionScreen(timeout = 45_000, { awaitUnmount = true } = {}): Promise<void> {
+    // `awaitUnmount: false` for a caller that has ALREADY waited for the old
+    // player to go. Otherwise this grabs whatever is mounted NOW — which by then
+    // is the NEXT step's player — and waits the full timeout for it to
+    // disconnect, swallowing the failure. That silent 45s is what made a
+    // three-player test take 98s instead of 5s.
+    const handle = awaitUnmount
+      ? await this.stepPlayer
+          .first()
+          .elementHandle({ timeout: 2_000 })
+          .catch(() => null)
+      : null
     if (handle) {
       await this.page
         .waitForFunction((el) => !(el as Element).isConnected, handle, { timeout })
@@ -510,25 +532,81 @@ export class CurriculumMapPage {
   async playLessonDeck({ absorbCompletion = true }: { absorbCompletion?: boolean } = {}): Promise<number> {
     await this.lessonCard.waitFor({ state: 'visible', timeout: 45_000 })
     let interactiveTapped = 0
+    // Phase 31 — walking a deck to its END now means clearing its review queue
+    // too: a missed tap-card is replayed before the lesson can be marked read, so
+    // "any answer proceeds" is no longer true. The right option is LEARNED from
+    // the first reveal (`data-state="correct"`), keyed by the card's prompt,
+    // because the authored key never reaches the DOM before an attempt.
+    const learned = new Map<string, number>()
+
+    const answerCurrentCard = async (): Promise<void> => {
+      const prompt = (await this.lessonCardPrompt.innerText()).trim()
+      const known = learned.get(prompt)
+      await this.lessonOption.nth(known ?? 0).click()
+      interactiveTapped++
+      if (known === undefined) {
+        // The reveal is what teaches the helper the key — WAIT for it. Reading
+        // `data-state` straight after the click can catch the pre-render DOM,
+        // learn nothing, and re-tap the same wrong option every round.
+        await this.lessonCardFeedback.waitFor({ state: 'visible', timeout: 45_000 })
+        const states = await this.lessonOption.evaluateAll((els) =>
+          els.map((el) => (el as HTMLElement).dataset.state ?? 'idle')
+        )
+        const correct = states.indexOf('correct')
+        if (correct >= 0) learned.set(prompt, correct)
+      }
+    }
+
     // The cap is a safety net against a stuck deck (a real deck is a handful of
-    // cards). Exactly one of lesson-next / lesson-done is rendered per card.
-    for (let i = 0; i < 30; i++) {
-      const onLast = (await this.lessonDone.count()) > 0
-      const advance = onLast ? this.lessonDone : this.lessonNext
+    // cards, plus at most a round or two of replay).
+    for (let i = 0; i < 40; i++) {
+      const reviewing = (await this.lessonReviewNext.count()) > 0
+      const onLast = !reviewing && (await this.lessonDone.count()) > 0
+      const advance = reviewing ? this.lessonReviewNext : onLast ? this.lessonDone : this.lessonNext
       await advance.waitFor({ state: 'visible', timeout: 45_000 })
-      // A disabled advance control at deck-walk time means an unanswered
-      // interactive card — tap an option to unlock it (any answer proceeds).
+      // A disabled advance control means EITHER an unanswered interactive card or
+      // a save in flight (`disabled={submitting || needsAnswer}`). Only the first
+      // wants a tap — clicking into the second lands on an already-answered,
+      // disabled option and hangs until the test times out.
       if (await advance.isDisabled()) {
-        await this.lessonOption.first().click()
-        interactiveTapped++
+        const waitingOnAnswer =
+          (await this.lessonOption.count()) > 0 && (await this.lessonOption.first().isEnabled())
+        if (waitingOnAnswer) {
+          await answerCurrentCard()
+        } else {
+          await expect
+            .poll(async () => (await this.lessonCard.count()) === 0, { timeout: 45_000 })
+            .toBe(true)
+          if (absorbCompletion) await this.absorbCompletionScreen(45_000, { awaitUnmount: false })
+          return interactiveTapped
+        }
       }
       await advance.click()
-      if (onLast) {
-        if (absorbCompletion) await this.absorbCompletionScreen()
+      // Done either completes the lesson or OPENS the review round; the review
+      // control either moves to the next queued card or completes. Which one is
+      // decided by WAITING for whichever lands — never by a fixed sleep, which is
+      // a guess between two outcomes and loses that bet on a slow WebKit run.
+      if (onLast || reviewing) {
+        // Wait for something that actually DISCRIMINATES. `step-player` is mounted
+        // in every outcome, so waiting on it resolves instantly and decides nothing
+        // — the deck either keeps the review round open, or the deck itself is
+        // gone (completion screen, or the host advanced to the next step).
+        await expect
+          .poll(
+            async () =>
+              (await this.lessonReviewNext.count()) > 0 || (await this.lessonCard.count()) === 0,
+            { timeout: 45_000 }
+          )
+          .toBe(true)
+        if ((await this.lessonReviewNext.count()) > 0) continue
+        // The poll above already waited out the unmount — see the note there.
+        if (absorbCompletion) await this.absorbCompletionScreen(45_000, { awaitUnmount: false })
         return interactiveTapped
       }
     }
-    return interactiveTapped
+    // Falling out of the loop means the deck never ended. Returning quietly would
+    // let the caller's next assertion blame the wrong thing.
+    throw new Error(`playLessonDeck: deck did not finish within 40 steps (tapped ${interactiveTapped})`)
   }
 
   /**
@@ -545,7 +623,18 @@ export class CurriculumMapPage {
     await this.quizQuestion.waitFor({ state: 'visible', timeout: 45_000 })
     for (let i = 0; i < correctIndices.length; i++) {
       await this.quizOption.nth(correctIndices[i]).click()
-      if (i < correctIndices.length - 1) {
+      // Phase 31 — a PRACTICE quiz checks ON the tap and then shows ONE control
+      // that steps on, replays or submits; an assessment quiz still carries the
+      // Next / Submit pair. Wait for whichever this quiz renders: in practice
+      // nothing is on screen until the check comes back.
+      await this.quizAdvance
+        .or(this.quizSubmit)
+        .or(this.quizNext)
+        .first()
+        .waitFor({ state: 'visible', timeout: 45_000 })
+      if ((await this.quizAdvance.count()) > 0) {
+        await this.quizAdvance.click()
+      } else if (i < correctIndices.length - 1) {
         await this.quizNext.click()
       } else {
         await this.quizSubmit.click()

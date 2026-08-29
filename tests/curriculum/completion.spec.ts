@@ -128,16 +128,19 @@ test.describe('Curriculum — completion + reward screen', () => {
     await map.openCurrentNode('smart-spending')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz')
 
-    // Submit a WRONG answer → the fail review renders the supportive the player.
+    // Phase 31: the miss is checked ON THE TAP, so the supportive line lands
+    // immediately — there is no batch submit to wait for.
     const wrong = QUIZ_ANSWER_INDEX === 0 ? 1 : 0
     await map.quizOption.nth(wrong).click()
-    await map.quizSubmit.click()
-    await expect(map.quizResult.first()).toBeVisible({ timeout: 45_000 })
+    await expect(map.quizOption.nth(wrong)).toHaveAttribute('data-state', 'incorrect', {
+      timeout: 45_000,
+    })
     await expect(map.playerReaction).toHaveText(SUPPORTS)
 
-    // The support copy is never shaming, and NEVER celebrating either (I1 — the
-    // `quiz_fail` pool must be disjoint from CELEBRATES; mirrors the lesson-wrong
-    // guard). A quiz fail that read as a celebration would be dishonest.
+    // The support copy is never shaming, and NEVER celebrating either — a miss
+    // that read as a celebration would be dishonest. (Since Phase 31 a practice
+    // miss draws from `lesson_wrong`, the same pool a missed tap-card uses; both
+    // are inside SUPPORTS, which is exactly the point of one card language.)
     const reaction = (await map.playerReaction.innerText()).trim()
     expect(reaction.length).toBeGreaterThan(0)
     expect(reaction).not.toMatch(SHAME_PATTERN)
@@ -195,19 +198,17 @@ test.describe('Curriculum — completion + reward screen', () => {
     await map.openCurrentNode('start-here')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz')
 
-    // Record Q1's option order + select one, then navigate Next → Back. The order
-    // and the selection must be byte-identical (QuizPlayer renders questions
-    // verbatim and stores answers by index — no reshuffle; the stub-item guard).
+    // Record Q1's option order, answer it, and read the order back once the
+    // verdict has painted. It must be byte-identical: QuizPlayer renders questions
+    // verbatim and keys answers by index — no reshuffle (the stub-item guard).
+    // Phase 31 note: the check happens ON the tap and there is no Back to travel
+    // with any more, so the round trip is now "before the tap → after the verdict".
     const q1Before = await map.quizOption.allInnerTexts()
     expect(q1Before.length).toBeGreaterThan(1)
     const chosen = 1
     await map.quizOption.nth(chosen).click()
     await expect(map.quizOption.nth(chosen)).toHaveAttribute('aria-checked', 'true')
-
-    await map.quizNext.click() // → Q2
-    await expect(map.quizQuestion).toBeVisible()
-    await map.quizBack.click() // ← Q1
-    await expect(map.quizQuestion).toBeVisible()
+    await expect(map.quizAdvance).toBeVisible({ timeout: 45_000 })
 
     const q1After = await map.quizOption.allInnerTexts()
     expect(q1After).toEqual(q1Before)

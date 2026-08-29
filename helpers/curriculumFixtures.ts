@@ -43,6 +43,17 @@ export const INTERACTIVE_LESSON_SLUG = 'qa-fixture-lesson-v2'
 /** Phase 26 — a 🧮 Sandbox (labeled-hypothetical calculator) + a 🎭 Scenario. */
 export const SANDBOX_SLUG = 'qa-fixture-sandbox'
 export const SCENARIO_SLUG = 'qa-fixture-scenario'
+/**
+ * Phase 31 — the practice loop needs TWO questions to prove that only the MISSED
+ * one is replayed, and a separate `assessment` quiz to prove the boss keeps batch
+ * grading. New slugs, deliberately: `seed/step/` is create-only, so re-shaping an
+ * existing fixture in place would silently keep the old content on any DB that
+ * already has it.
+ */
+export const PRACTICE_QUIZ_SLUG = 'qa-fixture-practice-quiz'
+export const BOSS_QUIZ_SLUG = 'qa-fixture-boss-quiz'
+/** An `order` question — arranged, then committed with its own Check. */
+export const ORDER_QUIZ_SLUG = 'qa-fixture-order-quiz'
 
 /** XP awarded on completion of each fixture (drives the "xp-total increments" checks). */
 export const LESSON_XP = 15
@@ -148,6 +159,33 @@ export const QUIZ_OPTIONS = [
  */
 export const QUIZ_FEEDBACK = 'A fixed bill lands on the same date every month, whether you think about it or not.'
 
+/**
+ * The two-question practice fixture. Q0's answer is index 1, Q1's is index 0 —
+ * DIFFERENT indices on purpose, so a spec that always taps the same slot cannot
+ * accidentally pass both.
+ */
+export const PRACTICE_Q0_ANSWER: number = 1
+export const PRACTICE_Q1_ANSWER: number = 0
+export const PRACTICE_Q0_PROMPT = 'Which of these is a fixed monthly bill?'
+export const PRACTICE_Q1_PROMPT = 'Money you can name is money you can…'
+export const PRACTICE_Q0_FEEDBACK =
+  'A fixed bill lands on the same date every month, whether you think about it or not.'
+export const PRACTICE_QUIZ_XP = 15
+
+/** The assessment fixture's single question — graded all-or-nothing. */
+export const BOSS_ANSWER_INDEX: number = 1
+export const BOSS_QUIZ_XP = 15
+
+/**
+ * The `order` fixture. Presented as [Rent, Coffee, Gift]; the authored answer is
+ * [1, 2, 0] — deliberately NOT the identity permutation, so pressing Check
+ * without touching anything is a MISS and the reveal is observable.
+ */
+export const ORDER_OPTIONS = ['Your monthly rent', 'A spontaneous coffee', 'A one-off birthday gift']
+export const ORDER_ANSWER: number[] = [1, 2, 0]
+export const ORDER_FEEDBACK = 'Sort by how often it repeats: daily, then one-off, then monthly.'
+export const ORDER_QUIZ_XP = 15
+
 export interface SeededFixtures {
   lesson: SeedStepResult
   quiz: SeedStepResult
@@ -158,6 +196,12 @@ export interface SeededFixtures {
   sandbox: SeedStepResult
   /** Phase 26 — a 🎭 branching Scenario (formative per-node feedback). */
   scenario: SeedStepResult
+  /** Phase 31 — a two-question PRACTICE quiz (immediate check + review round). */
+  practiceQuiz: SeedStepResult
+  /** Phase 31 — an `assessment` quiz: batch submit, and `check/` refuses it. */
+  bossQuiz: SeedStepResult
+  /** Phase 31 — an `order` question: arrange, Check, and a sequence reveal on a miss. */
+  orderQuiz: SeedStepResult
 }
 
 /**
@@ -280,7 +324,83 @@ export async function seedPlayerFixtures(api: ApiHelper): Promise<SeededFixtures
     content: { intro: SCENARIO_CONTENT.intro, nodes: SCENARIO_CONTENT.nodes.map((n) => ({ ...n })) },
   })
 
-  return { lesson, quiz, mission, interactive, sandbox, scenario }
+  // Phase 31 — the practice loop. TWO questions with DIFFERENT answer indices, so
+  // "only the missed one comes back" is actually observable.
+  const practiceQuiz = await api.seedStep({
+    topic_slug: FIXTURE_TOPIC,
+    level_slug: FIXTURE_LEVEL,
+    slug: PRACTICE_QUIZ_SLUG,
+    kind: 'quiz',
+    title: 'QA fixture practice quiz',
+    order: 57,
+    xp: PRACTICE_QUIZ_XP,
+    content: {
+      questions: [
+        {
+          prompt: PRACTICE_Q0_PROMPT,
+          type: 'mcq',
+          options: ['A spontaneous coffee', 'Your monthly rent', 'A one-off birthday gift'],
+          answer: PRACTICE_Q0_ANSWER,
+          feedback: PRACTICE_Q0_FEEDBACK,
+        },
+        {
+          prompt: PRACTICE_Q1_PROMPT,
+          type: 'mcq',
+          options: ['Steer', 'Forget', 'Hide'],
+          answer: PRACTICE_Q1_ANSWER,
+        },
+      ],
+    },
+  })
+
+  // Phase 31 — the ONE mechanic that did NOT change: an assessment quiz is graded
+  // as a single attempt and `check/` refuses it.
+  const bossQuiz = await api.seedStep({
+    topic_slug: FIXTURE_TOPIC,
+    level_slug: FIXTURE_LEVEL,
+    slug: BOSS_QUIZ_SLUG,
+    kind: 'quiz',
+    title: 'QA fixture boss quiz',
+    order: 58,
+    xp: BOSS_QUIZ_XP,
+    content: {
+      mode: 'assessment',
+      questions: [
+        {
+          prompt: 'Which of these is a fixed monthly bill?',
+          type: 'mcq',
+          options: ['A spontaneous coffee', 'Your monthly rent', 'A one-off birthday gift'],
+          answer: BOSS_ANSWER_INDEX,
+          feedback: PRACTICE_Q0_FEEDBACK,
+        },
+      ],
+    },
+  })
+
+  // Phase 31 — the `order` type has its own commit path (arrange, then Check) and
+  // its own reveal (a sequence, because there is no single option to mark).
+  const orderQuiz = await api.seedStep({
+    topic_slug: FIXTURE_TOPIC,
+    level_slug: FIXTURE_LEVEL,
+    slug: ORDER_QUIZ_SLUG,
+    kind: 'quiz',
+    title: 'QA fixture order quiz',
+    order: 59,
+    xp: ORDER_QUIZ_XP,
+    content: {
+      questions: [
+        {
+          prompt: 'Put these in order of how often they repeat.',
+          type: 'order',
+          options: ORDER_OPTIONS,
+          answer: ORDER_ANSWER,
+          feedback: ORDER_FEEDBACK,
+        },
+      ],
+    },
+  })
+
+  return { lesson, quiz, mission, interactive, sandbox, scenario, practiceQuiz, bossQuiz, orderQuiz }
 }
 
 /**

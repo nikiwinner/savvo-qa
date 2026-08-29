@@ -169,9 +169,13 @@ test.describe('Curriculum — lesson player (interactive cards, Phase 24)', () =
     await expect(map.missionFailNote).toHaveCount(0)
     await expect(map.lessonNext).toBeEnabled()
 
-    // The deck advances + completes despite the wrong tap (mark-read, no fail).
+    // Still no fail state — but since Phase 31 the miss is not left behind either:
+    // Done opens the review round, and the deck completes only once it is cleared.
     await map.lessonNext.click()
     await map.lessonDone.click()
+    await expect(map.lessonReviewNext).toBeVisible({ timeout: 45_000 })
+    await map.lessonOption.nth(INTERACTIVE_CORRECT_OPTION).click()
+    await map.lessonReviewNext.click()
     await map.absorbCompletionScreen()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
   })
@@ -225,6 +229,69 @@ test.describe('Curriculum — lesson player (interactive cards, Phase 24)', () =
     // Level completes → host closes and the real lesson XP lands (unchanged).
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBe(xpBefore + LESSON_XP)
+  })
+})
+
+test.describe('Curriculum — lesson deck review round (Phase 31)', () => {
+  test('a missed tap-card is replayed before the lesson can be marked read', async ({
+    page,
+    loggedInPage,
+  }) => {
+    test.slow()
+    const { api } = loggedInPage
+    const { interactive } = await seedPlayerFixtures(api)
+    await makeFixtureLevelPlayable(api, interactive.step_id)
+
+    const map = new CurriculumMapPage(page)
+    await map.goto(45_000)
+    const xpBefore = await map.xpValue()
+
+    await map.expandIslandFor('smart-spending')
+    await map.nodesInTopic('smart-spending', 'current').first().click()
+    await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson', { timeout: 45_000 })
+
+    // Walk to the tap card and MISS it. The verdict is client-side and instant —
+    // the card names the right option and explains it, exactly as before.
+    // Bounded, and each step WAITS for the next card: `count()` does not auto-wait,
+    // so an unbounded loop reading a pre-render DOM walks straight past the card.
+    for (let i = 0; i < 10 && (await map.lessonOption.count()) === 0; i++) {
+      await map.lessonNext.click()
+      await expect(map.lessonOption.or(map.lessonNext).or(map.lessonDone).first()).toBeVisible({
+        timeout: 45_000,
+      })
+    }
+    await expect(map.lessonOption.first()).toBeVisible({ timeout: 45_000 })
+    await map.lessonOption.nth(INTERACTIVE_WRONG_OPTION).click()
+    await expect(map.lessonCardFeedback).toBeVisible({ timeout: 45_000 })
+
+    // Reach the end of the deck and press Done — which opens the REVIEW ROUND
+    // instead of completing, because the queue is not empty.
+    for (let i = 0; i < 10 && (await map.lessonNext.count()) > 0; i++) {
+      await map.lessonNext.click()
+      await expect(map.lessonNext.or(map.lessonDone).first()).toBeVisible({ timeout: 45_000 })
+    }
+    await expect(map.lessonDone).toBeVisible({ timeout: 45_000 })
+    await map.lessonDone.click()
+
+    await expect(map.lessonReviewNext).toBeVisible({ timeout: 45_000 })
+    // The missed card is back, BLANK, and the deck's own navigation is gone —
+    // the queue is walking it now, not the reader.
+    await expect(map.lessonCardFeedback).toHaveCount(0)
+    await expect(map.lessonReviewNext).toBeDisabled()
+    await expect(map.stepPlayerHost).toBeVisible()
+    await expect(map.stepCompletion).toHaveCount(0)
+    expect(await map.xpValue()).toBe(xpBefore)
+
+    // Answer it correctly → the queue empties → the lesson is marked read.
+    await map.lessonOption.nth(INTERACTIVE_CORRECT_OPTION).click()
+    await expect(map.lessonReviewNext).toBeEnabled()
+    await map.lessonReviewNext.click()
+
+    await map.absorbCompletionScreen()
+    await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
+    await expect
+      .poll(async () => map.xpValue(), { timeout: 45_000 })
+      .toBe(xpBefore + INTERACTIVE_LESSON_XP)
   })
 })
 
