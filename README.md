@@ -113,7 +113,6 @@ Causes that bite repeatedly:
 | Symptom | Cause and fix |
 |---|---|
 | `Timeout` on a locator that visibly exists | Add `.waitFor({ state: 'visible' })` before the assertion |
-| A `confirm()` dialog is never handled | `page.once('dialog', d => d.accept())` must come BEFORE the click that triggers it |
 | Inline edit form not found after clicking Edit | The card locator loses its context on the DOM swap — re-query by the hidden `input[name="id"]` |
 | `APIResponse.json()` throws | Check `res.ok()` first and throw with the body; only then call `.json()` |
 | Cookie not set in the browser | Domain mismatch — cookies need `domain: 'localhost'` with no port |
