@@ -21,6 +21,15 @@
  * 3. LAYOUT CHOICE. Phones AND tablets get the compact layout whatever their
  *    pixel count — the condition is `pointer: coarse`, not a width. On an iPad
  *    (834px portrait, 1194px landscape) the width alone would say "desktop".
+ * 4. THE FOCUSED CHAPTER'S HEIGHT. Zoomed into one chapter the frame is a
+ *    viewport with its own scroller, and it used to sit on its 420px floor at
+ *    every screen size — a porthole on a 1059px monitor, the path cut off at
+ *    its bottom edge with the rest of the screen unused. Nothing was lost (the
+ *    scroller reaches its own end, so a "nothing is clipped" assertion here is
+ *    a tautology and is deliberately absent); what was wrong was the size of
+ *    the window onto the path. The height is measured from the viewport now, so
+ *    the guard reads the LIVE box: the frame takes exactly what the viewport
+ *    leaves it, and the page gains no scrollbar behind it.
  *
  * Every assertion is read from the LIVE box model, so it holds in all three
  * browser projects at their own viewports.
@@ -194,5 +203,120 @@ test.describe('Curriculum — world map geometry', () => {
       // Mouse-driven and wide enough: the rail keeps its own column beside the map.
       expect(w.rail!.left, 'desktop keeps the rail beside the map').toBeGreaterThanOrEqual(w.frame.right)
     }
+  })
+})
+
+test.describe('Curriculum — the focused chapter fills the viewport', () => {
+  interface FocusGeometry {
+    compact: boolean
+    vh: number
+    top: number
+    bottom: number
+    height: number
+    pageScrolls: boolean
+  }
+
+  async function readFocusOnce(page: import('@playwright/test').Page): Promise<FocusGeometry> {
+    return page.evaluate(() => {
+      const frame = document.querySelector('.map-frame')
+      if (!frame) throw new Error('the focused chapter is not rendered')
+      const r = frame.getBoundingClientRect()
+      return {
+        // Byte-identical to the component's own capability test (its `COMPACT_MQ`
+        // and its @media block). That layout stacks the rail ON TOP of the map and
+        // keeps `height: 82vh` instead of the measured height, so it is asserted
+        // separately rather than skipped — every mobile-safari and tablet run
+        // lands here whatever the width, per CLAUDE.md gotcha 48, point d.
+        compact: window.matchMedia('(max-width: 768px), (pointer: coarse)').matches,
+        vh: window.innerHeight,
+        top: r.top,
+        bottom: r.bottom,
+        height: r.height,
+        pageScrolls: document.documentElement.scrollHeight > window.innerHeight + 1,
+      }
+    })
+  }
+
+  /**
+   * Two identical reads in a row — the same settle `readWorld` uses above, for the
+   * same reason and one more: the frame's height comes from JS now (resize event →
+   * measurement → Svelte flush), so a box read taken the instant a viewport change
+   * lands can still carry the previous viewport's number. `focus-back` being
+   * visible proves nothing about it — the button is up a tick before the height is.
+   */
+  async function readFocus(page: import('@playwright/test').Page): Promise<FocusGeometry> {
+    let previous = JSON.stringify(await readFocusOnce(page))
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await page.waitForTimeout(100)
+      const next = await readFocusOnce(page)
+      const serialised = JSON.stringify(next)
+      if (serialised === previous) return next
+      previous = serialised
+    }
+    throw new Error('the focused frame never settled')
+  }
+
+  test('the frame takes exactly the height the viewport leaves it', async ({
+    page,
+    loggedInPage: _,
+  }) => {
+    test.slow()
+    const map = new CurriculumMapPage(page)
+    await map.goto()
+    await expect(map.chapterCard).toBeVisible()
+    await map.islandToggle.first().click()
+    await expect(map.focusBack).toBeVisible()
+
+    // The project's own viewport, then a tall window: on a 1280x720 chromium the
+    // bug cost 244px, but the tall step is where it cost the most and where the
+    // absolute floor check below has real headroom.
+    for (const vp of [null, { width: 1440, height: 1000 }] as const) {
+      if (vp) await page.setViewportSize(vp)
+      const f = await readFocus(page)
+      const label = vp ? `${vp.width}x${vp.height}` : 'project viewport'
+
+      if (f.compact) {
+        // 82vh, with the page free to scroll past it. The 420px floor still
+        // applies underneath, so this holds only while a compact viewport is
+        // taller than ~512px — iPhone 13 is 664, iPad Pro 11 is 1194.
+        expect(Math.abs(f.height - f.vh * 0.82), `${label}: compact keeps 82vh`).toBeLessThanOrEqual(2)
+        continue
+      }
+
+      // THE contract, and the assertion that fails on the bug: the frame is the
+      // viewport minus its own top gap, counted twice so the gap below matches.
+      // Pre-fix this was a flat 420 at every viewport.
+      expect(
+        Math.abs(f.height - (f.vh - f.top * 2)),
+        `${label}: frame height == viewport − 2× the gap above it`,
+      ).toBeLessThanOrEqual(1)
+      expect(f.bottom, `${label}: bottom edge inside the viewport`).toBeLessThanOrEqual(f.vh)
+      // Equality by construction: 28px padding + frame + 28px padding == 100vh.
+      // Anything added below the frame breaks this before it breaks anything the
+      // eye can see — do not "widen" the tolerance, fix the layout.
+      expect(f.pageScrolls, `${label}: no page scrollbar behind a fitted frame`).toBe(false)
+      if (vp) expect(f.height, `${label}: well clear of the 420px floor`).toBeGreaterThan(600)
+    }
+  })
+
+  test('a viewport shorter than the floor scrolls the page instead of letterboxing', async ({
+    page,
+    loggedInPage: _,
+  }) => {
+    test.slow()
+    const map = new CurriculumMapPage(page)
+    await map.goto()
+    await expect(map.chapterCard).toBeVisible()
+    await map.islandToggle.first().click()
+    await expect(map.focusBack).toBeVisible()
+
+    await page.setViewportSize({ width: 1280, height: 420 })
+    const f = await readFocus(page)
+
+    // Below the floor the frame stops shrinking — the path keeps a usable height
+    // and the PAGE takes the overflow. On a compact project the same 420 comes
+    // from the floor beating 82vh (=344), which is why the assertion is shared.
+    expect(f.height, 'the 420px floor holds').toBeGreaterThanOrEqual(419)
+    if (!f.compact) expect(f.pageScrolls, 'the page scrolls instead').toBe(true)
   })
 })
