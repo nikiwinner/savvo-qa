@@ -9,13 +9,25 @@
  *
  * Why that level is safe:
  *   - It is ALREADY step-bearing (carries seeded missions), so adding steps does
- *     NOT change `smart-spending`'s `levels_total_playable` — the topic-crest
- *     assertion in `progress.spec` ("1 / 4") is unaffected.
+ *     not add a NODE to the map.
  *   - No spec asserts it COMPLETED. `progress.spec`'s streak test does
  *     `seedLevelState(name-what-you-buy)` (completes ALL its steps, incl. these
  *     fixtures) and only reads date-based streak — immune to an extra step.
  *   - Its ONLY prerequisite level is `catch-every-spend`, which carries NO
  *     fixture, so unlocking it is race-free.
+ *
+ * What Phase 32 changed about that choice, and it is load-bearing: eight of the
+ * nine fixtures are NON-mission, so in the QA database `smart-spending` is a
+ * ROAD topic, while in the authored content it is mission-only. Two consequences
+ * a spec author must know:
+ *   - `smart-spending` GATES here (its required fixture steps must be done
+ *     before `budgeting → saving` opens) where in production it passes learners
+ *     through. That is why the fresh-user "locked" assertions on `saving` /
+ *     `interest` still hold in the suite. Do not move these fixtures onto
+ *     another topic without re-reading every such assertion.
+ *   - its topic fraction counts ROAD levels only, so it reads out of 1 (this
+ *     level), not out of 4. A mission-only level such as `catch-every-spend` is
+ *     a side quest and is not part of the fraction.
  *
  * Determinism across the parallel player specs: EVERY spec seeds ALL FOUR
  * fixtures (idempotent on `(level, slug)`) before making the level playable, then

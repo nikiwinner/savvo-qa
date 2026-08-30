@@ -112,7 +112,7 @@ test.describe('Curriculum — Interest topic', () => {
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'quiz')
     await map.answerMcqQuiz(I_BOSS_ANSWERS)
 
-    // The checkpoint crest reveal fires; the real crest count rose by exactly one.
+    // The topic crest reveal fires; the real crest count rose by exactly one.
     await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
     const crestAfter = (await api.getCurriculumMap()).bars.knowledge.crest_count
     expect(crestAfter).toBe(crestBefore + 1)

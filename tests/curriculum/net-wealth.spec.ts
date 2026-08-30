@@ -14,8 +14,11 @@
  *
  * Two blocks:
  *   • APPLIED HAPPY PATH — L1 lesson→quiz award XP; the L2 log-accounts mission
- *     PASSes for the cash-only user (1/1 known) with snapshot + XP; the capstone
- *     PASSes → the Save & Grow section crest + Bar #1 crest count rises; Bar #2
+ *     PASSes for the cash-only user (1/1 known) with snapshot + XP; the L6
+ *     capstone holds NOTHING but a mission, so since Phase 32 it is a side
+ *     quest — `optional`, never `current`, opened BY SLUG — and it PASSes for
+ *     real XP while the topic crest, already earned by the required lessons and
+ *     quizzes, stays exactly where it was; Bar #2
  *     (`data-bar-doing="live"`) shows the derived (FX-folded) cash figure +
  *     "Score coming soon", tappable to the per-account breakdown listing the
  *     real cash account.
@@ -34,6 +37,7 @@
  */
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
+import { topicOf } from '../../helpers/unlockFixtures'
 import {
   unlockNetWealth,
   completeNetWealthLevels,
@@ -41,6 +45,7 @@ import {
   seedCashIncome,
   netWealthLevel,
   netWealthStepId,
+  NET_WEALTH_TOPIC,
   L1_QUIZ_ANSWERS,
   L1_WHAT_NET_WEALTH,
   L2_FIND_EVERY_ACCOUNT,
@@ -147,11 +152,16 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
   })
 
-  test('the capstone reveals the Save & Grow section crest', async ({ page, loggedInPage }) => {
+  test('the capstone mission pays XP and completes, and the crest it never gated stays put', async ({
+    page,
+    loggedInPage,
+  }) => {
     test.slow()
     const { api } = loggedInPage
     await unlockNetWealth(api)
-    // Everything up to the capstone done; the L6 checkpoint is the current node.
+    // Every level up to the capstone done. L6 holds NOTHING but its mission, so
+    // since Phase 32 it is a side quest — `optional`, never `current` — and the
+    // topic already crested on its required lessons and quizzes alone.
     await completeNetWealthLevels(
       api,
       L1_WHAT_NET_WEALTH,
@@ -165,29 +175,46 @@ test.describe('Curriculum — Net wealth topic (applied happy path)', () => {
     // capstone celebrates is a real row sum, not an empty 0.00.
     await seedCashIncome(api, '2750.00')
 
-    const crestBefore = (await api.getCurriculumMap()).bars.knowledge.crest_count
+    // The crest is ALREADY earned before a single mission is played — the open
+    // capstone does not hold the topic back.
+    const before = await api.getCurriculumMap()
+    expect(topicOf(before, NET_WEALTH_TOPIC).status).toBe('completed')
+    const crestBefore = before.bars.knowledge.crest_count
+    expect(crestBefore).toBeGreaterThan(0)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    await map.expandIslandFor(NET_WEALTH_TOPIC)
+    // On screen: the earned crest sits on the TOPIC HEAD, Bar #1 already counts
+    // it, and the capstone node is the `optional` side quest.
+    await expect(map.topic(NET_WEALTH_TOPIC).getByTestId('topic-crest-badge')).toBeVisible()
+    expect(await map.crestCountValue()).toBe(crestBefore)
+    expect(await map.levelNodeStatus(NET_WEALTH_TOPIC, L6_COMPLETE)).toBe('optional')
 
-    // The capstone (L6 checkpoint) is the current node → verify → PASS.
-    await map.openCurrentNode('net-wealth')
+    const xpBefore = await map.xpValue()
+    expect(xpBefore).toBe(0)
+
+    // Open the capstone BY SLUG (a `current`-node lookup would find nothing here)
+    // → verify → PASS.
+    await map.openLevelNode(NET_WEALTH_TOPIC, L6_COMPLETE)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await map.missionVerify.click()
     await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
     await expect(map.snapshotFigure.first()).toContainText('1/1')
     await map.missionContinue.click()
 
-    // The checkpoint crest reveal fires; the real crest count rose by exactly one.
-    await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
-    const crestAfter = (await api.getCurriculumMap()).bars.knowledge.crest_count
-    expect(crestAfter).toBe(crestBefore + 1)
-    // …and the on-screen Bar #1 chip shows the SAME real number (live refresh).
-    await expect.poll(() => map.crestCountValue(), { timeout: 15_000 }).toBe(crestAfter)
-
-    // API parity — the capstone level reads completed.
+    // The voluntary capstone still pays real XP and still writes its completion —
+    // the side-quest level flips to `completed` once its mission is done.
+    await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
     const payload = await api.getCurriculumMap()
+    expect(payload.bars.knowledge.xp_total).toBeGreaterThan(0)
     expect(netWealthLevel(payload, L6_COMPLETE).status).toBe('completed')
+
+    // …but it changes NO crest: the topic was already complete, so nothing is
+    // newly revealed and Bar #1 holds the same real number it held before.
+    expect(payload.bars.knowledge.crest_count).toBe(crestBefore)
+    await expect(map.crestReveal).toHaveCount(0)
+    expect(await map.crestCountValue()).toBe(crestBefore)
   })
 
   test('Bar #2 shows the real Net Wealth figure once cash income is recorded', async ({ page, loggedInPage }) => {
@@ -269,7 +296,9 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     const { api } = loggedInPage
     await unlockNetWealth(api)
     await completeNetWealthLevels(api, L1_WHAT_NET_WEALTH, L2_FIND_EVERY_ACCOUNT, L3_ASSET_VS_LIABILITY)
-    // Pre-complete the L4 lesson so the `see-your-net-wealth` mission is active.
+    // Pre-complete the L4 lesson — its ONLY required step — so `build-your-number`
+    // already reads `completed` with both of its missions still open and the
+    // `see-your-net-wealth` one first in line.
     await precompleteNetWealthStep(api, L4_BUILD_YOUR_NUMBER, YOUR_REAL_TOTAL_LESSON)
     // The honest FAIL needs an unknown REAL bank balance (cash is always known).
     await api.seedBankAccount({
@@ -282,7 +311,11 @@ test.describe('Curriculum — Net wealth topic (data-less honesty)', () => {
     await map.goto(45_000)
 
     // Second unknown-balance mission (L4 `see-your-net-wealth`) → honest FAIL, zero XP.
-    await map.openCurrentNode('net-wealth')
+    // An open mission no longer holds its level, so L4 is `completed` and never
+    // `current` — open it BY SLUG and the host still mounts the first incomplete
+    // step, which is the mission.
+    expect(await map.levelNodeStatus(NET_WEALTH_TOPIC, L4_BUILD_YOUR_NUMBER)).toBe('completed')
+    await map.openLevelNode(NET_WEALTH_TOPIC, L4_BUILD_YOUR_NUMBER)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.missionDeeplink).toBeVisible()
     await map.missionVerify.click()

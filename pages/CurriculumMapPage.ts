@@ -393,6 +393,33 @@ export class CurriculumMapPage {
   }
 
   /**
+   * Open ONE named level node and wait for the step player to mount.
+   *
+   * Phase 32 made `openCurrentNode` structurally too narrow: once missions stop
+   * gating, the level holding a mission is usually NOT the `current` one — it is
+   * a `completed` road level with an optional mission still inside, or an
+   * `optional` side-quest level that is never `current` by design. Both are
+   * reachable, so a spec that wants a specific level asks for it by slug.
+   */
+  async openLevelNode(topicSlug: string, levelSlug: string, timeout = 45_000): Promise<void> {
+    await this.expandIslandFor(topicSlug, timeout)
+    const node = this.topic(topicSlug).locator(
+      `[data-testid="map-level-node"][data-level-slug="${levelSlug}"]`,
+    )
+    await node.waitFor({ state: 'visible', timeout })
+    await node.click()
+    await this.stepPlayerHost.waitFor({ state: 'visible', timeout })
+    await this.stepPlayer.waitFor({ state: 'visible', timeout })
+  }
+
+  /** The derived `data-node-status` of ONE named level node. */
+  async levelNodeStatus(topicSlug: string, levelSlug: string): Promise<string | null> {
+    return this.topic(topicSlug)
+      .locator(`[data-testid="map-level-node"][data-level-slug="${levelSlug}"]`)
+      .getAttribute('data-node-status')
+  }
+
+  /**
    * Absorb the Phase-27 completion / reward screen after a terminal player action.
    *
    * The host settles into ONE of three states after a lesson / quiz / scenario /
@@ -679,9 +706,12 @@ export class CurriculumMapPage {
     await this.absorbCompletionScreen()
   }
 
-  /** The crest count integer shown inside Bar #1 (the `.figure.crest` readout). */
+  /**
+   * The crest count integer shown inside Bar #1. Phase 32: it counts
+   * knowledge-complete TOPICS, not completed checkpoint levels.
+   */
   async crestCountValue(): Promise<number> {
-    const text = (await this.barKnowledge.locator('.figure.crest').innerText()).trim()
+    const text = (await this.barKnowledge.getByTestId('crest-count').innerText()).trim()
     const match = text.match(/(\d+)/)
     return match ? Number(match[1]) : NaN
   }
@@ -744,6 +774,19 @@ export class CurriculumMapPage {
   /** All level nodes on the map carrying a given derived `data-node-status`. */
   nodesByStatus(status: string): Locator {
     return this.page.locator(`[data-testid="map-level-node"][data-node-status="${status}"]`)
+  }
+
+  /** ONE named level node, by topic + level slug (Phase 32 `data-level-slug`). */
+  levelNode(topicSlug: string, levelSlug: string): Locator {
+    return this.topic(topicSlug).locator(
+      `[data-testid="map-level-node"][data-level-slug="${levelSlug}"]`,
+    )
+  }
+
+  /** Side-quest nodes — every step in them is an optional real-world mission. */
+  sideQuestNodes(topicSlug?: string): Locator {
+    const sel = '[data-testid="map-level-node"][data-side-quest="true"]'
+    return topicSlug ? this.topic(topicSlug).locator(sel) : this.page.locator(sel)
   }
 
   /** The current-streak integer parsed out of the `map-streak` readout. */

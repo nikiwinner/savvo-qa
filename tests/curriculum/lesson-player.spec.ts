@@ -4,7 +4,9 @@
  * The step-player host is no longer empty: tapping a `current` node fetches the
  * leak-safe level manifest and mounts the registry player for the active step.
  * These specs drive the 📖 Lesson player end-to-end (deck → Done → completion),
- * the baseline crest reveal on a completed checkpoint, and the auth guard.
+ * the crest that the REQUIRED work earns — Phase 32: a mission gates nothing, so
+ * the earning-money crest is already on the topic head before its capstone mission
+ * is ever opened — and the auth guard.
  *
  * Pollution-safety (gotcha #26): lesson fixtures land in the already-step-bearing,
  * unlocked `smart-spending / name-what-you-buy` level (see
@@ -27,7 +29,8 @@ import {
   INTERACTIVE_WRONG_OPTION,
   INTERACTIVE_FEEDBACK,
 } from '../../helpers/curriculumFixtures'
-import { completeEarningMoneyLevels, seedIncomeRows, EM_PRE_CAPSTONE_LEVELS } from '../../helpers/earnFixtures'
+import { seedIncomeRows, EARNING_MONEY_TOPIC, EM_L5_INCOME_SHOWS_UP } from '../../helpers/earnFixtures'
+import { completeRequiredSteps, levelOf, topicOf } from '../../helpers/unlockFixtures'
 
 test.describe('Curriculum — lesson player', () => {
   test('a seeded lesson plays through its deck and completes', async ({ page, loggedInPage }) => {
@@ -72,44 +75,74 @@ test.describe('Curriculum — lesson player', () => {
     expect(payload.bars.knowledge.xp_total).toBe(LESSON_XP)
   })
 
-  test('completing a checkpoint level reveals its crest', async ({ page, loggedInPage }) => {
+  test('the crest is earned by the required work, and the capstone mission adds none', async ({
+    page,
+    loggedInPage,
+  }) => {
     test.slow()
     const { api } = loggedInPage
     await api.getCurriculumMap() // seed the tree
 
-    // Unlock the earning-money capstone `income-shows-up` (a ROW-VERIFIED CHECKPOINT
-    // since Phase 29) by completing the four step-bearing levels before it, and seed
-    // ≥2 income rows so the pure `income_rows_exist` capstone verifies PASS against
-    // real data.
-    await completeEarningMoneyLevels(api, EM_PRE_CAPSTONE_LEVELS)
+    // Phase 32: earning-money crests on its REQUIRED work — the lessons, quizzes,
+    // scenario and sandbox of L1–L4. Complete exactly those and NOT one mission,
+    // then seed ≥2 income rows so the L5 capstone's pure `income_rows_exist` check
+    // verifies PASS against real data when it is played later on.
+    const written = await completeRequiredSteps(api, EARNING_MONEY_TOPIC)
+    expect(written).toBeGreaterThan(0)
     await seedIncomeRows(api, 2)
 
-    // No crest earned yet (none of the four unlocked levels is a checkpoint).
+    // The crest is ALREADY earned, with every mission in the topic still open —
+    // the L5 capstone among them: a side quest that is never `current` and holds
+    // nothing back.
     const before = await api.getCurriculumMap()
-    expect(before.bars.knowledge.crest_count).toBe(0)
+    expect(topicOf(before, EARNING_MONEY_TOPIC).status).toBe('completed')
+    expect(before.bars.knowledge.crest_count).toBe(1)
+    const capstoneBefore = levelOf(before, EARNING_MONEY_TOPIC, EM_L5_INCOME_SHOWS_UP)
+    expect(capstoneBefore.status).toBe('optional')
+    expect(capstoneBefore.required_step_count).toBe(0)
+    expect(capstoneBefore.steps_completed).toBe(0)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    const xpBefore = await map.xpValue()
 
-    // The capstone is the sole `current` node in earning-money; it is a guided-v2
-    // row-verified mission (Verify terminal + snapshot), NOT self_attest — walk
-    // action → choice to the terminal, Verify PASSES against the rows, and Continue
-    // closes the host onto the revealed crest.
-    await map.expandIslandFor('earning-money')
-    await map.nodesInTopic('earning-money', 'current').first().click()
-    await expect(map.stepPlayerHost).toBeVisible()
-    await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
+    // The map says the same thing: the crest chip sits on the TOPIC HEAD (Phase 32
+    // moved it off the checkpoint node) and it is old news — the reveal fires only
+    // when a topic NEWLY completes, and this one crested before the page loaded.
+    await map.expandIslandFor(EARNING_MONEY_TOPIC)
+    await expect(map.topic(EARNING_MONEY_TOPIC)).toHaveAttribute('data-topic-status', 'completed')
+    await expect(map.topic(EARNING_MONEY_TOPIC).getByTestId('topic-crest-badge')).toBeVisible()
+    await expect(map.crestReveal).toHaveCount(0)
+    expect(await map.crestCountValue()).toBe(1)
+    await expect(map.levelNode(EARNING_MONEY_TOPIC, EM_L5_INCOME_SHOWS_UP)).toHaveAttribute(
+      'data-side-quest',
+      'true',
+    )
+
+    // Play the capstone anyway — it is a guided-v2 ROW-VERIFIED mission (Verify
+    // terminal + snapshot), NOT self_attest: walk the action screen, Verify PASSES
+    // against the seeded rows, and Continue closes the host.
+    await map.openLevelNode(EARNING_MONEY_TOPIC, EM_L5_INCOME_SHOWS_UP)
+    await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await map.walkMissionFlow()
     await map.missionVerify.click()
     await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
     await map.missionContinue.click()
+    await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
 
-    // Baseline crest reveal pops on the newly-completed checkpoint node …
-    await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
-
-    // … and the real crest count rose by exactly one.
+    // It wrote its completion and paid real XP …
+    await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
     const after = await api.getCurriculumMap()
-    expect(after.bars.knowledge.crest_count).toBe(1)
+    const capstoneAfter = levelOf(after, EARNING_MONEY_TOPIC, EM_L5_INCOME_SHOWS_UP)
+    expect(capstoneAfter.status).toBe('completed')
+    expect(capstoneAfter.steps_completed).toBe(capstoneAfter.step_count)
+    expect(after.bars.knowledge.xp_total).toBeGreaterThan(before.bars.knowledge.xp_total)
+
+    // … and it moved NO crest: the mission was never what earned it. The chip that
+    // was there before is still there, and still not a reveal.
+    expect(after.bars.knowledge.crest_count).toBe(before.bars.knowledge.crest_count)
+    expect(await map.crestCountValue()).toBe(1)
+    await expect(map.crestReveal).toHaveCount(0)
   })
 })
 

@@ -25,7 +25,12 @@ import type { Locator } from '@playwright/test'
 import { test, expect } from '../../fixtures/index'
 import { CurriculumMapPage } from '../../pages/CurriculumMapPage'
 import { seedPlayerFixtures, makeFixtureLevelPlayable } from '../../helpers/curriculumFixtures'
-import { completeEarningMoneyLevels, EM_PRE_CAPSTONE_LEVELS } from '../../helpers/earnFixtures'
+import {
+  completeEarningMoneyLevels,
+  EARNING_MONEY_TOPIC,
+  EM_L5_INCOME_SHOWS_UP,
+  EM_PRE_CAPSTONE_LEVELS,
+} from '../../helpers/earnFixtures'
 
 // Read a locator's boundingBox once it has SETTLED — two consecutive reads that
 // agree (to the rounded pixel) with a non-zero width. Under emulated reduced
@@ -113,11 +118,11 @@ test.describe('Curriculum — step-player host', () => {
     // that mounts the Lesson player (node A — a short 2-card deck).
     const { lesson } = await seedPlayerFixtures(api)
     await makeFixtureLevelPlayable(api, lesson.step_id)
-    // Seed-complete earning-money's L1–L4 so its `current` node is the L5
-    // `sketch-your-income-mix` capstone MISSION (a guided-v2 flow, not a lesson deck)
-    // — node B, a different step + kind from the deck (the frame-stability contrast;
-    // Phase 29 gave L1 a lesson, so the old lone-mission `earning-inventory` node no
-    // longer sits at the topic's fresh `current`).
+    // Seed-complete earning-money's L1–L4 so the L5 `sketch-your-income-mix`
+    // capstone MISSION (a guided-v2 flow, not a lesson deck) is reachable — node B,
+    // a different step + kind from the deck (the frame-stability contrast). L5 holds
+    // NOTHING but that mission, so since Phase 32 it is a side quest: it reads
+    // `optional`, never `current`, and is opened BY SLUG, not by status.
     await completeEarningMoneyLevels(api, EM_PRE_CAPSTONE_LEVELS)
 
     const map = new CurriculumMapPage(page)
@@ -166,10 +171,10 @@ test.describe('Curriculum — step-player host', () => {
     await map.stepHostClose.click()
     await expect(map.stepPlayerHost).toBeHidden()
 
-    await map.expandIslandFor('earning-money')
-    await map.nodesInTopic('earning-money', 'current').first().click()
-    await expect(map.stepPlayerHost).toBeVisible()
-    await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
+    // The mission-only L5 is an `optional` side quest — open it by SLUG (a status
+    // lookup would find no `current` node here) and prove it IS the playable one.
+    expect(await map.levelNodeStatus(EARNING_MONEY_TOPIC, EM_L5_INCOME_SHOWS_UP)).toBe('optional')
+    await map.openLevelNode(EARNING_MONEY_TOPIC, EM_L5_INCOME_SHOWS_UP)
     const b = await readSettledBox(map.stepPlayerHost)
 
     // Byte-identical frame regardless of the step's content length.

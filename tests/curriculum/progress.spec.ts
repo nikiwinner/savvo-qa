@@ -14,7 +14,10 @@
  *
  * Content facts used below trace to `backend/src/app/curriculum/content/`:
  *   - `smart-spending` (S2, no prereq) has 4 step-bearing levels — `catch-every-spend`
- *     is one of them.
+ *     is one of them. In the QA DB it is a ROAD topic (the `qa-fixture-*` steps in
+ *     `name-what-you-buy` are non-mission), so since Phase 32 its topic FRACTION
+ *     counts that one road level; the other three are all-mission side quests and
+ *     are not part of it.
  *   - `earning-money` (S1, no prereq) has 5 step-bearing levels (`income-is-a-number`,
  *     `earning-inventory`, `active-passive-one-off`, `plant-one-new-stream`,
  *     `income-shows-up` — L1 + L3 gained steps in Phase 29); `career-choice`'s ONLY
@@ -50,8 +53,21 @@ test.describe('Curriculum — derived progress', () => {
       'data-node-status',
       'completed',
     )
-    // … and the topic-crest count incremented (1 of the 4 playable levels done).
-    await expect(map.topicCrest('smart-spending')).toContainText('1')
+    // … and the topic fraction did NOT move. Phase 32: `catch-every-spend` holds
+    // only missions, so it is a SIDE QUEST and is not part of the fraction —
+    // which counts the topic's road levels, here just the fixture level
+    // `name-what-you-buy`. (Before this phase the chip read "1 / 4"; a bare
+    // `toContainText('1')` would now match the denominator of "0 / 1" and prove
+    // nothing, so this asserts the whole string.)
+    await expect(map.topicCrest('smart-spending')).toHaveText(/0\s*\/\s*1/)
+
+    // Completing the ROAD level is what moves it.
+    await api.seedLevelState({ topic_slug: 'smart-spending', level_slug: 'name-what-you-buy' })
+    await map.goto()
+    await expect(map.topicCrest('smart-spending')).toHaveText(/1\s*\/\s*1/)
+    // …and with its one ROAD level done the topic is knowledge-complete, even
+    // though six of its ten missions are still open — that is the phase's point.
+    await expect(map.topic('smart-spending')).toHaveAttribute('data-topic-status', 'completed')
   })
 
   test('seeded completions render the right streak on the map', async ({ page, loggedInPage }) => {

@@ -4,8 +4,9 @@
  * Term deposits (Section 3, `term-deposits`) is the section's second knowledge
  * top-up — it leans hardest on the two NEW players (the lock-up + ladder 🧮
  * Sandboxes and the branching 🎭 Scenarios), capped by the `park-this-money-boss`
- * SCENARIO checkpoint. A scenario capstone crests exactly like a quiz/mission
- * capstone — the crest derives from the completed checkpoint level, not the step
+ * SCENARIO checkpoint. Since Phase 32 the crest is the knowledge-complete TOPIC,
+ * and a scenario is a REQUIRED step, so playing this capstone is what finishes
+ * the topic — the crest derives from the required work, not from the step
  * kind. It is honestly KNOWLEDGE-ONLY; XP feeds Bar #1 only.
  *
  * Pollution-safety (gotcha #26): Term deposits is REAL seeded content, so this
@@ -93,8 +94,8 @@ test.describe('Curriculum — Term deposits topic', () => {
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'scenario')
     await map.playScenarioToEnd()
 
-    // A scenario capstone crests like any checkpoint — the reveal fires and the
-    // real crest count rose by exactly one.
+    // A scenario capstone is a REQUIRED step, so playing it knowledge-completes
+    // the topic: the reveal fires and the real crest count rose by exactly one.
     await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
     const crestAfter = (await api.getCurriculumMap()).bars.knowledge.crest_count
     expect(crestAfter).toBe(crestBefore + 1)

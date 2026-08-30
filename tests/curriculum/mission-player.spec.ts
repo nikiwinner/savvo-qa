@@ -12,6 +12,10 @@
  * The row-verified fixture lands in the pollution-safe
  * `smart-spending / name-what-you-buy` level (see `helpers/curriculumFixtures.ts`);
  * the `self_attest` case reuses the real single-mission `earning-inventory` node.
+ * Phase 32: a mission is never a REQUIRED step, so the level holding one is
+ * `completed` as soon as its lessons/quizzes are done — the mission stays open and
+ * playable inside it, and every node here is reached by slug (`openLevelNode`),
+ * never as the topic's `current` node.
  * `test.slow()` + 45s waits absorb the QA stack's cold-start window.
  */
 import { test, expect } from '../../fixtures/index'
@@ -22,6 +26,8 @@ import {
   seedPlayerFixtures,
   makeFixtureLevelPlayable,
   unlockFixtureLevel,
+  FIXTURE_TOPIC,
+  FIXTURE_LEVEL,
   MISSION_XP,
 } from '../../helpers/curriculumFixtures'
 
@@ -35,8 +41,8 @@ test.describe('Curriculum — mission player', () => {
     // Phase 29 A1: earning-money's L2 `your-earning-inventory` is now a guided-v2
     // self_attest mission (choice → input → attest). L1 (`income-is-a-number`) leads
     // with a lesson, so seed-complete L1 + the L2 `what-you-already-own` lesson
-    // (per-step, writes NO XP) so `earning-inventory` (L2) is current and opens
-    // directly to the mission (it mounts after its teach-first lesson).
+    // (per-step, writes NO XP) so the mission is the ONLY step left in L2 and the
+    // host opens directly on it (it mounts after its teach-first lesson).
     await api.seedLevelState({ topic_slug: 'earning-money', level_slug: 'income-is-a-number' })
     await api.seedStepCompletion({ level_slug: 'earning-inventory', step_slug: 'what-you-already-own' })
 
@@ -45,13 +51,14 @@ test.describe('Curriculum — mission player', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    // `earning-inventory` (L2) is now the `current` node; its lesson is done, so the
-    // host opens directly on the lone `your-earning-inventory` self_attest mission
-    // (in a collapsed island — expand it first).
+    // Phase 32: the mission does not gate its level, so with the lesson done
+    // `earning-inventory` (L2) ALREADY reads `completed` — earning-money has no
+    // `current` node pointing at it any more. The level stays open and playable, so
+    // the spec names it (in a collapsed island — focus the chapter first) and the
+    // host mounts its lone unfinished step: the `your-earning-inventory` mission.
     await map.expandIslandFor('earning-money')
-    await map.nodesInTopic('earning-money', 'current').first().click()
-    await expect(map.stepPlayerHost).toBeVisible()
-    await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
+    expect(await map.levelNodeStatus('earning-money', 'earning-inventory')).toBe('completed')
+    await map.openLevelNode('earning-money', 'earning-inventory')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
 
     // Single-path mission → no chooser; walk the guided screens (choice → input) to
@@ -169,10 +176,13 @@ test.describe('Curriculum — mission player', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    await map.expandIslandFor('smart-spending')
-    await map.nodesInTopic('smart-spending', 'current').first().click()
-    await expect(map.stepPlayerHost).toBeVisible()
-    await expect(map.stepPlayer).toBeVisible({ timeout: 45_000 })
+    // Phase 32: `makeFixtureLevelPlayable` completes every step EXCEPT this
+    // mission, and a mission is never required — so the fixture level reads
+    // `completed` and smart-spending has no `current` node at all. The mission is
+    // still sitting there to be played; reach its level by slug.
+    await map.expandIslandFor(FIXTURE_TOPIC)
+    expect(await map.levelNodeStatus(FIXTURE_TOPIC, FIXTURE_LEVEL)).toBe('completed')
+    await map.openLevelNode(FIXTURE_TOPIC, FIXTURE_LEVEL)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     // Row-verified — NOT a self_attest label; there's a real "Verify" action + a
     // deep link that names where it goes (there is no generic "Open Savvo"
@@ -250,7 +260,10 @@ test.describe('Curriculum — mission player', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    await map.openCurrentNode('smart-spending')
+    // Phase 32: the fixture level is already `completed` (its required steps are
+    // done) with the mission still open — reach it by slug, never via a `current`
+    // node, which no longer exists in this topic.
+    await map.openLevelNode(FIXTURE_TOPIC, FIXTURE_LEVEL)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
 
     // Verify → PASS → the ENRICHED snapshot phase celebrates in ONE screen: a

@@ -136,9 +136,10 @@ export async function completeEarningMoneyLevels(api: ApiHelper, levelSlugs: str
  * career-choice / job-applications / pay-and-tax — so the SECTION crest reads
  * complete (`levels_completed === levels_total_playable`). That full-section
  * completion is what flips the focused-chapter guide copy to the "…every level done."
- * short-circuit (I4); completing ONLY earning-money leaves the section crest short
- * (the other Section-1 topics still carry step-bearing legacy-mission levels).
- * Same 3-pass self-verify retry, verified against the section crest.
+ * short-circuit (I4). Since Phase 32 the section fraction counts REQUIRED levels
+ * only, so the mission-only topics contribute nothing to it — this helper still
+ * seeds them, because the guide copy also reads whether any side quest is left
+ * open. Same 3-pass self-verify retry, verified against the section crest.
  */
 export async function completeEarnCareerSection(api: ApiHelper): Promise<void> {
   const isComplete = (section: MapSection): boolean =>

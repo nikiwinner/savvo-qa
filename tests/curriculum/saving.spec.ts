@@ -11,7 +11,11 @@
  * Two blocks:
  *   • APPLIED HAPPY PATH — the L1→capstone chain drives PASS against real rows,
  *     the L3 Space picker binds the topic, the `for_bound` missions verify the
- *     bound Space, and the checkpoint capstone reveals the Saving crest.
+ *     bound Space, and the capstone plays as an OPTIONAL side quest AFTER the
+ *     crest the road already earned. Phase 32 — missions never gate, so a level
+ *     whose only open step is a mission is `completed` (road level) or
+ *     `optional` (mission-only level) and never `current`: those are opened by
+ *     slug with `openLevelNode`, not through `openCurrentNode`.
  *   • DATA-LESS HONESTY — a user with zero rows / zero Spaces gets the honest
  *     FAIL on the row-verified missions (never a fabricated pass or number), yet
  *     can still complete every lesson/quiz and earn knowledge-XP up the topic.
@@ -41,12 +45,14 @@ import {
   L3_A_HOME,
   L4_MOVE_IT,
   L5_AUTOMATIC,
+  L6_FIRST_MONEY,
   A_SPACE_LESSON_SLUG,
   AVOIDABLE_LESSON_SLUG,
   MOVING_LESSON_SLUG,
   DECIDE_LESSON_SLUG,
   SAVING_LOOP_QUIZ_SLUG,
 } from '../../helpers/savingFixtures'
+import { topicOf } from '../../helpers/unlockFixtures'
 
 // Money/currency tripwire (same shape as map.spec): any currency symbol, a
 // currency-formatted decimal, or an ISO code. The learn surface shows exactly
@@ -112,7 +118,7 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     expect(payload.bars.knowledge.xp_total).toBeGreaterThan(0)
   })
 
-  test('creating a savings Space binds it and both L3 missions complete the level', async ({
+  test('creating a savings Space binds it and both L3 missions play on the already-complete level', async ({
     page,
     loggedInPage,
   }) => {
@@ -121,8 +127,9 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     const space = await api.createSpace('QA Savings Home')
     await unlockSaving(api)
     await completeSavingLevels(api, L1_PAY_YOURSELF, L2_FIND_LEAK)
-    // Pre-complete the L3 lesson so only the two missions remain — the host mounts
-    // the create-Space mission (order 1), then the self_attest reflection (order 2).
+    // Pre-complete the L3 lesson — L3's only REQUIRED step, so the level already
+    // reads `completed` with both its missions still open. The host mounts the
+    // create-Space mission (order 1), then the self_attest reflection (order 2).
     await precompleteSavingStep(api, L3_A_HOME, A_SPACE_LESSON_SLUG)
 
     const map = new CurriculumMapPage(page)
@@ -131,8 +138,9 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     expect(xpBefore).toBe(0)
 
     // The `binds_space` create-Space mission shows the Space picker with the real
-    // Space as an option; designate it, then verify.
-    await map.openCurrentNode('saving')
+    // Space as an option; designate it, then verify. L3 is no longer the `current`
+    // node (its road work is done), so it is opened by slug.
+    await map.openLevelNode('saving', L3_A_HOME)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.spacePicker).toBeVisible()
     await expect(map.pickerRadios.first()).toBeVisible()
@@ -158,9 +166,12 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
     await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
 
-    // API parity — L3 reads completed (both missions counted).
+    // API parity — L3 already read `completed` on its lesson alone, so what the
+    // two missions moved is the step ledger, not the status: every step is done.
     const payload = await api.getCurriculumMap()
-    expect(savingLevel(payload, L3_A_HOME).status).toBe('completed')
+    const l3 = savingLevel(payload, L3_A_HOME)
+    expect(l3.status).toBe('completed')
+    expect(l3.steps_completed).toBe(l3.step_count)
   })
 
   test('the first-deposit mission fails then passes against the bound Space', async ({ page, loggedInPage }) => {
@@ -202,7 +213,10 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     await expect(map.snapshotFigure.first()).toContainText(String(space.id))
   })
 
-  test('completing the L5 rule then the capstone reveals the Saving crest', async ({ page, loggedInPage }) => {
+  test('the L5 rule and the capstone play after the crest, and change no crest', async ({
+    page,
+    loggedInPage,
+  }) => {
     test.slow()
     const { api } = loggedInPage
     const space = await api.createSpace('QA Crest Home')
@@ -222,35 +236,56 @@ test.describe('Curriculum — Saving topic (applied happy path)', () => {
     await precompleteSavingStep(api, L5_AUTOMATIC, DECIDE_LESSON_SLUG)
     await precompleteSavingStep(api, L5_AUTOMATIC, SAVING_LOOP_QUIZ_SLUG)
 
-    const crestBefore = (await api.getCurriculumMap()).bars.knowledge.crest_count
+    // Phase 32 — that finished saving's ROAD, so the crest is ALREADY earned with
+    // both missions still open: L5 reads `completed` on its lesson + quiz, and the
+    // mission-only L6 capstone is an `optional` side quest, never the current node.
+    const before = await api.getCurriculumMap()
+    expect(topicOf(before, 'saving').status).toBe('completed')
+    expect(savingLevel(before, L5_AUTOMATIC).status).toBe('completed')
+    expect(savingLevel(before, L6_FIRST_MONEY).status).toBe('optional')
+    expect(savingLevel(before, L6_FIRST_MONEY).steps_completed).toBe(0)
+    const crestBefore = before.bars.knowledge.crest_count
+    expect(crestBefore).toBeGreaterThan(0)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    const xpBefore = await map.xpValue()
+    expect(await map.crestCountValue()).toBe(crestBefore)
 
     // L5 `put-routing-on-autopilot` → PASS (space_exists + claim_rule bound).
-    await map.openCurrentNode('saving')
+    await map.openLevelNode('saving', L5_AUTOMATIC)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await map.missionVerify.click()
     await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
     await map.missionContinue.click()
     await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
 
-    // Fresh map → the capstone (L6 checkpoint) is now the current node.
+    // Fresh map → the capstone (L6) is reachable as the side quest it now is.
     await map.goto(45_000)
-    await map.openCurrentNode('saving')
+    await expect(map.levelNode('saving', L6_FIRST_MONEY)).toHaveAttribute('data-side-quest', 'true')
+    expect(await map.levelNodeStatus('saving', L6_FIRST_MONEY)).toBe('optional')
+    await map.openLevelNode('saving', L6_FIRST_MONEY)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await map.missionVerify.click()
     await expect(map.verifierSnapshot).toBeVisible({ timeout: 45_000 })
     await expect(map.snapshotFigure.first()).toContainText(String(space.id))
     await map.missionContinue.click()
 
-    // The checkpoint crest reveal fires; the real crest count rose by exactly one.
-    await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
-    const crestAfter = (await api.getCurriculumMap()).bars.knowledge.crest_count
-    expect(crestAfter).toBe(crestBefore + 1)
-    // ...and the on-screen Bar #1 chip shows the SAME real number (the map
-    // refreshes live behind the host after completion).
-    await expect.poll(() => map.crestCountValue(), { timeout: 15_000 }).toBe(crestAfter)
+    // The capstone still writes its completion — the node flips on the live map …
+    await expect
+      .poll(async () => map.levelNodeStatus('saving', L6_FIRST_MONEY), { timeout: 45_000 })
+      .toBe('completed')
+    const after = await api.getCurriculumMap()
+    expect(savingLevel(after, L6_FIRST_MONEY).steps_completed).toBe(1)
+    // … and still pays real XP, traceable to the ledger …
+    expect(after.bars.knowledge.xp_total).toBeGreaterThan(before.bars.knowledge.xp_total)
+    await expect.poll(async () => map.xpValue(), { timeout: 45_000 }).toBeGreaterThan(xpBefore)
+    // … but it moves NO crest: the road earned that before the mission was played,
+    // so the count is unchanged and no topic newly completes (nothing reveals).
+    expect(after.bars.knowledge.crest_count).toBe(crestBefore)
+    expect(topicOf(after, 'saving').status).toBe('completed')
+    await expect(map.crestReveal).toHaveCount(0)
+    expect(await map.crestCountValue()).toBe(crestBefore)
   })
 })
 
@@ -297,7 +332,9 @@ test.describe('Curriculum — Saving topic (data-less honesty)', () => {
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    await map.openCurrentNode('saving')
+    // The lesson was L3's only required step, so the level already reads
+    // `completed` with its missions open — open it by slug, not as `current`.
+    await map.openLevelNode('saving', L3_A_HOME)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     // The binds_space create-Space mission: picker present, empty state + create CTA.
     await expect(map.spacePicker).toBeVisible()

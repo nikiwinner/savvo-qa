@@ -5,8 +5,13 @@
  * lands on FIRST: how the course works + a demo mini-quiz, then the TWO real
  * foundational setup missions — create your first Space (`space_exists`) and
  * create your first routing rule (`claim_rule_exists`), both PLAIN (non-bound)
- * predicates honestly completable by a brand-new zero-transaction user. The L4
- * checkpoint close awards the Section 0 crest.
+ * predicates honestly completable by a brand-new zero-transaction user.
+ *
+ * Phase 32 — missions gate NOTHING. A level is `completed` once its REQUIRED
+ * (non-mission) steps are done, so a level holding a leftover setup mission is
+ * already `completed` and is opened by LEVEL SLUG (`openLevelNode`), never as the
+ * `current` node. The crest is the TOPIC's and lands when the topic's last
+ * REQUIRED step — L4's lesson — is played.
  *
  * Pollution-safety (gotcha #26): "Start here" is REAL seeded content (the runtime
  * seeder authors it), so this file seeds NO global `Step` — every fixture is
@@ -86,8 +91,9 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
   test('creating the first Space passes the setup mission', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
-    // Complete L1, then pre-complete the L2 lesson so the create-Space MISSION is
-    // the active step of the L2 current node.
+    // Complete L1, then pre-complete the L2 lesson. Its lesson is L2's only
+    // REQUIRED step, so L2 already reads `completed` while the create-Space
+    // MISSION is still open inside it — reach it by level slug, not as `current`.
     await completeStartHereLevels(api, L1_HOW_THIS_WORKS)
     await precompleteStartHereStep(api, L2_MISSIONS_ARE_REAL, MISSIONS_REAL_LESSON_SLUG)
 
@@ -96,7 +102,7 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    await map.openCurrentNode('start-here')
+    await map.openLevelNode('start-here', L2_MISSIONS_ARE_REAL)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     // A PLAIN (non-binding) space_exists mission: NO Space picker, NO self_attest,
     // a real deep-link CTA to /dashboard/spaces.
@@ -128,14 +134,15 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     test.slow()
     const { api } = loggedInPage
     // Same setup as the create-Space mission above: L1 done + the L2 lesson
-    // pre-completed → the create-your-first-space MISSION is the L2 active step.
+    // pre-completed → L2 is `completed` on its required work and the
+    // create-your-first-space MISSION is the only step left inside it.
     await completeStartHereLevels(api, L1_HOW_THIS_WORKS)
     await precompleteStartHereStep(api, L2_MISSIONS_ARE_REAL, MISSIONS_REAL_LESSON_SLUG)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    await map.openCurrentNode('start-here')
+    await map.openLevelNode('start-here', L2_MISSIONS_ARE_REAL)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
 
     // The redesign made the deep-link the FILLED hero CTA — a real anchor to
@@ -157,8 +164,9 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     // Complete L1 + L2 (their create-Space mission is marked done by the DEBUG
     // seed, bypassing verify), then pre-complete the L3 lesson AND the L3
     // `take-the-tour` mission (Phase 24 added it at order 3, after this one) so the
-    // create-rule MISSION is the ONLY active step of the L3 current node — Continue
-    // then closes the host instead of advancing to the tour.
+    // create-rule MISSION is the ONLY step left in L3 — a level that already reads
+    // `completed` on its lesson, so it is opened by slug. Continue then closes the
+    // host instead of advancing to the tour.
     await completeStartHereLevels(api, L1_HOW_THIS_WORKS, L2_MISSIONS_ARE_REAL)
     await precompleteStartHereStep(api, L3_THE_PIECES, PIECES_LESSON_SLUG)
     await precompleteStartHereStep(api, L3_THE_PIECES, TAKE_TOUR_MISSION_SLUG)
@@ -168,7 +176,7 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    await map.openCurrentNode('start-here')
+    await map.openLevelNode('start-here', L3_THE_PIECES)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     // A PLAIN claim_rule_exists mission: NO picker, NO self_attest, deep-link to
     // the routing-rules form (which needs no transaction).
@@ -202,7 +210,8 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     const { api } = loggedInPage
     // Reach L3 `the-pieces` with the tour as the active step: complete L1 + L2,
     // then pre-complete the L3 lesson AND the create-rule mission (orders 1 + 2) so
-    // `take-the-tour` (order 3) is the sole incomplete step of the L3 current node.
+    // `take-the-tour` (order 3) is the sole incomplete step of L3 — a level already
+    // `completed` on its required lesson, hence opened by slug.
     await completeStartHereLevels(api, L1_HOW_THIS_WORKS, L2_MISSIONS_ARE_REAL)
     await precompleteStartHereStep(api, L3_THE_PIECES, PIECES_LESSON_SLUG)
     await precompleteStartHereStep(api, L3_THE_PIECES, CREATE_RULE_MISSION_SLUG)
@@ -212,7 +221,7 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    await map.openCurrentNode('start-here')
+    await map.openLevelNode('start-here', L3_THE_PIECES)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
 
     // A self_attest mission WITH a seeded deep-link: the honest "Mark done" path is
@@ -224,7 +233,7 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     await expect(map.missionDeeplink).toHaveAttribute('href', /\/dashboard\/transactions/)
 
     // "Mark done" (self_attest) completes the tour — through the Phase-30
-    // accountability confirm — → it's the last L3 step → a
+    // accountability confirm — → it's the last INCOMPLETE L3 step → a
     // self-attest mission DOES get the Phase-27 reward screen → Continue closes
     // the host and the real XP lands, traceable to the ledger (API parity).
     await map.markDone()
@@ -240,6 +249,7 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     // Seed-complete L1–L3 (their setup missions — including the Phase-24 L3
     // `take-the-tour` — are all marked done by the DEBUG seed, which completes
     // EVERY step in the level, bypassing verify) so the L4 checkpoint is current.
+    // L4's lesson is the topic's LAST required step — nothing else is outstanding.
     await completeStartHereLevels(api, L1_HOW_THIS_WORKS, L2_MISSIONS_ARE_REAL, L3_THE_PIECES)
 
     const crestBefore = (await api.getCurriculumMap()).bars.knowledge.crest_count
@@ -254,7 +264,9 @@ test.describe('Curriculum — Start here (Topic 0)', () => {
     const tapped = await map.playLessonDeck()
     expect(tapped).toBeGreaterThan(0)
 
-    // The checkpoint crest reveal fires; the real crest count rose by exactly one.
+    // L4's lesson was the topic's last REQUIRED step → `start-here` newly reads
+    // knowledge-complete → the crest reveal fires and the real crest count (Phase
+    // 32: knowledge-complete TOPICS, not completed checkpoint levels) rose by one.
     await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
     const crestAfter = (await api.getCurriculumMap()).bars.knowledge.crest_count
     expect(crestAfter).toBe(crestBefore + 1)

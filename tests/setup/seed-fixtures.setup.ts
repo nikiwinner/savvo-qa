@@ -7,10 +7,13 @@
  * starts. Player specs create them mid-run — and FIXTURE_TOPIC is
  * `smart-spending`, the ROOT of the prereq chain that saving / net-wealth /
  * interest / term-deposits specs chain-complete via `seed/level-state`. A
- * fixture Step INSERTED into that topic after a worker already completed its
- * levels makes the topic read incomplete again, which re-locks every
- * downstream topic for that worker's user (the interest specs flaked exactly
- * this way: zero `current` nodes, chain stuck `locked`).
+ * REQUIRED (non-mission) fixture Step INSERTED into that topic after a worker
+ * already completed its levels makes the topic read incomplete again, which
+ * re-locks every downstream topic for that worker's user (the interest specs
+ * flaked exactly this way: zero `current` nodes, chain stuck `locked`). Since
+ * Phase 32 a `kind='mission'` fixture gates nothing, so only the eight
+ * non-mission fixtures carry this hazard — eight is still every reason to
+ * pre-seed the whole set once.
  *
  * Seeding the curriculum tree + the FULL fixture set ONCE, before any browser
  * project, turns every in-test `seedPlayerFixtures` call into a pure

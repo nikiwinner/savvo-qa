@@ -160,15 +160,26 @@ export interface CreateExpenseData {
 
 // ── Curriculum unit-map payload (Phase 21) — GET /api/curriculum/map/ ───────
 
-/** Derived level status ∈ locked | current | completed | coming_soon (leak-safe). */
+/**
+ * Derived level status (leak-safe). `optional` is Phase 32's SIDE-QUEST node —
+ * a level whose steps are all real-world missions. It opens as soon as the road
+ * reaches it, never holds `current` and never blocks what follows.
+ */
 export interface MapLevel {
   slug: string
   title: string
   order: number
   is_checkpoint: boolean
-  status: 'locked' | 'current' | 'completed' | 'coming_soon'
+  status: 'locked' | 'current' | 'completed' | 'coming_soon' | 'optional'
   step_count: number
   steps_completed: number
+  /**
+   * Phase 32 — the non-mission steps: the work that IS the road.
+   * `required_step_count === 0` with `step_count > 0` is a pure side quest.
+   * Counts only; the payload never carries a step kind.
+   */
+  required_step_count: number
+  required_steps_completed: number
 }
 
 /** Derived topic status ∈ locked | available | in_progress | completed. */
@@ -179,6 +190,11 @@ export interface MapTopic {
   order: number
   status: 'locked' | 'available' | 'in_progress' | 'completed'
   prerequisites: string[]
+  /**
+   * Phase 32 — completed vs. total of the levels that MAKE UP the topic: its
+   * road levels, or (for a topic made only of missions) every step-bearing
+   * level it has.
+   */
   crest: { levels_completed: number; levels_total_playable: number }
   levels: MapLevel[]
 }
@@ -226,6 +242,7 @@ export interface MapDoingBar {
 export interface CurriculumMapPayload {
   sections: MapSection[]
   bars: {
+    /** Phase 32 — `crest_count` counts knowledge-complete TOPICS. */
     knowledge: { xp_total: number; crest_count: number }
     doing: MapDoingBar | null
   }

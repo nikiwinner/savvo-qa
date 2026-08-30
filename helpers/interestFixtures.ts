@@ -10,11 +10,13 @@
  * stable across parallel runs.
  *
  * Interest is prereq-locked behind Saving (interest ← saving ← budgeting ←
- * smart-spending), and a topic only reads `completed` when its OWN prereqs are
- * completed too (map_service `topic_status` recurses the prereq DAG). So to make
- * `interest` AVAILABLE the whole Saving chain must be COMPLETED — `unlockInterest`
- * completes every step-bearing level of smart-spending + budgeting + saving via
- * the DEBUG `seed/level-state` (which bypasses the map's topic-lock).
+ * smart-spending), and a prereq only opens when it is itself unlocked (`unlock.py`
+ * recurses the prereq DAG). So to make `interest` AVAILABLE the whole Saving chain
+ * must be walked to the end — `unlockInterest` completes every step-bearing level
+ * of smart-spending + budgeting + saving via the DEBUG `seed/level-state` (which
+ * bypasses the map's topic-lock). Since Phase 32 "the end" is every REQUIRED
+ * level, not the topic's `completed` status: `budgeting` holds nothing but
+ * missions, so it passes learners through and never crests.
  */
 import type { ApiHelper, CurriculumMapPayload, MapTopic } from './api'
 
@@ -34,8 +36,20 @@ export const I_L2_QUIZ_ANSWERS = [1, 1, 0]
 //   L6 `interest-mastery-boss` (6-question mixed mastery set) — all correct.
 export const I_BOSS_ANSWERS = [1, 1, 0, 1, 1, 0]
 
-/** Interest's full prereq chain, in dependency order (all must be COMPLETED). */
+/** Interest's full prereq chain, in dependency order (all must be seeded through). */
 export const SAVING_CHAIN = ['smart-spending', 'budgeting', 'saving']
+
+/**
+ * Phase 32 — the chain is walked to the end when every REQUIRED level in the
+ * topic reads `completed`. That is `status === 'completed'` for a road topic;
+ * for a topic made only of missions it is vacuously true, and it has to be:
+ * such a topic never reads `completed` (missions earn no crest) while already
+ * passing learners through, so waiting for its status would hang forever.
+ * `budgeting` is exactly that in the authored content.
+ */
+function requiredLevelsDone(topic: MapTopic): boolean {
+  return topic.levels.filter((l) => l.required_step_count > 0).every((l) => l.status === 'completed')
+}
 
 export function allTopics(payload: CurriculumMapPayload): MapTopic[] {
   return payload.sections.flatMap((s) => s.topics)
@@ -64,7 +78,7 @@ export function findTopic(payload: CurriculumMapPayload, slug: string): MapTopic
 export async function completeTopicsFully(api: ApiHelper, topicSlugs: string[]): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const map = await api.getCurriculumMap() // lazy-seeds the tree on an empty DB
-    const pending = topicSlugs.filter((slug) => findTopic(map, slug).status !== 'completed')
+    const pending = topicSlugs.filter((slug) => !requiredLevelsDone(findTopic(map, slug)))
     if (pending.length === 0) return
     for (const topicSlug of pending) {
       for (const level of findTopic(map, topicSlug).levels) {
@@ -75,9 +89,9 @@ export async function completeTopicsFully(api: ApiHelper, topicSlugs: string[]):
     }
   }
   const map = await api.getCurriculumMap()
-  const stillPending = topicSlugs.filter((slug) => findTopic(map, slug).status !== 'completed')
+  const stillPending = topicSlugs.filter((slug) => !requiredLevelsDone(findTopic(map, slug)))
   if (stillPending.length > 0) {
-    throw new Error(`chain topics never read 'completed' after 3 seeding passes: ${stillPending.join(', ')}`)
+    throw new Error(`chain topics never finished their required levels after 3 seeding passes: ${stillPending.join(', ')}`)
   }
 }
 

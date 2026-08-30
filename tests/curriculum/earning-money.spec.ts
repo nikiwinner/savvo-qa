@@ -18,12 +18,20 @@
  * no snapshot). The capstone is a PURE `income_rows_exist{min_count:1}` check now —
  * the old `any_of` self-attest arm is GONE, so a data-less user gets an honest FAIL.
  *
+ * Phase 32 — missions never gate. A REQUIRED step is any step whose kind is not
+ * `mission`, so L1/L2/L4 read `completed` on their lessons, quizzes and sandbox
+ * while the mission inside each of them stays open and playable, and the
+ * mission-only L5 `income-shows-up` is a SIDE QUEST: `optional`, never `current`.
+ * Every mission here is therefore opened BY SLUG (`openLevelNode`), never by
+ * status. The topic crest is earned by that required work alone — the capstone
+ * adds XP and its own completion, and no crest.
+ *
  * Two blocks:
  *   • APPLIED HAPPY PATH — the L1 lesson/quiz award XP; `log-your-income` FAILs
  *     with no income row and PASSes once ≥1 exists; the L3 scenario + L4 sandbox
  *     complete with zero financial rows; `sell-something-idle` offers two authored
  *     paths; the capstone PASSes (row-verified, `self_attested:false`) with income
- *     rows → the topic crest, and FAILS honestly with zero income rows.
+ *     rows and FAILS honestly with zero, moving the road-earned crest neither way.
  *   • FOLD-IN GUARDS — a completed earn-career chapter shows the "…every level
  *     done." guide copy (I4); the topic surface shows only the traceable Bar #2 money
  *     figure (no-fake-numbers).
@@ -46,13 +54,14 @@ import {
   EM_L2_EARNING_INVENTORY,
   EM_L3_ACTIVE_PASSIVE,
   EM_L4_PLANT_ONE_NEW_STREAM,
-  EM_PRE_CAPSTONE_LEVELS,
+  EM_L5_INCOME_SHOWS_UP,
   EM_L1_QUIZ_ANSWERS,
   EM_L1_LESSON_SLUG,
   EM_L1_QUIZ_SLUG,
   EM_L4_SANDBOX_SLUG,
   EM_L4_ONE_SMALL_ASK_SLUG,
 } from '../../helpers/earnFixtures'
+import { completeRequiredSteps, levelOf, topicOf } from '../../helpers/unlockFixtures'
 
 // Money/currency tripwire (same shape as map.spec / saving.spec / net-wealth.spec):
 // any currency symbol, a currency-formatted decimal, or an ISO code. The learn
@@ -88,10 +97,11 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
 
     // L1 income-is-a-number is the fresh current node: lesson `income-is-data`
     // (order 1, an interactive v2 deck) → quiz `spot-the-income` (order 2, all MCQ).
-    // The L1 `log-your-income` mission (order 3) is NOT reached here — the level
-    // stays OPEN after the quiz, so the map's xp-total behind the host is not
-    // refreshed; assert the SERVER truth (Bar #1 ledger), which the lesson + quiz
-    // completions have already written.
+    // The L1 `log-your-income` mission (order 3) is NOT played here. Since Phase 32
+    // the quiz alone finishes L1's REQUIRED work, but the host stays open on that
+    // unplayed mission, so the map's xp-total behind it is never refreshed — assert
+    // the SERVER truth (Bar #1 ledger), which the lesson + quiz completions have
+    // already written.
     await map.openCurrentNode('earning-money')
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'lesson')
     await map.playLessonDeck()
@@ -110,7 +120,8 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     await api.getCurriculumMap() // seed the tree
     // Pre-complete the L1 lesson + quiz (per-step, writes NO XP) so the
     // `log-your-income` MISSION is the active step, then seed ONE real income row
-    // so the row-verified check PASSES.
+    // so the row-verified check PASSES. Those two ARE L1's required work, so since
+    // Phase 32 the node reads `completed` with the mission still open inside it.
     await api.seedStepCompletion({ level_slug: EM_L1_INCOME_IS_A_NUMBER, step_slug: EM_L1_LESSON_SLUG })
     await api.seedStepCompletion({ level_slug: EM_L1_INCOME_IS_A_NUMBER, step_slug: EM_L1_QUIZ_SLUG })
     await seedIncomeRows(api, 1)
@@ -120,7 +131,9 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    await map.openCurrentNode('earning-money')
+    // The mission no longer sits behind a `current` node — open its level BY SLUG.
+    expect(await map.levelNodeStatus('earning-money', EM_L1_INCOME_IS_A_NUMBER)).toBe('completed')
+    await map.openLevelNode('earning-money', EM_L1_INCOME_IS_A_NUMBER)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     // Row-verified guided-v2 flow: the first screen is an action carrying the income
     // deep-link; NOT a self_attest label. Walk the two action screens to the Verify
@@ -157,7 +170,8 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
-    await map.openCurrentNode('earning-money')
+    // L1's required work is seeded done, so its still-open mission is reached BY SLUG.
+    await map.openLevelNode('earning-money', EM_L1_INCOME_IS_A_NUMBER)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.learnPage).toHaveAttribute('data-mode', 'focus')
 
@@ -200,7 +214,8 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     test.slow()
     const { api } = loggedInPage
     await api.getCurriculumMap() // seed the tree
-    // L1 lesson + quiz done → the `log-your-income` mission is active; seed NO income.
+    // L1 lesson + quiz done → its required work is complete and the still-open
+    // `log-your-income` mission is what the node opens onto; seed NO income.
     await api.seedStepCompletion({ level_slug: EM_L1_INCOME_IS_A_NUMBER, step_slug: EM_L1_LESSON_SLUG })
     await api.seedStepCompletion({ level_slug: EM_L1_INCOME_IS_A_NUMBER, step_slug: EM_L1_QUIZ_SLUG })
 
@@ -209,7 +224,7 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     const xpBefore = await map.xpValue()
     expect(xpBefore).toBe(0)
 
-    await map.openCurrentNode('earning-money')
+    await map.openLevelNode('earning-money', EM_L1_INCOME_IS_A_NUMBER)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.missionSelfAttest).toHaveCount(0)
     // The first screen carries the deep-link CTA to go log a real income row.
@@ -282,24 +297,41 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
       .toBeGreaterThan(xpAfterL3Play)
   })
 
-  test('the capstone passes and reveals the topic crest with income rows', async ({ page, loggedInPage }) => {
+  test('the capstone passes on real rows and leaves the road-earned crest alone', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
-    // Complete the four levels before the capstone + seed 2 income rows so the pure
-    // `income_rows_exist{min_count:1}` capstone verifies PASS against real rows.
-    await completeEarningMoneyLevels(api, EM_PRE_CAPSTONE_LEVELS)
+    // The ROAD alone — every lesson, quiz, scenario and sandbox of L1–L4 and not one
+    // mission — plus 2 income rows so the pure `income_rows_exist{min_count:1}`
+    // capstone verifies PASS against real rows.
+    await completeRequiredSteps(api, 'earning-money')
     await seedIncomeRows(api, 2)
 
-    const crestBefore = (await api.getCurriculumMap()).bars.knowledge.crest_count
-    expect(crestBefore).toBe(0)
+    // Phase 32: the crest belongs to the REQUIRED work and is already in hand before
+    // a single mission is played. earning-money is the only topic this test walks the
+    // road of, so its crest is the only one in the count.
+    const before = await api.getCurriculumMap()
+    expect(topicOf(before, 'earning-money').status).toBe('completed')
+    const crestBefore = before.bars.knowledge.crest_count
+    expect(crestBefore).toBe(1)
+    const xpBefore = before.bars.knowledge.xp_total
+    // L5 holds NOTHING but the capstone mission → a side quest: `optional`, never
+    // `current`, with nothing done in it yet.
+    const capstoneBefore = levelOf(before, 'earning-money', EM_L5_INCOME_SHOWS_UP)
+    expect(capstoneBefore.status).toBe('optional')
+    expect(capstoneBefore.required_step_count).toBe(0)
+    expect(capstoneBefore.steps_completed).toBe(0)
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
+    await map.expandIslandFor('earning-money')
+    // The crest chip sits on the TOPIC HEAD (Phase 32) and is already worn.
+    await expect(map.topic('earning-money').getByTestId('topic-crest-badge')).toBeVisible()
+    expect(await map.crestCountValue()).toBe(crestBefore)
 
-    // The capstone (L5 checkpoint) is the sole current node → a guided-v2 row-verified
-    // mission (Verify terminal + snapshot), NOT self_attest. Its flow is ONE action
-    // screen (the recap choice was cut 2026-08-08) → walk it to the Verify terminal.
-    await map.openCurrentNode('earning-money')
+    // Open the side quest BY SLUG (a status lookup finds no `current` node here) → a
+    // guided-v2 row-verified mission (Verify terminal + snapshot), NOT self_attest.
+    // Its flow is ONE action screen (the recap choice was cut 2026-08-08).
+    await map.openLevelNode('earning-money', EM_L5_INCOME_SHOWS_UP)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await expect(map.missionSelfAttest).toHaveCount(0)
     await map.walkMissionFlow()
@@ -319,34 +351,50 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     await expect(map.verifierSnapshot).toBeVisible()
     await expect(map.missionReportedLead).toHaveCount(0)
     await map.missionContinue.click()
+    await expect(map.stepPlayerHost).toBeHidden({ timeout: 45_000 })
 
-    // The checkpoint crest reveal fires; the real crest count rose by exactly one.
-    await expect(map.crestReveal).toBeVisible({ timeout: 45_000 })
-    const crestAfter = (await api.getCurriculumMap()).bars.knowledge.crest_count
-    expect(crestAfter).toBe(crestBefore + 1)
+    // What the mission DOES write: its own completion and real XP. What it does NOT
+    // touch: the crest. No topic newly completes, so no reveal fires — the badge the
+    // road earned is simply still there and the count has not moved.
+    await expect
+      .poll(async () => (await api.getCurriculumMap()).bars.knowledge.xp_total, { timeout: 45_000 })
+      .toBeGreaterThan(xpBefore)
+    const after = await api.getCurriculumMap()
+    expect(levelOf(after, 'earning-money', EM_L5_INCOME_SHOWS_UP).status).toBe('completed')
+    expect(after.bars.knowledge.crest_count).toBe(crestBefore)
+    await expect(map.crestReveal).toHaveCount(0)
+    await expect(map.topic('earning-money').getByTestId('topic-crest-badge')).toBeVisible()
+    expect(await map.crestCountValue()).toBe(crestBefore)
   })
 
   test('the capstone fails honestly with no income rows', async ({ page, loggedInPage }) => {
     test.slow()
     const { api } = loggedInPage
-    // Complete the four preceding levels but seed NO income row → the pure
+    // Walk the road of L1–L4 but seed NO income row → the pure
     // `income_rows_exist{min_count:1}` capstone has no real row to verify. Amendment 1
     // removed the auto-passing self-attest arm, so this is an honest FAIL — never a
     // fabricated pass.
-    await completeEarningMoneyLevels(api, EM_PRE_CAPSTONE_LEVELS)
+    await completeRequiredSteps(api, 'earning-money')
 
-    const crestBefore = (await api.getCurriculumMap()).bars.knowledge.crest_count
-    expect(crestBefore).toBe(0)
+    // Phase 32: the crest came with the required work, so what this watches is that a
+    // FAILED mission neither awards one nor takes the earned one away.
+    const before = await api.getCurriculumMap()
+    expect(topicOf(before, 'earning-money').status).toBe('completed')
+    const crestBefore = before.bars.knowledge.crest_count
+    expect(crestBefore).toBe(1)
+    const xpBefore = before.bars.knowledge.xp_total
 
     const map = new CurriculumMapPage(page)
     await map.goto(45_000)
 
-    await map.openCurrentNode('earning-money')
+    // The mission-only L5 is an `optional` side quest — opened BY SLUG.
+    expect(await map.levelNodeStatus('earning-money', EM_L5_INCOME_SHOWS_UP)).toBe('optional')
+    await map.openLevelNode('earning-money', EM_L5_INCOME_SHOWS_UP)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
     await map.walkMissionFlow()
 
     // Verify with zero income rows → honest FAIL: no snapshot, no reported pass, host
-    // stays open, and NO crest is awarded.
+    // stays open, nothing written, no XP — and the crest neither moves nor re-reveals.
     const verifyResp = page.waitForResponse(
       (r) => r.url().includes('/verify/') && r.request().method() === 'POST',
     )
@@ -359,7 +407,10 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     await expect(map.missionReportedLead).toHaveCount(0)
     await expect(map.crestReveal).toHaveCount(0)
     await expect(map.stepPlayerHost).toBeVisible()
-    expect((await api.getCurriculumMap()).bars.knowledge.crest_count).toBe(crestBefore)
+    const after = await api.getCurriculumMap()
+    expect(after.bars.knowledge.crest_count).toBe(crestBefore)
+    expect(after.bars.knowledge.xp_total).toBe(xpBefore)
+    expect(levelOf(after, 'earning-money', EM_L5_INCOME_SHOWS_UP).steps_completed).toBe(0)
   })
 
   test('sell-something-idle offers two paths and reports via the alternative', async ({ page, loggedInPage }) => {
@@ -367,7 +418,8 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     const { api } = loggedInPage
     // Reach the L4 `sell-something-idle` mission (order 3): complete L1–L3, then the
     // L4 growth sandbox (order 1) + `one-small-ask` (order 2) so it is the sole
-    // incomplete step and the L4 `current` node opens directly onto it.
+    // incomplete step. The sandbox IS L4's required work, so since Phase 32 the level
+    // reads `completed` with this mission still open — open it BY SLUG.
     await completeEarningMoneyLevels(api, [
       EM_L1_INCOME_IS_A_NUMBER,
       EM_L2_EARNING_INVENTORY,
@@ -380,7 +432,7 @@ test.describe('Curriculum — Earning money topic (applied happy path)', () => {
     await map.goto(45_000)
     const xpBefore = await map.xpValue()
 
-    await map.openCurrentNode('earning-money')
+    await map.openLevelNode('earning-money', EM_L4_PLANT_ONE_NEW_STREAM)
     await expect(map.stepPlayer).toHaveAttribute('data-player-kind', 'mission')
 
     // The no-Skip authored ALTERNATIVES: two paths render a chooser (>1 path).
