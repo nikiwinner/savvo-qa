@@ -17,6 +17,7 @@
  */
 import { test, expect } from '../../fixtures/index'
 import { DashboardPage } from '../../pages/DashboardPage'
+import { visibleNavLabels, navIsPhoneBar } from '../../helpers/nav'
 
 const TODAY = new Date()
 
@@ -299,29 +300,71 @@ test.describe('Analytics shell (/dashboard/analytics)', () => {
 })
 
 test.describe('Sidebar nav', () => {
-  test('the sidebar has Learn / Analytics / Spaces / Transactions / Settings', async ({
+  // Both surfaces are asserted at EXPLICIT widths rather than at whatever the
+  // project happens to run at. Branching on the project would have parked the
+  // user's frozen-phone contract on `mobile-safari` alone — the one project a
+  // known WebKit network-process wedge takes down as a block, which would leave
+  // the constraint unverified while two green projects reported success.
+  test('the rail shows one world at a time; the phone bar keeps all five tabs', async ({
     page,
     loggedInPage,
   }) => {
     const { api } = loggedInPage
     await api.createSpace('Nav Home')
 
+    await page.setViewportSize({ width: 1280, height: 800 })
     await page.goto('/dashboard/learn')
     await page.waitForLoadState('networkidle')
 
-    // The five nav items are present (match by visible label inside the menu).
     const nav = page.locator('.nav-menu')
-    await expect(nav.locator('a', { hasText: 'Learn' })).toBeVisible()
-    await expect(nav.locator('a', { hasText: 'Analytics' })).toBeVisible()
-    await expect(nav.locator('a', { hasText: 'Spaces' })).toBeVisible()
-    await expect(nav.locator('a', { hasText: 'Transactions' })).toBeVisible()
-    await expect(nav.locator('a', { hasText: 'Settings' })).toBeVisible()
-
-    // No "Today" or "Dashboard" nav link exists anymore.
+    // No "Today" or "Dashboard" nav link exists anymore, in any world.
     await expect(nav.locator('a', { hasText: 'Today' })).toHaveCount(0)
     await expect(nav.locator('a', { hasText: 'Dashboard' })).toHaveCount(0)
-    // Exactly five items in the menu (Learn first).
-    await expect(nav.locator('a')).toHaveCount(5)
+    // All five rows are rendered in every state; only their visibility differs.
+    await expect(nav.locator('li')).toHaveCount(5)
+
+    // Desktop, Learn world: the map row (printed "Map") and Settings, nothing else.
+    expect(await navIsPhoneBar(page)).toBe(false)
+    await expect(page.getByTestId('world-switch')).toBeVisible()
+    expect(await visibleNavLabels(page)).toEqual(['Map', 'Settings'])
+
+    // Desktop, Money world: the three money rows and Settings, no Learn row.
+    await page.goto('/dashboard/transactions')
+    await page.waitForLoadState('networkidle')
+    expect(await visibleNavLabels(page)).toEqual([
+      'Analytics',
+      'Spaces',
+      'Transactions',
+      'Settings',
+    ])
+
+    // FROZEN (user 2026-09-04, verbatim: "mobile version must stay as it is we
+    // dont change it and work only with desktop now"): the phone shows the same
+    // five tabs it always did, Learn first and under its own name, never the
+    // world switch, and never the world filter.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/dashboard/learn')
+    await page.waitForLoadState('networkidle')
+
+    expect(await navIsPhoneBar(page)).toBe(true)
+    await expect(page.getByTestId('world-switch')).toBeHidden()
+    expect(await visibleNavLabels(page)).toEqual([
+      'Learn',
+      'Analytics',
+      'Spaces',
+      'Transactions',
+      'Settings',
+    ])
+
+    // …on ONE row. Five equal cells that WRAP still pass the equal-width and
+    // full-bleed checks in no-horizontal-overflow.spec.ts, so a four-column
+    // grid would only fail collaterally, in a spec about something else.
+    const tabTops = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.nav-menu .nav-link')).map((a) =>
+        Math.round(a.getBoundingClientRect().top),
+      ),
+    )
+    expect(new Set(tabTops).size, `tab bar wrapped onto more than one row: ${tabTops}`).toBe(1)
   })
 
   test('the Analytics nav link preserves ?space after a client-side switch', async ({
@@ -354,5 +397,53 @@ test.describe('Sidebar nav', () => {
     await page.locator(`.space-card[data-space-id="${b.id}"] a.space-title`).click()
     await page.waitForURL(new RegExp(`/dashboard/analytics\\?space=${b.id}`))
     await expect(analyticsLink).toHaveAttribute('href', new RegExp(`space=${b.id}`))
+  })
+})
+
+test.describe('World switch (Money / Learn)', () => {
+  test('the switch marks the world the route is in and moves the rail both ways', async ({
+    page,
+    loggedInPage,
+  }) => {
+    void loggedInPage // the fixture authenticates; this test needs no seeded data
+
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await page.goto('/dashboard/analytics')
+    await page.waitForLoadState('networkidle')
+
+    const money = page.getByTestId('world-money')
+    const learn = page.getByTestId('world-learn')
+
+    // The world is derived from the path, so both halves are plain links. The
+    // marked one is `aria-current="true"` — current within this set — and NOT
+    // `page`, which would claim the href IS the page you are on. It is not:
+    // Money points at /dashboard/analytics from every money route.
+    await expect(money).toHaveAttribute('href', /\/dashboard\/analytics/)
+    await expect(learn).toHaveAttribute('href', /\/dashboard\/learn/)
+    await expect(money).toHaveAttribute('aria-current', 'true')
+    await expect(learn).not.toHaveAttribute('aria-current', 'true')
+
+    // Client-side into Learn — the marked half and the rail follow together.
+    await learn.click()
+    await page.waitForURL(/\/dashboard\/learn/)
+    await expect(learn).toHaveAttribute('aria-current', 'true')
+    await expect(money).not.toHaveAttribute('aria-current', 'true')
+    expect(await visibleNavLabels(page)).toEqual(['Map', 'Settings'])
+
+    // …and back, client-side again: a rail stuck in the world it just left
+    // would survive a test that only ever travels one way.
+    await money.click()
+    await page.waitForURL(/\/dashboard\/analytics/)
+    await expect(money).toHaveAttribute('aria-current', 'true')
+    expect(await visibleNavLabels(page)).toEqual([
+      'Analytics',
+      'Spaces',
+      'Transactions',
+      'Settings',
+    ])
+
+    // The phone never renders the switch; its tab bar is the navigation there.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await expect(page.getByTestId('world-switch')).toBeHidden()
   })
 })
